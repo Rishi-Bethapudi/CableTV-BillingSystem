@@ -1,0 +1,19 @@
+{
+  "name": "cabletvbilldesk",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rishi-Bethapudi/CableTV-BillingSystem.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Rishi-Bethapudi/CableTV-BillingSystem/issues"
+  },
+  "homepage": "https://github.com/Rishi-Bethapudi/CableTV-BillingSystem#readme",
+  "description": ""
+}
