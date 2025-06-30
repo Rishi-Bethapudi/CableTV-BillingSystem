@@ -2,14 +2,12 @@ const mongoose = require('mongoose');
 
 const productSchema = new mongoose.Schema(
   {
-    operatorId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Operator',
-      required: true,
-    },
     name: { type: String, required: true },
-    description: String,
-    price: { type: Number, required: true },
+    planCharge: { type: Number, required: true },
+
+    // optional extra
+    description: { type: String }, // short description of the plan
+    isActive: { type: Boolean, default: true }, // for disabling a product
   },
   { timestamps: true }
 );
