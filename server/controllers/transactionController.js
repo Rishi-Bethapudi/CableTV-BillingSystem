@@ -1,5 +1,5 @@
-const Counter = require('../models/Counter');
-const Transaction = require('../models/Transaction');
+const Counter = require('../models/counter.model.js');
+const Transaction = require('../models/transaction.model.js');
 
 async function createTransaction(req, res) {
   try {

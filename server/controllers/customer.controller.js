@@ -11,26 +11,41 @@ const fs = require('fs'); // To clean up uploaded files
  */
 const createCustomer = async (req, res) => {
   try {
-    const { name, locality, mobile, planAmount, stbNumber } = req.body;
+    const {
+      name,
+      mobile,
+      planAmount,
+      locality,
+      stbNumber,
+      agentId,
+      balanceAmount = 0,
+    } = req.body;
 
-    // Basic validation
-    if (!name || !locality || !mobile || !planAmount) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Please provide all required fields: name, locality, mobile, planAmount',
-        });
+    // --- 1. Basic Validation ---
+    if (!name || !mobile || !planAmount) {
+      return res.status(400).json({
+        message: 'Please provide all required fields: name, mobile, planAmount',
+      });
     }
 
     // The operator's ID is taken from the authenticated user's token.
-    // req.user.id is the operator's _id.
     const operatorId = req.user.id;
 
-    // Optional: Check if a customer with the same mobile or STB number already exists for this operator
+    // --- 2. Auto-generation of Sequence and Customer Code ---
+    // Find the customer with the highest sequenceNo for this operator
+    const lastCustomer = await Customer.findOne({ operatorId }).sort({
+      sequenceNo: -1,
+    });
+    const newSequenceNo = lastCustomer ? lastCustomer.sequenceNo + 1 : 1;
+
+    // Create a unique customerCode, e.g., CUST-1, CUST-2 for this operator
+    const customerCode = `CUST-${newSequenceNo}`;
+
+    // --- 3. Duplicate Check (Enhanced) ---
+    // Check if a customer with the same mobile or STB number already exists for this operator
     const existingCustomer = await Customer.findOne({
       operatorId,
-      $or: [{ mobile }, { stbNumber }],
+      $or: [{ mobile }, { stbNumber: stbNumber ? stbNumber : null }], // Only check stbNumber if provided
     });
 
     if (existingCustomer) {
@@ -41,9 +56,35 @@ const createCustomer = async (req, res) => {
         .json({ message: `A customer with this ${field} already exists.` });
     }
 
+    // --- 4. Calculate Expiry Date ---
+    const connectionStartDate = new Date();
+    const billingInterval = req.body.billingInterval || 30; // Default to 30 days
+    let expiryDate = new Date(connectionStartDate);
+
+    // If an initial balance is provided that covers at least one billing cycle, calculate the expiry.
+    if (balanceAmount >= planAmount) {
+      const monthsPaid = Math.floor(balanceAmount / planAmount);
+      expiryDate.setDate(expiryDate.getDate() + monthsPaid * billingInterval);
+    }
+
+    // --- 5. Construct the New Customer Object from Schema ---
     const newCustomer = new Customer({
+      // Pass all fields from the request body
       ...req.body,
-      operatorId: operatorId, // Ensure the customer is linked to the correct operator (tenant)
+
+      // Overwrite/set required and auto-generated fields
+      operatorId: operatorId,
+      agentId: agentId || undefined, // Set agent if provided
+      customerCode: customerCode,
+      sequenceNo: newSequenceNo,
+      connectionStartDate: connectionStartDate,
+      expiryDate: expiryDate,
+
+      // Ensure defaults are set if not provided in body
+      balanceAmount: balanceAmount,
+      additionalCharge: req.body.additionalCharge || 0,
+      discount: req.body.discount || 0,
+      active: req.body.active !== undefined ? req.body.active : true,
     });
 
     const savedCustomer = await newCustomer.save();
@@ -51,6 +92,10 @@ const createCustomer = async (req, res) => {
     res.status(201).json(savedCustomer);
   } catch (error) {
     console.error('Error creating customer:', error);
+    // Handle potential validation errors from Mongoose
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: 'Server error while creating customer.' });
   }
 };
@@ -177,11 +222,9 @@ const updateCustomer = async (req, res) => {
 
     // SECURITY CHECK: Operator can only update their own customers
     if (customerToUpdate.operatorId.toString() !== req.user.id) {
-      return res
-        .status(403)
-        .json({
-          message: 'Forbidden: You are not authorized to update this customer.',
-        });
+      return res.status(403).json({
+        message: 'Forbidden: You are not authorized to update this customer.',
+      });
     }
 
     // Prevent operatorId from being changed
@@ -220,11 +263,9 @@ const deleteCustomer = async (req, res) => {
 
     // SECURITY CHECK: Operator can only delete their own customers
     if (customerToDelete.operatorId.toString() !== req.user.id) {
-      return res
-        .status(403)
-        .json({
-          message: 'Forbidden: You are not authorized to delete this customer.',
-        });
+      return res.status(403).json({
+        message: 'Forbidden: You are not authorized to delete this customer.',
+      });
     }
 
     await Customer.findByIdAndDelete(customerId);
@@ -258,11 +299,9 @@ const importCustomersFromExcel = async (req, res) => {
     const customersJson = xlsx.utils.sheet_to_json(worksheet);
 
     if (customersJson.length === 0) {
-      return res
-        .status(400)
-        .json({
-          message: 'The Excel file is empty or in an incorrect format.',
-        });
+      return res.status(400).json({
+        message: 'The Excel file is empty or in an incorrect format.',
+      });
     }
 
     // Add the operatorId to each customer record from the authenticated user
@@ -287,12 +326,10 @@ const importCustomersFromExcel = async (req, res) => {
     console.error('Error importing from Excel:', error);
     // Handle duplicate key errors specifically
     if (error.code === 11000) {
-      return res
-        .status(409)
-        .json({
-          message:
-            'Import failed due to duplicate entries (e.g., mobile or STB number). Please check your file.',
-        });
+      return res.status(409).json({
+        message:
+          'Import failed due to duplicate entries (e.g., mobile or STB number). Please check your file.',
+      });
     }
     res.status(500).json({ message: 'Failed to import customers from Excel.' });
   } finally {

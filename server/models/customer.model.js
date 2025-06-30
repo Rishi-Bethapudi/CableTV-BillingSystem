@@ -24,7 +24,7 @@ const customerSchema = new mongoose.Schema(
     connectionStartDate: Date,
     expiryDate: Date,
 
-    billingInterval: { type: number, default: 30 },
+    billingInterval: { type: Number, default: 30 },
     planAmount: Number,
     sequenceNo: Number,
 
