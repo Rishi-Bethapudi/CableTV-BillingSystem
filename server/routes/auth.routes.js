@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   loginUser,
+  refreshToken,
   requestPasswordReset,
   verifyOtpAndResetPassword,
   changePassword,
@@ -15,6 +16,7 @@ const { authMiddleware } = require('../middleware/auth.middleware');
  */
 router.post('/login', loginUser);
 
+router.post('/refresh', refreshToken);
 /**
  * @route   POST /api/auth/change-password
  * @desc    Allows a logged-in user to change their own password using the old one
