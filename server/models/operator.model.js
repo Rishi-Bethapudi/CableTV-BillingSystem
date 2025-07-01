@@ -2,9 +2,8 @@ const mongoose = require('mongoose');
 
 const operatorSchema = new mongoose.Schema(
   {
-    // the unique ID (_id) is automatically created by MongoDB
-    name: { type: String, required: true }, // owner's name
-    cableName: { type: String, required: true }, // company name / cable business name
+    name: { type: String, required: true },
+    cableName: { type: String, required: true },
 
     subscription: {
       startDate: { type: Date, default: Date.now },
@@ -16,14 +15,41 @@ const operatorSchema = new mongoose.Schema(
       },
     },
 
-    contactNumber: String, // optional contact
-    address: String, // optional office location
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      match: [/.+@.+\..+/, 'Please fill a valid email address'],
+    },
+    password: {
+      type: String,
+      required: [true, 'Password is required.'],
+      minlength: [6, 'Password must be at least 6 characters long.'],
+    },
+    contactNumber: {
+      type: String,
+      trim: true,
+    },
 
-    // you can even store credentials for operator login here
-    // email: String,
-    // passwordHash: String
+    address: String,
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model('Operator', operatorSchema);
+// Custom validator: at least one of email or contactNumber must be present
+operatorSchema.path('email').validate(function (value) {
+  if (!value && !this.contactNumber) {
+    return false;
+  }
+  return true;
+}, 'Either email or contact number must be provided.');
+
+operatorSchema.path('contactNumber').validate(function (value) {
+  if (!value && !this.email) {
+    return false;
+  }
+  return true;
+}, 'Either contact number or email must be provided.');
+
+const Operator = mongoose.model('Operator', operatorSchema);
+module.exports = Operator;

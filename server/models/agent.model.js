@@ -8,11 +8,20 @@ const agentSchema = new mongoose.Schema(
       required: true,
     },
     name: { type: String, required: true },
-    contact: String,
+    email: {
+      type: String,
+      trim: true,
+    },
+    password: {
+      type: String,
+      required: [true, 'Password is required.'],
+    },
+    mobile: { type: String, required: true, unique: true, trim: true },
     address: String,
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model('Agent', agentSchema);
+const Agent = mongoose.model('Agent', agentSchema);
+module.exports = Agent;

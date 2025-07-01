@@ -78,12 +78,10 @@ const createAgent = async (req, res) => {
     const { name, email, password, mobile } = req.body;
 
     if (!name || !email || !password || !mobile) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Please provide name, email, password, and mobile for the agent.',
-        });
+      return res.status(400).json({
+        message:
+          'Please provide name, email, password, and mobile for the agent.',
+      });
     }
 
     // Check if an agent with this email already exists for this operator
@@ -92,12 +90,9 @@ const createAgent = async (req, res) => {
       operatorId: req.user.id,
     });
     if (existingAgent) {
-      return res
-        .status(409)
-        .json({
-          message:
-            'An agent with this email already exists under your account.',
-        });
+      return res.status(409).json({
+        message: 'An agent with this email already exists under your account.',
+      });
     }
 
     // Also check if email is used by an operator or admin
@@ -165,7 +160,6 @@ const updateAgent = async (req, res) => {
     }
 
     // Prevent password from being updated here
-    delete req.body.password;
     delete req.body.operatorId;
 
     const agent = await Agent.findOne({
@@ -174,13 +168,15 @@ const updateAgent = async (req, res) => {
     });
 
     if (!agent) {
-      return res
-        .status(404)
-        .json({
-          message: 'Agent not found or you do not have permission to update.',
-        });
+      return res.status(404).json({
+        message: 'Agent not found or you do not have permission to update.',
+      });
     }
-
+    if (req.body.password) {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(req.body.password, salt);
+      req.body.password = hashedPassword;
+    }
     const updatedAgent = await Agent.findByIdAndUpdate(
       agentId,
       { $set: req.body },
@@ -212,17 +208,15 @@ const deleteAgent = async (req, res) => {
     });
 
     if (!agent) {
-      return res
-        .status(404)
-        .json({
-          message: 'Agent not found or you do not have permission to delete.',
-        });
+      return res.status(404).json({
+        message: 'Agent not found or you do not have permission to delete.',
+      });
     }
 
     await Agent.findByIdAndDelete(agentId);
 
     // Optional: Unassign this agent from any customers
-    // await Customer.updateMany({ agent: agentId }, { $unset: { agent: "" } });
+    await Customer.updateMany({ agent: agentId }, { $unset: { agent: '' } });
 
     res.status(200).json({ message: 'Agent deleted successfully.' });
   } catch (error) {

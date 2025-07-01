@@ -21,78 +21,67 @@ const createCustomer = async (req, res) => {
       balanceAmount = 0,
     } = req.body;
 
-    // --- 1. Basic Validation ---
+    // 1️⃣ Validate required fields
     if (!name || !mobile || !planAmount) {
       return res.status(400).json({
-        message: 'Please provide all required fields: name, mobile, planAmount',
+        message: 'Please provide name, mobile, and planAmount.',
       });
     }
 
-    // The operator's ID is taken from the authenticated user's token.
+    // 2️⃣ Operator ID from the logged-in token
     const operatorId = req.user.id;
 
-    // --- 2. Auto-generation of Sequence and Customer Code ---
-    // Find the customer with the highest sequenceNo for this operator
+    // 3️⃣ Generate Sequence Number & Customer Code
     const lastCustomer = await Customer.findOne({ operatorId }).sort({
       sequenceNo: -1,
     });
     const newSequenceNo = lastCustomer ? lastCustomer.sequenceNo + 1 : 1;
-
-    // Create a unique customerCode, e.g., CUST-1, CUST-2 for this operator
     const customerCode = `CUST-${newSequenceNo}`;
 
-    // --- 3. Duplicate Check (Enhanced) ---
-    // Check if a customer with the same mobile or STB number already exists for this operator
+    // 4️⃣ Check duplicate (same mobile OR stbNumber if provided)
+    let duplicateQuery = [{ mobile }];
+    if (stbNumber) duplicateQuery.push({ stbNumber });
+
     const existingCustomer = await Customer.findOne({
       operatorId,
-      $or: [{ mobile }, { stbNumber: stbNumber ? stbNumber : null }], // Only check stbNumber if provided
+      $or: duplicateQuery,
     });
 
     if (existingCustomer) {
       let field =
         existingCustomer.mobile === mobile ? 'mobile number' : 'STB number';
-      return res
-        .status(409)
-        .json({ message: `A customer with this ${field} already exists.` });
+      return res.status(409).json({
+        message: `Customer with this ${field} already exists.`,
+      });
     }
 
-    // --- 4. Calculate Expiry Date ---
+    // 5️⃣ Handle expiry date
     const connectionStartDate = new Date();
-    const billingInterval = req.body.billingInterval || 30; // Default to 30 days
+    const billingInterval = req.body.billingInterval || 30;
     let expiryDate = new Date(connectionStartDate);
 
-    // If an initial balance is provided that covers at least one billing cycle, calculate the expiry.
     if (balanceAmount >= planAmount) {
       const monthsPaid = Math.floor(balanceAmount / planAmount);
       expiryDate.setDate(expiryDate.getDate() + monthsPaid * billingInterval);
     }
 
-    // --- 5. Construct the New Customer Object from Schema ---
+    // 6️⃣ Build and save the customer
     const newCustomer = new Customer({
-      // Pass all fields from the request body
       ...req.body,
-
-      // Overwrite/set required and auto-generated fields
-      operatorId: operatorId,
-      agentId: agentId || undefined, // Set agent if provided
-      customerCode: customerCode,
+      operatorId,
+      agentId: agentId || undefined,
+      customerCode,
       sequenceNo: newSequenceNo,
-      connectionStartDate: connectionStartDate,
-      expiryDate: expiryDate,
-
-      // Ensure defaults are set if not provided in body
-      balanceAmount: balanceAmount,
-      additionalCharge: req.body.additionalCharge || 0,
-      discount: req.body.discount || 0,
+      connectionStartDate,
+      expiryDate,
+      balanceAmount,
       active: req.body.active !== undefined ? req.body.active : true,
     });
 
     const savedCustomer = await newCustomer.save();
-
     res.status(201).json(savedCustomer);
   } catch (error) {
     console.error('Error creating customer:', error);
-    // Handle potential validation errors from Mongoose
     if (error.name === 'ValidationError') {
       return res.status(400).json({ message: error.message });
     }

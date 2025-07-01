@@ -36,4 +36,5 @@ counterSchema.statics.getPaymentId = async function (operatorId) {
   return `${yearMonth}${serial}`; // e.g. 20250601
 };
 
-module.exports = mongoose.model('Counter', counterSchema);
+const Counter = mongoose.model('Counter', counterSchema);
+module.exports = Counter;

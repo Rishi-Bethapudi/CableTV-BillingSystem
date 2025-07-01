@@ -26,15 +26,20 @@ const generateRefreshToken = (id) => {
  */
 const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
-
+    const { email, password, contactNumber } = req.body;
+    console.log('Login attempt:', { email, contactNumber });
     // 1. Look for the user across all three collections (from your previous code)
     let user =
       (await Admin.findOne({ email })) ||
-      (await Operator.findOne({ email })) ||
-      (await Agent.findOne({ email }));
-
+      (await Operator.findOne({
+        $or: [{ email }, { contactNumber }],
+      })) ||
+      (await Agent.findOne({
+        $or: [{ email: email }, { contactNumber: contactNumber }],
+      }));
+    console.log('User found:', user);
     // 2. Check if user exists and password is correct
+
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }

@@ -11,15 +11,20 @@ const mongoose = require('mongoose');
  */
 const createOperator = async (req, res) => {
   try {
-    const { name, email, password, cableName, subscription } = req.body;
+    const { name, email, password, cableName, contactNumber, subscription } =
+      req.body;
 
-    if (!name || !email || !password || !cableName || !subscription) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Please provide name, email, password, cableName, and subscription details.',
-        });
+    if (
+      !name ||
+      (!email && !contactNumber) ||
+      !password ||
+      !cableName ||
+      !subscription
+    ) {
+      return res.status(400).json({
+        message:
+          'Please provide name, email/contact, password, cableName, and subscription details.',
+      });
     }
 
     // Check if user with this email already exists in any collection
@@ -46,6 +51,7 @@ const createOperator = async (req, res) => {
     const newOperator = new Operator({
       name,
       email,
+      contactNumber,
       password: hashedPassword,
       cableName,
       serialNumber: newSerialNumber,
