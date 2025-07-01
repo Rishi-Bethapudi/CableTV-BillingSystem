@@ -1,4 +1,8 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -8,18 +12,21 @@ import {
 } from '@/components/ui/select';
 import {
   Popover,
-  PopoverContent,
   PopoverTrigger,
+  PopoverContent,
 } from '@/components/ui/popover';
-import { Button } from '@/components/ui/button';
 import { Search, Filter, RotateCcw } from 'lucide-react';
-import { useEffect, useState } from 'react';
 
 interface Props {
   onSearchChange: (value: string) => void;
   onStatusChange: (value: string) => void;
   onBalanceChange: (value: string) => void;
   onAreaChange: (value: string) => void;
+  onDueTodayChange: (value: boolean) => void;
+  onDueTomorrowChange: (value: boolean) => void;
+  onDueNext5DaysChange: (value: boolean) => void;
+  onSortChange: (value: string) => void;
+  onOrderChange: (value: string) => void;
 }
 
 export default function CustomerFilters({
@@ -27,19 +34,34 @@ export default function CustomerFilters({
   onStatusChange,
   onBalanceChange,
   onAreaChange,
+  onDueTodayChange,
+  onDueTomorrowChange,
+  onDueNext5DaysChange,
+  onSortChange,
+  onOrderChange,
 }: Props) {
   const [search, setSearch] = useState('');
   const [popoverOpen, setPopoverOpen] = useState(false);
 
-  // Reset all filters
+  const [dueToday, setDueToday] = useState(false);
+  const [dueTomorrow, setDueTomorrow] = useState(false);
+  const [dueNext5Days, setDueNext5Days] = useState(false);
+
   const resetFilters = () => {
     onStatusChange('');
     onBalanceChange('');
     onAreaChange('');
+    onDueTodayChange(false);
+    onDueTomorrowChange(false);
+    onDueNext5DaysChange(false);
+    onSortChange('');
+    onOrderChange('');
+    setDueToday(false);
+    setDueTomorrow(false);
+    setDueNext5Days(false);
     setSearch('');
   };
 
-  // Debounce search input
   useEffect(() => {
     const debounce = setTimeout(() => {
       onSearchChange(search);
@@ -47,9 +69,14 @@ export default function CustomerFilters({
     return () => clearTimeout(debounce);
   }, [search]);
 
+  // These update parent
+  useEffect(() => onDueTodayChange(dueToday), [dueToday]);
+  useEffect(() => onDueTomorrowChange(dueTomorrow), [dueTomorrow]);
+  useEffect(() => onDueNext5DaysChange(dueNext5Days), [dueNext5Days]);
+
   return (
     <div className="flex flex-col gap-4 w-full">
-      {/* Mobile: Search + Filter + Reset */}
+      {/* Mobile */}
       <div className="flex items-center gap-2 lg:hidden">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -62,7 +89,6 @@ export default function CustomerFilters({
           />
         </div>
 
-        {/* Filter Icon */}
         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="icon">
@@ -104,16 +130,66 @@ export default function CustomerFilters({
                 <SelectItem value="tenali">Tenali</SelectItem>
               </SelectContent>
             </Select>
+
+            <div className="space-y-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={dueToday}
+                  onChange={(e) => setDueToday(e.target.checked)}
+                  className="accent-primary"
+                />
+                Due Today
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={dueTomorrow}
+                  onChange={(e) => setDueTomorrow(e.target.checked)}
+                  className="accent-primary"
+                />
+                Due Tomorrow
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={dueNext5Days}
+                  onChange={(e) => setDueNext5Days(e.target.checked)}
+                  className="accent-primary"
+                />
+                Due in 5 Days
+              </label>
+            </div>
+
+            <Select onValueChange={onSortChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="balanceAmount">Balance</SelectItem>
+                <SelectItem value="expiryDate">Expiry</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select onValueChange={onOrderChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Order" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">Ascending</SelectItem>
+                <SelectItem value="desc">Descending</SelectItem>
+              </SelectContent>
+            </Select>
           </PopoverContent>
         </Popover>
 
-        {/* Reset Icon */}
         <Button variant="outline" size="icon" onClick={resetFilters}>
           <RotateCcw className="h-5 w-5" />
         </Button>
       </div>
 
-      {/* Desktop: Search + Filters + Reset */}
+      {/* Desktop */}
       <div className="hidden lg:flex items-center gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -158,6 +234,55 @@ export default function CustomerFilters({
             <SelectItem value="vijayawada">Vijayawada</SelectItem>
             <SelectItem value="mangalagiri">Mangalagiri</SelectItem>
             <SelectItem value="tenali">Tenali</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={dueToday}
+            onChange={(e) => setDueToday(e.target.checked)}
+            className="accent-primary"
+          />
+          Due Today
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={dueTomorrow}
+            onChange={(e) => setDueTomorrow(e.target.checked)}
+            className="accent-primary"
+          />
+          Due Tomorrow
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={dueNext5Days}
+            onChange={(e) => setDueNext5Days(e.target.checked)}
+            className="accent-primary"
+          />
+          Due in 5 Days
+        </label>
+
+        <Select onValueChange={onSortChange}>
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="Sort by" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="name">Name</SelectItem>
+            <SelectItem value="balanceAmount">Balance</SelectItem>
+            <SelectItem value="expiryDate">Expiry</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select onValueChange={onOrderChange}>
+          <SelectTrigger className="w-32">
+            <SelectValue placeholder="Order" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="asc">Asc</SelectItem>
+            <SelectItem value="desc">Desc</SelectItem>
           </SelectContent>
         </Select>
 

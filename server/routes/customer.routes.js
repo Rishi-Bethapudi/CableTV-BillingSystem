@@ -44,6 +44,7 @@ router.post('/', authMiddleware, operatorOnly, createCustomer);
  * Example Query: /api/customers?page=1&limit=10&search=John&status=active
  */
 router.get('/', authMiddleware, operatorOrAgentOnly, getCustomers);
+// router.get('/', getCustomers);
 
 /**
  * @route   GET /api/customers/:id

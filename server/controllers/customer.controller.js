@@ -96,61 +96,96 @@ const createCustomer = async (req, res) => {
  */
 const getCustomers = async (req, res) => {
   try {
-    // The operatorId is taken from the token. This is the core of our multi-tenancy.
-    // For an agent, req.user.operatorId is set during login. For an operator, it's their own ID.
     const operatorId = req.user.operatorId;
+    // const operatorId = '6863f992548073a2ed1891f0';
 
-    // Pagination
+    // --- Pagination ---
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const skip = (page - 1) * limit;
 
-    // Build the query object
+    // --- Build dynamic query ---
     const query = { operatorId };
 
-    // Filtering by search term (name, mobile, stbNumber, etc.)
+    // Filter by customerStatus (active/inactive)
+    if (req.query.customerStatus === 'active') query.active = true;
+    else if (req.query.customerStatus === 'inactive') query.active = false;
+
+    // Filter by locality
+    if (req.query.locality) {
+      query.locality = new RegExp(req.query.locality, 'i');
+    }
+
+    // Filter by payment mode (if you store lastPaymentMode or such on customer)
+    if (req.query.paymentMode) {
+      query.lastPaymentMode = req.query.paymentMode;
+    }
+
+    // --- DUE FILTERS based on expiryDate ---
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (req.query.dueToday === 'true') {
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      query.expiryDate = { $gte: today, $lt: tomorrow };
+    }
+
+    if (req.query.dueTomorrow === 'true') {
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      const dayAfter = new Date(today);
+      dayAfter.setDate(today.getDate() + 2);
+      query.expiryDate = { $gte: tomorrow, $lt: dayAfter };
+    }
+
+    if (req.query.dueNext5Days === 'true') {
+      const in5Days = new Date(today);
+      in5Days.setDate(today.getDate() + 5);
+      query.expiryDate = { $gte: today, $lt: in5Days };
+    }
+
+    // --- BALANCE FILTERS ---
+    if (req.query.unpaid === 'true') {
+      query.balanceAmount = { $gt: 0 };
+    }
+    if (req.query.advance === 'true') {
+      query.balanceAmount = { $lt: 0 };
+    }
+
+    // --- SEARCH by name/mobile/stb ---
     if (req.query.search) {
-      const searchRegex = new RegExp(req.query.search, 'i'); // case-insensitive search
-      query.$or = [
-        { name: searchRegex },
-        { mobile: searchRegex },
-        { stbNumber: searchRegex },
-        { locality: searchRegex },
-      ];
+      const regex = new RegExp(req.query.search, 'i');
+      query.$or = [{ name: regex }, { mobile: regex }, { stbNumber: regex }];
     }
 
-    // Filtering by status
-    if (req.query.status && ['active', 'inactive'].includes(req.query.status)) {
-      query.active = req.query.status === 'active';
-    }
+    // --- Sorting ---
+    const sortField = req.query.sortBy || 'createdAt';
+    const sortOrder = req.query.order === 'asc' ? 1 : -1;
+    const sort = { [sortField]: sortOrder };
 
-    // Filtering by agent
-    if (req.query.agentId) {
-      query.agent = req.query.agentId;
-    }
-
-    // Execute query to get customers and total count for pagination
+    // --- Execute query ---
     const customers = await Customer.find(query)
-      .populate('agent', 'name') // Populate agent's name for better frontend display
-      .sort({ createdAt: -1 }) // Sort by most recently created
+      .populate('agentId', 'name') // if needed
+      .sort(sort)
       .skip(skip)
       .limit(limit)
-      .lean(); // Use .lean() for faster, read-only operations
+      .lean();
 
-    const totalCustomers = await Customer.countDocuments(query);
+    const total = await Customer.countDocuments(query);
 
     res.status(200).json({
       data: customers,
       pagination: {
-        total: totalCustomers,
+        total,
         page,
         limit,
-        totalPages: Math.ceil(totalCustomers / limit),
+        totalPages: Math.ceil(total / limit),
       },
     });
-  } catch (error) {
-    console.error('Error fetching customers:', error);
-    res.status(500).json({ message: 'Server error while fetching customers.' });
+  } catch (err) {
+    console.error('Error fetching customers with filters:', err);
+    res.status(500).json({ message: 'Server error.' });
   }
 };
 
@@ -167,7 +202,7 @@ const getCustomerById = async (req, res) => {
     }
 
     const customer = await Customer.findById(customerId)
-      .populate('agent', 'name email')
+      .populate('agentId', 'name email')
       .lean();
 
     if (!customer) {
