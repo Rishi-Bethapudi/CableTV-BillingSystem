@@ -2,33 +2,53 @@ const mongoose = require('mongoose');
 
 const complaintSchema = new mongoose.Schema(
   {
-    serialNumber: { type: Number }, // human friendly S.No
-
+    operatorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Operator',
+      required: true,
+    },
     customerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Customer',
       required: true,
     },
-    complain: { type: String, required: true },
-
+    // Who logged the complaint
+    loggedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      refPath: 'loggedByType',
+    },
+    loggedByType: {
+      type: String,
+      required: true,
+      enum: ['Operator', 'Agent'],
+    },
+    // Who is assigned to resolve it
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Agent',
     },
-
-    date: { type: Date, default: Date.now }, // complaint registered
-    dueDate: { type: Date }, // by when to resolve
-    completedDate: { type: Date }, // actually resolved
-
+    description: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     status: {
       type: String,
-      enum: ['pending', 'in-progress', 'resolved'],
-      default: 'pending',
+      required: true,
+      enum: ['Open', 'In Progress', 'Resolved', 'Closed'],
+      default: 'Open',
     },
-
-    remarks: String,
+    resolutionNotes: {
+      type: String,
+      trim: true,
+    },
+    resolvedAt: {
+      type: Date,
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
 const Complaint = mongoose.model('Complaint', complaintSchema);
