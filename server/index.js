@@ -9,7 +9,7 @@ const adminRoutes = require('./routes/admin.routes');
 const operatorRoutes = require('./routes/operator.routes');
 const authRoutes = require('./routes/auth.routes');
 const customerRoutes = require('./routes/customer.routes');
-
+const { initCronJobs } = require('./services/scheduler.service');
 // --- Load Environment Variables ---
 dotenv.config();
 
@@ -18,7 +18,7 @@ const app = express();
 
 // --- Database Connection ---
 connectDB();
-
+initCronJobs();
 // --- Core Middleware ---
 // Enable CORS (Cross-Origin Resource Sharing)
 // This is crucial for allowing your React frontend to communicate with the backend.
