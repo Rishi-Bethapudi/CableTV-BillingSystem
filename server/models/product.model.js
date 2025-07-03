@@ -1,13 +1,38 @@
+// models/product.model.js
 const mongoose = require('mongoose');
 
 const productSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },
-    planCharge: { type: Number, required: true },
-
-    // optional extra
-    description: { type: String }, // short description of the plan
-    isActive: { type: Boolean, default: true }, // for disabling a product
+    operatorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Operator',
+      required: true,
+    },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    // The price you charge the customer
+    customerPrice: {
+      type: Number,
+      required: true,
+    },
+    // The cost you incur for this product
+    operatorCost: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    billingInterval: {
+      // e.g., 30 for monthly, 90 for quarterly
+      type: Number,
+      default: 30,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true }
 );

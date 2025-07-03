@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
-
+// const Product = require('./product.model'); // Assuming you have a Product model
+// const Agent = require('./agent.model'); // Assuming you have an Agent model
+// const Operator = require('./operator.model'); // Assuming you have an Operator model
 const customerSchema = new mongoose.Schema(
   {
     // Multi-tenant references
@@ -24,8 +26,6 @@ const customerSchema = new mongoose.Schema(
     connectionStartDate: Date,
     expiryDate: Date,
 
-    billingInterval: { type: Number, default: 30 },
-    planAmount: Number,
     sequenceNo: Number,
 
     active: { type: Boolean, default: true },
@@ -34,7 +34,12 @@ const customerSchema = new mongoose.Schema(
     stbNumber: String,
     cardNumber: String,
 
-    products: [String], // can switch to ObjectIds if you later normalize
+    // products: [String], // can switch to ObjectIds if you later normalize
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      required: true,
+    },
     additionalCharge: { type: Number, default: 0 },
     discount: { type: Number, default: 0 },
 

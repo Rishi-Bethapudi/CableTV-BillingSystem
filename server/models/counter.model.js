@@ -33,8 +33,23 @@ counterSchema.statics.getPaymentId = async function (operatorId) {
   );
 
   const serial = String(counter.value).padStart(2, '0');
-  return `${yearMonth}${serial}`; // e.g. 20250601
+  return `${yearMonth}${serial}`; // e.g. 2025060001
 };
 
+counterSchema.statics.getReceiptNumber = async function (operatorId) {
+  const key = `receipt-${operatorId}`; // A continuous key for the operator
+
+  const counter = await this.findOneAndUpdate(
+    { name: key },
+    {
+      $setOnInsert: { operatorId },
+      $inc: { value: 1 },
+    },
+    { new: true, upsert: true }
+  );
+
+  // You can format it if you like, e.g., pad with zeros, or just return the number
+  return counter.value.toString().padStart(6, '0'); // e.g., "000001", "000002"
+};
 const Counter = mongoose.model('Counter', counterSchema);
 module.exports = Counter;
