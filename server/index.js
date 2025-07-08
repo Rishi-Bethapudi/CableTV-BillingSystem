@@ -51,7 +51,9 @@ app.get('/', (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
-
+app.head('/health', (req, res) => {
+  res.sendStatus(200); // sends only headers
+});
 // --- Not Found and Error Handling Middleware ---
 // Handle 404 - Not Found
 app.use((req, res, next) => {
