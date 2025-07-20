@@ -24,8 +24,9 @@ initCronJobs();
 // This is crucial for allowing your React frontend to communicate with the backend.
 app.use(
   cors({
-    origin: 'http://localhost:8080', // Allow requests from your React dev server
+    // origin: 'http://localhost:8080', // Allow requests from your React dev server
     credentials: true, // Allow cookies to be sent from the frontend
+    origin: '*',
   })
 );
 

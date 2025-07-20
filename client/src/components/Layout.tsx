@@ -61,9 +61,8 @@ export function Layout({ children }: LayoutProps) {
           >
             <Menu className="h-6 w-6" />
           </Button>
-          <span className="text-lg font-bold">CableTV</span>
+          <Header />
         </div>
-
         <Header />
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
