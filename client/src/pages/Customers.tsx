@@ -54,7 +54,7 @@ export default function CustomersPage() {
         if (dueNext5Days) query.append('dueNext5Days', 'true');
 
         const res = await fetch(
-          `https://44t70zsp-5000.inc1.devtunnels.ms/api/customers?${query.toString()}`
+          `https://cabletv-billingsystem.onrender.com/api/customers?${query.toString()}`
         );
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Failed to fetch');
