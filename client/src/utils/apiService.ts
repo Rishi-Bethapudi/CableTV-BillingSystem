@@ -71,10 +71,10 @@ export const loginUser = async (email: string, password: string): Promise<LoginR
  * @param params - The query parameters for filtering and pagination.
  * @returns A paginated list of customers.
  */
-export const getCustomers = async (params: GetCustomersParams): Promise<PaginatedCustomersResponse> => {
-  const response = await apiClient.get('/customers', { params });
-  return response.data;
-};
+// export const getCustomers = async (params: GetCustomersParams): Promise<PaginatedCustomersResponse> => {
+//   const response = await apiClient.get('/customers', { params });
+//   return response.data;
+// };
 
 /**
  * Fetches a single customer by their ID.
