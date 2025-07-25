@@ -35,7 +35,9 @@ apiClient.interceptors.response.use(
         if (Capacitor.isNativePlatform()) {
           const { value } = await Preferences.get({ key: 'refreshToken' });
           refreshToken = value;
-        }
+        } else {
+  refreshToken = localStorage.getItem('refreshToken'); // fallback for web
+}
 
         const res = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/auth/refresh`, {
           refreshToken: Capacitor.isNativePlatform() ? refreshToken : undefined,
@@ -47,7 +49,9 @@ apiClient.interceptors.response.use(
 
         if (Capacitor.isNativePlatform()) {
           await Preferences.set({ key: 'accessToken', value: newAccessToken });
-        }
+        }else {
+            localStorage.setItem('accessToken', newAccessToken); 
+          }
 
         originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
