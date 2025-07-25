@@ -6,8 +6,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { Layout } from '@/components/Layout';
-import { AuthProvider, useAuth } from './components/layouts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+
+import { useSelector } from 'react-redux';
+import { RootState } from './redux/store';
 
 // --- Page Imports ---
 import Dashboard from './pages/Dashboard';
@@ -22,21 +24,20 @@ import LoginPage from './pages/LoginPage';
 
 const queryClient = new QueryClient();
 
-// This new component contains all the routes and can access the auth context
 const AppRoutes = () => {
-  const { user } = useAuth();
+  const isAuthenticated = useSelector(
+    (state: RootState) => state.auth.isAuthenticated
+  );
 
   return (
     <Routes>
-      {/* Public Login Route: If user is already logged in, redirect them to the dashboard */}
+      {/* Public Login Route */}
       <Route
         path="/login"
-        element={user ? <Navigate to="/" replace /> : <LoginPage />}
+        element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />}
       />
 
-      {/* --- Protected Routes --- */}
-      {/* All application routes are now wrapped in ProtectedRoute */}
-      {/* The Layout component is now INSIDE the protected route */}
+      {/* Protected Routes */}
       <Route
         path="/"
         element={
@@ -143,6 +144,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
@@ -155,10 +157,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          {/* AuthProvider must wrap the routes to provide context */}
-          <AuthProvider>
-            <AppRoutes />
-          </AuthProvider>
+          <AppRoutes />
         </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>

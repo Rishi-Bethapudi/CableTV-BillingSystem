@@ -1,24 +1,33 @@
-// src/components/ProtectedRoute.tsx
-import { useAuth } from './layouts/AuthContext';
+import { useSelector } from 'react-redux';
 import { Navigate, useLocation } from 'react-router-dom';
+import { RootState } from '../redux/store';
+import { useEffect, useState } from 'react';
 
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading } = useAuth();
+  const user = useSelector((state: RootState) => state.auth.user);
+  const accessToken = useSelector((state: RootState) => state.auth.accessToken);
   const location = useLocation();
 
-  if (isLoading) {
-    // Show a loading spinner or a blank page while checking auth state
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    // Allow time for redux-persist to rehydrate
+    const timeout = setTimeout(() => {
+      setHydrated(true);
+    }, 100); // 100ms delay is enough in most cases
+
+    return () => clearTimeout(timeout);
+  }, []);
+
+  if (!hydrated) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
-        {/* You can add a nice spinner component here */}
-        Loading...
+        Loading...&&
       </div>
     );
   }
 
-  if (!user) {
-    // Redirect them to the /login page, but save the current location they were
-    // trying to go to. This allows us to send them back there after they log in.
+  if (!accessToken || !user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

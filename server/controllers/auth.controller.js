@@ -307,7 +307,7 @@ const refreshAccessToken = async (req, res) => {
 };
 module.exports = {
   loginUser,
-  refreshToken,
+  refreshAccessToken,
   changePassword,
   requestPasswordReset,
   verifyOtpAndResetPassword,

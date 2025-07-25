@@ -1,5 +1,5 @@
 // src/utils/apiService.ts
-import apiClient from './clientCalls'; // Import our central axios instance
+import apiClient from './apiClient'; // Import our central axios instance
 
 // --- Type Definitions for Clarity ---
 

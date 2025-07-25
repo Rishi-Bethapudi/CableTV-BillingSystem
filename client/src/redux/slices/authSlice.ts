@@ -1,5 +1,4 @@
-
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { Preferences } from '@capacitor/preferences';
 
@@ -20,14 +19,33 @@ export const loginAsync = createAsyncThunk(
   }
 );
 
+export const refreshAccessToken = createAsyncThunk(
+  'auth/refreshToken',
+  async (_, { rejectWithValue }) => {
+    try {
+      const refreshTokenResult = await Preferences.get({ key: 'refreshToken' });
+      const refreshToken = refreshTokenResult.value;
+
+      const response = await axios.post('/auth/refresh-token', { refreshToken });
+
+      const { accessToken, user } = response.data;
+      await Preferences.set({ key: 'accessToken', value: accessToken });
+
+      return { accessToken, user };
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || 'Token refresh failed');
+    }
+  }
+);
+
 const authSlice = createSlice({
   name: 'auth',
   initialState: {
-    user: null,
-    accessToken: null,
+    user: null as any,
+    accessToken: null as string | null,
     isAuthenticated: false,
     loading: false,
-    error: null,
+    error: null as string | null,
   },
   reducers: {
     logout(state) {
@@ -36,6 +54,9 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       Preferences.remove({ key: 'accessToken' });
       Preferences.remove({ key: 'refreshToken' });
+    },
+    setAccessToken(state, action: PayloadAction<string>) {
+      state.accessToken = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -53,9 +74,19 @@ const authSlice = createSlice({
       .addCase(loginAsync.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+      })
+      .addCase(refreshAccessToken.fulfilled, (state, action) => {
+        state.accessToken = action.payload.accessToken;
+        state.user = action.payload.user;
+        state.isAuthenticated = true;
+      })
+      .addCase(refreshAccessToken.rejected, (state) => {
+        state.accessToken = null;
+        state.user = null;
+        state.isAuthenticated = false;
       });
   },
 });
 
-export const { logout } = authSlice.actions;
+export const { logout, setAccessToken } = authSlice.actions;
 export default authSlice.reducer;
