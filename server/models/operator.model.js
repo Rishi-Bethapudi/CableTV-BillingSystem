@@ -32,6 +32,7 @@ const operatorSchema = new mongoose.Schema(
     },
 
     address: String,
+    refreshTokens: [String],
   },
   { timestamps: true }
 );

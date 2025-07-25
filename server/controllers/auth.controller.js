@@ -24,115 +24,49 @@ const generateRefreshToken = (id) => {
  * @route   POST /api/auth/login
  * @access  Public
  */
+
 const loginUser = async (req, res) => {
   try {
-    const { email, password, contactNumber } = req.body;
-    // 1. Look for the user across all three collections (from your previous code)
+    const { identifier, password } = req.body; // identifier can be email or contactNumber
+
+    if (!identifier || !password) {
+      return res
+        .status(400)
+        .json({ message: 'Identifier and password are required.' });
+    }
+
+    // Step 1: Find user across all collections
     let user =
-      (await Admin.findOne({ email })) ||
+      (await Admin.findOne({ email: identifier })) ||
       (await Operator.findOne({
-        $or: [{ email }, { contactNumber }],
+        $or: [{ email: identifier }, { contactNumber: identifier }],
       })) ||
       (await Agent.findOne({
-        $or: [{ email: email }, { contactNumber: contactNumber }],
+        $or: [{ email: identifier }, { contactNumber: identifier }],
       }));
-    // 2. Check if user exists and password is correct
 
+    // Step 2: If user doesn't exist or password is wrong
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
-    // 3. For Operators, check if their subscription is active (from your previous code)
+    // Step 3: Operator-specific validation
     if (
-      user.constructor === Operator &&
-      user.subscription.status !== 'active'
+      user.constructor.modelName === 'Operator' &&
+      user.subscription?.status !== 'active'
     ) {
-      return res
-        .status(403)
-        .json({ message: 'Your account is disabled. Please contact support.' });
+      return res.status(403).json({
+        message: 'Your account is disabled. Please contact support.',
+      });
     }
 
-    // 4. Determine role and operatorId for all user types (from your previous code)
-    let role, operatorId;
-    if (user.constructor === Admin) {
+    // Step 4: Set role and operatorId for token payload
+    let role,
+      operatorId = null;
+
+    if (user.constructor.modelName === 'Admin') {
       role = 'admin';
-      // operatorId remains null for admin
-    } else if (user.constructor === Operator) {
-      role = 'operator';
-      operatorId = user._id; // An operator's operatorId is their own ID
-    } else {
-      // Agent
-      role = 'agent';
-      operatorId = user.operatorId; // An agent's operatorId is their parent operator's ID
-    }
-
-    // 5. Generate BOTH access and refresh tokens (from the new strategy)
-    const accessToken = generateAccessToken(user._id, role, operatorId);
-    const refreshToken = generateRefreshToken(user._id);
-
-    // TODO: Store the refresh token in your database against the user's ID to allow for revocation.
-    // Example: user.refreshTokens.push(refreshToken); await user.save();
-
-    // 6. Send tokens to the client universally (from the new strategy)
-    // Set refresh token in a secure, httpOnly cookie for web clients
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
-
-    // Send tokens in the response body for ALL clients (mobile will use this)
-    res.status(200).json({
-      message: 'Login successful',
-      accessToken,
-      refreshToken, // For mobile app consumption
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: role,
-      },
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error during login.' });
-  }
-};
-
-/**
- * @desc    Generate a new access token using a refresh token (Essential for this strategy)
- * @route   POST /api/auth/refresh
- * @access  Public
- */
-const refreshToken = async (req, res) => {
-  // Get refresh token from EITHER cookie (web) OR body (mobile)
-  const token = req.cookies.refreshToken || req.body.refreshToken;
-
-  if (!token) {
-    return res
-      .status(401)
-      .json({ message: 'Access denied. No refresh token provided.' });
-  }
-
-  try {
-    const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
-
-    // TODO: Verify the refresh token exists in your database for this user.
-
-    // Find user to get their role and operatorId
-    const user =
-      (await Admin.findById(decoded.id)) ||
-      (await Operator.findById(decoded.id)) ||
-      (await Agent.findById(decoded.id));
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid token.' });
-    }
-
-    let role, operatorId;
-    if (user.constructor === Admin) {
-      role = 'admin';
-    } else if (user.constructor === Operator) {
+    } else if (user.constructor.modelName === 'Operator') {
       role = 'operator';
       operatorId = user._id;
     } else {
@@ -140,12 +74,40 @@ const refreshToken = async (req, res) => {
       operatorId = user.operatorId;
     }
 
-    // Issue a new access token
-    const newAccessToken = generateAccessToken(user._id, role, operatorId);
+    // Step 5: Generate Tokens
+    const accessToken = generateAccessToken(user._id, role, operatorId);
+    const refreshToken = generateRefreshToken(user._id);
 
-    res.json({ accessToken: newAccessToken });
+    // Optional: Store refreshToken in DB (for token revocation later)
+    // Example: user.refreshTokens.push(refreshToken); await user.save();
+    user.refreshTokens = user.refreshTokens || [];
+    user.refreshTokens.push(refreshToken);
+    await user.save();
+    // Step 6: Set refreshToken in secure cookie (Web)
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    // Step 7: Send token and user info to frontend
+    res.status(200).json({
+      message: 'Login successful',
+      accessToken,
+      refreshToken, // for mobile apps
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        contactNumber: user.contactNumber,
+        role,
+        operatorId,
+      },
+    });
   } catch (error) {
-    return res.status(403).json({ message: 'Invalid refresh token.' });
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error during login.' });
   }
 };
 
@@ -279,11 +241,69 @@ const verifyOtpAndResetPassword = async (req, res) => {
  * @access  Private
  */
 const logoutUser = async (req, res) => {
-  // TODO: Remove the specific refresh token from the user's record in the database.
+  const token = req.cookies.refreshToken || req.body.refreshToken;
+  if (!token) return res.status(400).json({ message: 'No token found.' });
 
-  // Clear the cookie for web clients
-  res.clearCookie('refreshToken');
-  res.status(200).json({ message: 'Logged out successfully.' });
+  try {
+    const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+    const userId = decoded.userId;
+
+    const user =
+      (await Admin.findById(userId)) ||
+      (await Operator.findById(userId)) ||
+      (await Agent.findById(userId));
+
+    if (user) {
+      user.refreshTokens = user.refreshTokens.filter((t) => t !== token);
+      await user.save();
+    }
+
+    res.clearCookie('refreshToken');
+    return res.status(200).json({ message: 'Logged out successfully' });
+  } catch (err) {
+    return res.status(403).json({ message: 'Invalid token.' });
+  }
+};
+const refreshAccessToken = async (req, res) => {
+  const token = req.cookies.refreshToken || req.body.refreshToken;
+
+  if (!token)
+    return res.status(401).json({ message: 'Refresh token missing.' });
+
+  try {
+    // 1. Verify token
+    const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+
+    // 2. Find user
+    const userId = decoded.userId;
+
+    const user =
+      (await Admin.findById(userId)) ||
+      (await Operator.findById(userId)) ||
+      (await Agent.findById(userId));
+
+    if (!user || !user.refreshTokens.includes(token)) {
+      return res.status(403).json({ message: 'Invalid refresh token.' });
+    }
+
+    // 3. Generate new access token
+    let role,
+      operatorId = null;
+    if (user.constructor.modelName === 'Admin') role = 'admin';
+    else if (user.constructor.modelName === 'Operator') {
+      role = 'operator';
+      operatorId = user._id;
+    } else {
+      role = 'agent';
+      operatorId = user.operatorId;
+    }
+
+    const newAccessToken = generateAccessToken(user._id, role, operatorId);
+
+    return res.json({ accessToken: newAccessToken });
+  } catch (err) {
+    return res.status(403).json({ message: 'Token expired or invalid.' });
+  }
 };
 module.exports = {
   loginUser,
@@ -292,4 +312,5 @@ module.exports = {
   requestPasswordReset,
   verifyOtpAndResetPassword,
   logoutUser,
+  refreshAccessToken,
 };

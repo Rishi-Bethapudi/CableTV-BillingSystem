@@ -27,6 +27,7 @@ const adminSchema = new mongoose.Schema(
       type: String,
       default: 'admin', // The role is fixed to 'admin'
     },
+    refreshTokens: [String],
   },
   {
     // Adds createdAt and updatedAt timestamps automatically

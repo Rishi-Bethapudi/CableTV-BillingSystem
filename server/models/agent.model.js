@@ -19,6 +19,7 @@ const agentSchema = new mongoose.Schema(
     mobile: { type: String, required: true, unique: true, trim: true },
     address: String,
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
+    refreshTokens: [String],
   },
   { timestamps: true }
 );
