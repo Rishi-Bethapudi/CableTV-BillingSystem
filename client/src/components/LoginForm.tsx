@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router-dom';
 
 export function LoginForm({
   className,
@@ -28,7 +28,7 @@ export function LoginForm({
   const { loading, error, isAuthenticated } = useSelector(
     (state: RootState) => state.auth
   );
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -44,9 +44,9 @@ export function LoginForm({
   useEffect(() => {
     if (isAuthenticated) {
       toast.success('Login successful');
-      router.push('/dashboard'); // or your desired route
+      navigate('/dashboard'); // or your desired route
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, navigate]);
 
   return (
     <div className={cn('flex flex-col gap-6', className)} {...props}>
