@@ -49,19 +49,17 @@ export default function CustomerTable({ customers }: Props) {
             ) : (
               customers.map((customer) => (
                 <TableRow
-                  key={customer.sCode}
+                  key={customer._id}
                   className="group cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                  onClick={() => navigate(`/customers/${customer.sCode}`)}
+                  onClick={() => navigate(`/customers/${customer._id}`)}
                 >
-                  <TableCell>{customer.sCode}</TableCell>
+                  <TableCell>{customer.customerCode}</TableCell>
                   <TableCell>
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="font-medium">
-                          {customer.firstName} {customer.lastName}
-                        </div>
+                        <div className="font-medium">{customer.name}</div>
                         <div className="text-sm text-muted-foreground">
-                          {customer.phone}
+                          {customer.mobile}
                         </div>
                       </div>
 
@@ -70,25 +68,21 @@ export default function CustomerTable({ customers }: Props) {
                         className="ml-2 h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={(e) => {
                           e.stopPropagation(); // prevent row click
-                          navigate(`/customers/${customer.sCode}`);
+                          navigate(`/customers/${customer._id}`);
                         }}
                       />
                     </div>
                   </TableCell>
 
-                  <TableCell>{customer.balance}</TableCell>
-                  <TableCell>{customer.area}</TableCell>
-                  <TableCell>{customer.lastBillAmount}</TableCell>
+                  <TableCell>{customer.balanceAmount}</TableCell>
+                  <TableCell>{customer.locality}</TableCell>
+                  <TableCell>{customer.lastPaymentAmount}</TableCell>
                   <TableCell>
-                    {new Date(customer.expired).toLocaleDateString('en-IN')}
+                    {new Date(customer.expiryDate).toLocaleDateString('en-IN')}
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={
-                        customer.status === 'Active' ? 'default' : 'secondary'
-                      }
-                    >
-                      {customer.status}
+                    <Badge variant={customer.active ? 'default' : 'secondary'}>
+                      {customer.active ? 'Active' : 'Expired'}
                     </Badge>
                   </TableCell>
                 </TableRow>

@@ -1,234 +1,25 @@
 export interface Customer {
-  id: number;
-  firstName: string;
-  lastName: string;
+  _id: string;
+  operatorId: string;
+  agentId: string | null;
+  customerCode: string;
   name: string;
+  locality: string;
   mobile: string;
-  area: string;
-  agent: string;
-  status: 'Active' | 'Inactive' | 'Suspended' | 'Disconnected';
-  balance: number;
-  lastBillDate: string; // ISO format
-  expiryDate: string; // ISO format
-  stbNumber: string;
-  membershipNo: string;
+  billingAddress: string;
+  balanceAmount: number;
+  connectionStartDate: string; // or Date if parsed
+  expiryDate: string; // or Date
+  sequenceNo: number;
+  active: boolean;
   stbName: string;
-  address: string;
-  email: string;
-  connectionDate: string; // ISO format
-  lastPayment: number;
-  lastPaymentDate: string; // ISO format
+  stbNumber: string;
+  cardNumber: string;
+  productId: string;
+  additionalCharge: number;
+  discount: number;
+  lastPaymentAmount: number;
+  remark: string;
+  createdAt: string; // or Date
+  updatedAt: string; // or Date
 }
-
-export const customers: Customer[] = [
-  {
-    id: 1,
-    firstName: 'Anjaneyulu',
-    lastName: 'Janga',
-    name: 'Anjaneyulu Janga',
-    mobile: '+91 9963676402',
-    area: 'Kandrapadu',
-    agent: 'Agent 1',
-    status: 'Active',
-    balance: 0,
-    lastBillDate: '2025-06-27',
-    expiryDate: '2025-07-27',
-    stbNumber: 'DSNW202dec08',
-    membershipNo: '100740915',
-    stbName: 'DASAN - Corpus',
-    address: 'Kandrapadu, Andhra Pradesh',
-    email: 'anjaneyulu@example.com',
-    connectionDate: '2023-01-15',
-    lastPayment: 350,
-    lastPaymentDate: '2025-05-29',
-  },
-  {
-    id: 2,
-    firstName: 'Karthik',
-    lastName: 'Mehta',
-    name: 'Karthik Mehta',
-    mobile: '+91 9876543210',
-    area: 'Vijayawada',
-    agent: 'Agent 2',
-    status: 'Active',
-    balance: 150,
-    lastBillDate: '2025-06-15',
-    expiryDate: '2025-07-15',
-    stbNumber: 'STB123456',
-    membershipNo: '100740916',
-    stbName: 'Hathway HD',
-    address: 'Vijayawada, Andhra Pradesh',
-    email: 'karthik@example.com',
-    connectionDate: '2022-05-10',
-    lastPayment: 500,
-    lastPaymentDate: '2025-05-15',
-  },
-  {
-    id: 3,
-    firstName: 'Sneha',
-    lastName: 'Reddy',
-    name: 'Sneha Reddy',
-    mobile: '+91 9123456780',
-    area: 'Tenali',
-    agent: 'Agent 3',
-    status: 'Inactive',
-    balance: 0,
-    lastBillDate: '2025-05-20',
-    expiryDate: '2025-06-20',
-    stbNumber: 'STB654321',
-    membershipNo: '100740917',
-    stbName: 'Airtel Digital',
-    address: 'Tenali, Andhra Pradesh',
-    email: 'sneha@example.com',
-    connectionDate: '2021-12-20',
-    lastPayment: 430,
-    lastPaymentDate: '2025-04-20',
-  },
-  {
-    id: 4,
-    firstName: 'Vinay',
-    lastName: 'Varma',
-    name: 'Vinay Varma',
-    mobile: '+91 9012345678',
-    area: 'Mangalagiri',
-    agent: 'Agent 4',
-    status: 'Suspended',
-    balance: 220,
-    lastBillDate: '2025-05-01',
-    expiryDate: '2025-06-01',
-    stbNumber: 'STB999888',
-    membershipNo: '100740918',
-    stbName: 'Tata Play',
-    address: 'Mangalagiri, Andhra Pradesh',
-    email: 'vinay@example.com',
-    connectionDate: '2023-03-01',
-    lastPayment: 510,
-    lastPaymentDate: '2025-04-01',
-  },
-  {
-    id: 5,
-    firstName: 'Divya',
-    lastName: 'Nair',
-    name: 'Divya Nair',
-    mobile: '+91 9156234789',
-    area: 'Guntur',
-    agent: 'Agent 5',
-    status: 'Active',
-    balance: 80,
-    lastBillDate: '2025-06-10',
-    expiryDate: '2025-07-10',
-    stbNumber: 'STB777000',
-    membershipNo: '100740919',
-    stbName: 'Sun Direct',
-    address: 'Guntur, Andhra Pradesh',
-    email: 'divya@example.com',
-    connectionDate: '2023-04-18',
-    lastPayment: 480,
-    lastPaymentDate: '2025-05-10',
-  },
-  {
-    id: 6,
-    firstName: 'Harsha',
-    lastName: 'Vardhan',
-    name: 'Harsha Vardhan',
-    mobile: '+91 9345678123',
-    area: 'Amaravati',
-    agent: 'Agent 6',
-    status: 'Disconnected',
-    balance: 0,
-    lastBillDate: '2025-04-25',
-    expiryDate: '2025-05-25',
-    stbNumber: 'STB001122',
-    membershipNo: '100740920',
-    stbName: 'Videocon D2H',
-    address: 'Amaravati, Andhra Pradesh',
-    email: 'harsha@example.com',
-    connectionDate: '2022-07-11',
-    lastPayment: 600,
-    lastPaymentDate: '2025-03-25',
-  },
-  {
-    id: 7,
-    firstName: 'Pooja',
-    lastName: 'Devi',
-    name: 'Pooja Devi',
-    mobile: '+91 9786543210',
-    area: 'Gannavaram',
-    agent: 'Agent 7',
-    status: 'Active',
-    balance: 40,
-    lastBillDate: '2025-06-05',
-    expiryDate: '2025-07-05',
-    stbNumber: 'STB334455',
-    membershipNo: '100740921',
-    stbName: 'Reliance Digital',
-    address: 'Gannavaram, Andhra Pradesh',
-    email: 'pooja@example.com',
-    connectionDate: '2023-08-19',
-    lastPayment: 490,
-    lastPaymentDate: '2025-05-05',
-  },
-  {
-    id: 8,
-    firstName: 'Suresh',
-    lastName: 'Babu',
-    name: 'Suresh Babu',
-    mobile: '+91 9666123450',
-    area: 'Kankipadu',
-    agent: 'Agent 8',
-    status: 'Suspended',
-    balance: 275,
-    lastBillDate: '2025-05-28',
-    expiryDate: '2025-06-28',
-    stbNumber: 'STB223344',
-    membershipNo: '100740922',
-    stbName: 'Dish TV',
-    address: 'Kankipadu, Andhra Pradesh',
-    email: 'suresh@example.com',
-    connectionDate: '2021-09-15',
-    lastPayment: 520,
-    lastPaymentDate: '2025-04-28',
-  },
-  {
-    id: 9,
-    firstName: 'Radha',
-    lastName: 'Krishna',
-    name: 'Radha Krishna',
-    mobile: '+91 9856234012',
-    area: 'Pedakakani',
-    agent: 'Agent 9',
-    status: 'Active',
-    balance: 0,
-    lastBillDate: '2025-07-01',
-    expiryDate: '2025-08-01',
-    stbNumber: 'STB889900',
-    membershipNo: '100740923',
-    stbName: 'Siti Cable',
-    address: 'Pedakakani, Andhra Pradesh',
-    email: 'radha@example.com',
-    connectionDate: '2022-01-10',
-    lastPayment: 560,
-    lastPaymentDate: '2025-06-01',
-  },
-  {
-    id: 10,
-    firstName: 'Meghana',
-    lastName: 'Singh',
-    name: 'Meghana Singh',
-    mobile: '+91 9393939393',
-    area: 'Tadepalli',
-    agent: 'Agent 10',
-    status: 'Inactive',
-    balance: 150,
-    lastBillDate: '2025-06-12',
-    expiryDate: '2025-07-12',
-    stbNumber: 'STB556677',
-    membershipNo: '100740924',
-    stbName: 'GTPL',
-    address: 'Tadepalli, Andhra Pradesh',
-    email: 'meghana@example.com',
-    connectionDate: '2021-10-25',
-    lastPayment: 610,
-    lastPaymentDate: '2025-05-12',
-  }
-];
