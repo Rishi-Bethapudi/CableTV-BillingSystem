@@ -26,7 +26,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:8080',
   'capacitor://localhost',
-  'https://your-frontend-domain.com', // Replace with actual deployed frontend
+  'https://cable-tv-billing-system.vercel.app', // Replace with actual deployed frontend
 ];
 
 app.use(

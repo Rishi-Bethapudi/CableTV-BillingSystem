@@ -7,8 +7,8 @@ export const loginAsync = createAsyncThunk(
   'auth/login',
   async (payload: { identifier: string; password: string }, { rejectWithValue }) => {
     try {
-      // const response = await axios.post('https://cabletv-billingsystem.onrender.com/api/auth/login', payload);
-      const response = await apiClient.post('/auth/login', payload);
+      const response = await axios.post('https://cabletv-billingsystem.onrender.com/api/auth/login', payload);
+      // const response = await apiClient.post('/auth/login', payload);
       const { accessToken, refreshToken, user } = response.data;
 
       await Preferences.set({ key: 'accessToken', value: accessToken });
