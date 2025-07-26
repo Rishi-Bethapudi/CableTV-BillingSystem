@@ -31,7 +31,6 @@ export default function CustomersPage() {
   const [page, setPage] = useState(1);
   const limit = 6;
 
-  // --- Load customers from API ---
   useEffect(() => {
     const fetchCustomers = async () => {
       setLoading(true);
@@ -54,21 +53,17 @@ export default function CustomersPage() {
         if (dueTomorrow) query.append('dueTomorrow', 'true');
         if (dueNext5Days) query.append('dueNext5Days', 'true');
 
-        // const res = await fetch(
-        //   `https://cabletv-billingsystem.onrender.com/api/customers?${query.toString()}`
-        // );
         const res = await apiClient.get(`/customers?${query.toString()}`);
-        console.log;
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Failed to fetch');
+        const data = res.data;
 
         setCustomers(data.data);
         setTotalPages(data.pagination.totalPages);
       } catch (err) {
         console.error(err);
         toast.error('Failed to load customers');
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchCustomers();
