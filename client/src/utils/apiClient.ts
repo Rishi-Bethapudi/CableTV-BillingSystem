@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
-import store from '../redux/store';
+import {store} from '../redux/store';
 import { setAccessToken, logout } from '../redux/slices/authSlice';
 import { toast } from 'sonner';
 

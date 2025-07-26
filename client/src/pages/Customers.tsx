@@ -9,6 +9,7 @@ import { downloadCustomersToExcel } from '@/utils/excelUtils';
 import CustomerTable from '@/components/customers/CustomerTable';
 import CustomerFilters from '@/components/customers/CustomerFilters';
 import CustomerPagination from '@/components/customers/CustomerPagination';
+import apiClient from '@/utils/apiClient';
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState([]);
@@ -53,9 +54,11 @@ export default function CustomersPage() {
         if (dueTomorrow) query.append('dueTomorrow', 'true');
         if (dueNext5Days) query.append('dueNext5Days', 'true');
 
-        const res = await fetch(
-          `https://cabletv-billingsystem.onrender.com/api/customers?${query.toString()}`
-        );
+        // const res = await fetch(
+        //   `https://cabletv-billingsystem.onrender.com/api/customers?${query.toString()}`
+        // );
+        const res = await apiClient.get(`/customers?${query.toString()}`);
+        console.log;
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Failed to fetch');
 

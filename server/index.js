@@ -22,11 +22,17 @@ initCronJobs();
 // --- Core Middleware ---
 // Enable CORS (Cross-Origin Resource Sharing)
 // This is crucial for allowing your React frontend to communicate with the backend.
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:8080',
+  'capacitor://localhost',
+  'https://your-frontend-domain.com', // Replace with actual deployed frontend
+];
+
 app.use(
   cors({
-    // origin: 'http://localhost:8080', // Allow requests from your React dev server
-    credentials: true, // Allow cookies to be sent from the frontend
-    origin: '*',
+    origin: allowedOrigins,
+    credentials: true,
   })
 );
 
