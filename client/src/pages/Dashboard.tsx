@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { useLayout } from '@/components/layouts/LayoutContext';
 import {
   IndianRupee,
   Users,
@@ -9,10 +11,14 @@ import {
   UserPlus,
   MessageSquare,
   RotateCcw,
+  Bell,
+  LinkIcon,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { DashboardCard } from '@/components/DashboardCard';
 
 export default function Dashboard() {
+  const { setHeaderActions } = useLayout();
   // Sample data - in real app, this would come from your backend
   const dashboardData = {
     monthlyCollection: 125000,
@@ -30,6 +36,19 @@ export default function Dashboard() {
     followUpCustomers: 15,
     recycleBin: 3,
   };
+  useEffect(() => {
+    setHeaderActions(
+      <div className="flex gap-1">
+        <Button variant="ghost" size="icon" onClick={() => {}}>
+          <Bell className="h-5 w-5" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={() => {}}>
+          <LinkIcon className="h-5 w-5" />
+        </Button>
+      </div>
+    );
+    return () => setHeaderActions(null);
+  }, []);
 
   return (
     <div className="space-y-6 px-4 sm:px-6">

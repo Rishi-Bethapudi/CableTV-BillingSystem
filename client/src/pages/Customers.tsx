@@ -9,6 +9,7 @@ import {
   Search,
   MoreVertical,
   Filter,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,27 +22,37 @@ import { useLayout } from '@/components/layouts/LayoutContext';
 
 export default function CustomersPage() {
   const { setHeaderActions } = useLayout();
+  const [showSearch, setShowSearch] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    setHeaderActions(
-      <div className="flex gap-1">
-        <Button variant="ghost" size="icon" onClick={() => {}}>
-          <Search className="h-5 w-5" />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={() => {}}>
-          <Filter className="h-5 w-5" />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={() => {}}>
-          <MoreVertical className="h-5 w-5" />
-        </Button>
-      </div>
-    );
+  // useEffect(() => {
+  //   setHeaderActions(
+  //     <div className="flex gap-1">
+  //       <Button variant="ghost" size="icon" onClick={() => {}}>
+  //         <Search className="h-5 w-5" />
+  //         <Input
+  //           type="search"
+  //           placeholder="Search customers..."
+  //           className="pl-10"
+  //           onChange={(e) =>
+  //             setFilters((prev) => ({ ...prev, searchTerm: e.target.value }))
+  //           }
+  //         />
+  //       </Button>
+  //       <Button variant="ghost" size="icon" onClick={() => {}}>
+  //         <Filter className="h-5 w-5" />
+  //       </Button>
+  //       <Button variant="ghost" size="icon" onClick={() => {}}>
+  //         <MoreVertical className="h-5 w-5" />
+  //       </Button>
+  //     </div>
+  //   );
 
-    return () => setHeaderActions(null); // clear on unmount
-  }, []);
+  //   return () => setHeaderActions(null); // clear on unmount
+  // }, []);
+
   // Filters
   const [filters, setFilters] = useState({
     searchTerm: '',
@@ -54,7 +65,53 @@ export default function CustomersPage() {
     sortBy: 'createdAt',
     order: 'desc',
   });
+  useEffect(() => {
+    setHeaderActions(
+      <div className="flex items-center gap-2">
+        {/* Search Button / Input */}
+        {showSearch ? (
+          <div className="flex items-center border rounded-md px-2">
+            <Search className="h-4 w-4 text-gray-500" />
+            <Input
+              autoFocus
+              type="search"
+              placeholder="Search customers..."
+              className="pl-2 h-7 text-xs border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, searchTerm: e.target.value }))
+              }
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setShowSearch(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowSearch(true)}
+          >
+            <Search className="h-5 w-5" />
+          </Button>
+        )}
 
+        {/* Other buttons */}
+        <Button variant="ghost" size="icon" onClick={() => {}}>
+          <Filter className="h-5 w-5" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={() => {}}>
+          <MoreVertical className="h-5 w-5" />
+        </Button>
+      </div>
+    );
+
+    return () => setHeaderActions(null); // clear on unmount
+  }, [showSearch, setFilters, setHeaderActions]);
   // Pagination
   const [page, setPage] = useState(1);
   const limit = 6;
@@ -146,43 +203,6 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      {/* <Card className="hidden sm:block">
-        <CardHeader className="hidden sm:block">
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-2">
-          <CustomerFilters
-            onSearchChange={(val) =>
-              setFilters((prev) => ({ ...prev, searchTerm: val }))
-            }
-            onStatusChange={(val) =>
-              setFilters((prev) => ({ ...prev, statusFilter: val }))
-            }
-            onBalanceChange={(val) =>
-              setFilters((prev) => ({ ...prev, balanceFilter: val }))
-            }
-            onAreaChange={(val) =>
-              setFilters((prev) => ({ ...prev, areaFilter: val }))
-            }
-            onDueTodayChange={(val) =>
-              setFilters((prev) => ({ ...prev, dueToday: val }))
-            }
-            onDueTomorrowChange={(val) =>
-              setFilters((prev) => ({ ...prev, dueTomorrow: val }))
-            }
-            onDueNext5DaysChange={(val) =>
-              setFilters((prev) => ({ ...prev, dueNext5Days: val }))
-            }
-            onSortChange={(val) =>
-              setFilters((prev) => ({ ...prev, sortBy: val }))
-            }
-            onOrderChange={(val) =>
-              setFilters((prev) => ({ ...prev, order: val }))
-            }
-          />
-        </CardContent>
-      </Card> */}
       {/* Filters Panel (Desktop Only) */}
       <div className="hidden sm:block rounded-md border bg-white">
         {/* Header row with title + search */}

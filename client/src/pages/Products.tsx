@@ -1,16 +1,40 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLayout } from '@/components/layouts/LayoutContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2, Download, Upload } from 'lucide-react';
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Download,
+  Upload,
+  MoreVertical,
+  Trash,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { AddProductDialog } from '@/components/AddProductDialog';
 import { EditProductDialog } from '@/components/EditProductDialog';
-import { downloadProductsToExcel, parseProductsFromExcel } from '@/utils/excelUtils';
+import {
+  downloadProductsToExcel,
+  parseProductsFromExcel,
+} from '@/utils/excelUtils';
 import ExcelUploadDialog from '@/components/ExcelUploadDialog';
 
 interface Product {
@@ -26,11 +50,31 @@ interface Product {
 }
 
 export default function Products() {
+  const { setHeaderActions } = useLayout();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
 
-  const { data: products, isLoading, error, refetch } = useQuery({
+  useEffect(() => {
+    setHeaderActions(
+      <div className="flex gap-1">
+        <Button variant="ghost" size="icon" onClick={() => {}}>
+          <Trash className="h-5 w-5" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={() => {}}>
+          <MoreVertical className="h-5 w-5" />
+        </Button>
+      </div>
+    );
+    return () => setHeaderActions(null);
+  }, []);
+
+  const {
+    data: products,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
       console.log('Fetching products...');
@@ -38,12 +82,12 @@ export default function Products() {
         .from('products')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) {
         console.error('Error fetching products:', error);
         throw error;
       }
-      
+
       console.log('Products fetched:', data);
       return data as Product[];
     },
@@ -55,10 +99,7 @@ export default function Products() {
     }
 
     try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('products').delete().eq('id', id);
 
       if (error) throw error;
 
@@ -79,7 +120,9 @@ export default function Products() {
 
       if (error) throw error;
 
-      toast.success(`Product ${!currentStatus ? 'activated' : 'deactivated'} successfully`);
+      toast.success(
+        `Product ${!currentStatus ? 'activated' : 'deactivated'} successfully`
+      );
       refetch();
     } catch (error) {
       console.error('Error updating product status:', error);
@@ -92,7 +135,7 @@ export default function Products() {
       toast.error('No product data to download');
       return;
     }
-    
+
     downloadProductsToExcel(products, 'products_export.xlsx');
     toast.success('Product data downloaded successfully');
   };
@@ -100,21 +143,19 @@ export default function Products() {
   const handleUploadExcel = async (file: File) => {
     try {
       const productData = await parseProductsFromExcel(file);
-      
+
       // Process and insert the data
-      const insertData = productData.map(product => ({
+      const insertData = productData.map((product) => ({
         product_code: product.product_code,
         name: product.name,
         description: product.description || null,
         category: product.category,
         monthly_price: product.monthly_price,
         installation_fee: product.installation_fee || 0,
-        is_active: product.is_active !== false // Default to true if not specified
+        is_active: product.is_active !== false, // Default to true if not specified
       }));
 
-      const { error } = await supabase
-        .from('products')
-        .insert(insertData);
+      const { error } = await supabase.from('products').insert(insertData);
 
       if (error) throw error;
 
@@ -137,7 +178,9 @@ export default function Products() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-lg text-red-600">Error loading products: {error.message}</div>
+        <div className="text-lg text-red-600">
+          Error loading products: {error.message}
+        </div>
       </div>
     );
   }
@@ -147,7 +190,9 @@ export default function Products() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Products & Packages</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Products & Packages
+          </h1>
           <p className="text-muted-foreground mt-2">
             Manage your cable TV packages and services
           </p>
@@ -161,7 +206,10 @@ export default function Products() {
             <Upload className="h-4 w-4 mr-2" />
             Upload Excel
           </Button>
-          <Button onClick={() => setShowAddDialog(true)} className="flex items-center gap-2">
+          <Button
+            onClick={() => setShowAddDialog(true)}
+            className="flex items-center gap-2"
+          >
             <Plus className="h-4 w-4" />
             Add Product
           </Button>
@@ -172,7 +220,9 @@ export default function Products() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Products</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Products
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{products?.length || 0}</div>
@@ -180,31 +230,37 @@ export default function Products() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Products</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Active Products
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {products?.filter(p => p.is_active).length || 0}
+              {products?.filter((p) => p.is_active).length || 0}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Basic Packages</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Basic Packages
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {products?.filter(p => p.category === 'Basic').length || 0}
+              {products?.filter((p) => p.category === 'Basic').length || 0}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Premium Packages</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Premium Packages
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {products?.filter(p => p.category === 'Premium').length || 0}
+              {products?.filter((p) => p.category === 'Premium').length || 0}
             </div>
           </CardContent>
         </Card>
@@ -235,7 +291,9 @@ export default function Products() {
               <TableBody>
                 {products?.map((product) => (
                   <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.product_code}</TableCell>
+                    <TableCell className="font-medium">
+                      {product.product_code}
+                    </TableCell>
                     <TableCell>
                       <div>
                         <div className="font-medium">{product.name}</div>
@@ -250,12 +308,16 @@ export default function Products() {
                       <Badge variant="outline">{product.category}</Badge>
                     </TableCell>
                     <TableCell>₹{product.monthly_price.toFixed(2)}</TableCell>
-                    <TableCell>₹{(product.installation_fee || 0).toFixed(2)}</TableCell>
                     <TableCell>
-                      <Badge 
-                        variant={product.is_active ? "default" : "secondary"}
+                      ₹{(product.installation_fee || 0).toFixed(2)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={product.is_active ? 'default' : 'secondary'}
                         className="cursor-pointer"
-                        onClick={() => handleToggleActive(product.id, product.is_active)}
+                        onClick={() =>
+                          handleToggleActive(product.id, product.is_active)
+                        }
                       >
                         {product.is_active ? 'Active' : 'Inactive'}
                       </Badge>
@@ -272,7 +334,9 @@ export default function Products() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDeleteProduct(product.id, product.name)}
+                          onClick={() =>
+                            handleDeleteProduct(product.id, product.name)
+                          }
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -287,15 +351,15 @@ export default function Products() {
       </Card>
 
       {/* Dialogs */}
-      <AddProductDialog 
-        open={showAddDialog} 
+      <AddProductDialog
+        open={showAddDialog}
         onOpenChange={setShowAddDialog}
         onSuccess={() => {
           refetch();
           setShowAddDialog(false);
         }}
       />
-      
+
       {editingProduct && (
         <EditProductDialog
           product={editingProduct}
