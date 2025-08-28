@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Download, Plus, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,87 +12,80 @@ import CustomerPagination from '@/components/customers/CustomerPagination';
 import apiClient from '@/utils/apiClient';
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState([]);
+  const [customers, setCustomers] = useState<any[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  // --- Filter states ---
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [balanceFilter, setBalanceFilter] = useState('');
-  const [areaFilter, setAreaFilter] = useState('');
-  const [dueToday, setDueToday] = useState(false);
-  const [dueNext5Days, setDueNext5Days] = useState(false);
-  const [dueTomorrow, setDueTomorrow] = useState(false);
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [order, setOrder] = useState('desc');
+  // Filters
+  const [filters, setFilters] = useState({
+    searchTerm: '',
+    statusFilter: '',
+    balanceFilter: '',
+    areaFilter: '',
+    dueToday: false,
+    dueTomorrow: false,
+    dueNext5Days: false,
+    sortBy: 'createdAt',
+    order: 'desc',
+  });
 
   // Pagination
   const [page, setPage] = useState(1);
   const limit = 6;
 
-  useEffect(() => {
-    const fetchCustomers = async () => {
-      setLoading(true);
-      try {
-        const query = new URLSearchParams({
-          page: page.toString(),
-          limit: limit.toString(),
-          search: searchTerm,
-          customerStatus: statusFilter,
-          locality: areaFilter,
-          sortBy,
-          order,
-        });
+  const fetchCustomers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const query = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        search: filters.searchTerm,
+        customerStatus: filters.statusFilter,
+        locality: filters.areaFilter,
+        sortBy: filters.sortBy,
+        order: filters.order,
+      });
 
-        if (balanceFilter === 'zero') query.append('paid', 'true');
-        else if (balanceFilter === 'due') query.append('unpaid', 'true');
-        else if (balanceFilter === 'advance') query.append('advance', 'true');
-
-        if (dueToday) query.append('dueToday', 'true');
-        if (dueTomorrow) query.append('dueTomorrow', 'true');
-        if (dueNext5Days) query.append('dueNext5Days', 'true');
-
-        const res = await apiClient.get(`/customers?${query.toString()}`);
-        const data = res.data;
-
-        setCustomers(data.data);
-        setTotalPages(data.pagination.totalPages);
-      } catch (err) {
-        console.error(err);
-        toast.error('Failed to load customers');
-      } finally {
-        setLoading(false);
+      // balance filter
+      switch (filters.balanceFilter) {
+        case 'zero':
+          query.append('paid', 'true');
+          break;
+        case 'due':
+          query.append('unpaid', 'true');
+          break;
+        case 'advance':
+          query.append('advance', 'true');
+          break;
       }
-    };
 
-    fetchCustomers();
-  }, [
-    page,
-    limit,
-    searchTerm,
-    statusFilter,
-    balanceFilter,
-    areaFilter,
-    dueToday,
-    dueTomorrow,
-    dueNext5Days,
-    sortBy,
-    order,
-  ]);
+      // due filters
+      if (filters.dueToday) query.append('dueToday', 'true');
+      if (filters.dueTomorrow) query.append('dueTomorrow', 'true');
+      if (filters.dueNext5Days) query.append('dueNext5Days', 'true');
+
+      const res = await apiClient.get(`/customers?${query.toString()}`);
+      const data = res.data;
+      console.log(data);
+
+      setCustomers(data?.data || []);
+      setTotalPages(data?.pagination?.totalPages ?? 1);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load customers');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, limit, filters]);
 
   useEffect(() => {
-    // Reset page to 1 on filter change
+    fetchCustomers();
+  }, [fetchCustomers]);
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
     setPage(1);
-  }, [
-    searchTerm,
-    statusFilter,
-    balanceFilter,
-    areaFilter,
-    dueToday,
-    dueTomorrow,
-    dueNext5Days,
-  ]);
+  }, [filters]);
 
   const handleDownloadExcel = () => {
     if (!customers.length) return toast.error('No data');
@@ -102,7 +95,7 @@ export default function CustomersPage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
+      <div className="hidden sm:flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mb-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             Customers
@@ -128,39 +121,64 @@ export default function CustomersPage() {
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card className="hidden sm:block">
         <CardHeader className="hidden sm:block">
           <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent className="pt-2">
           <CustomerFilters
-            onSearchChange={setSearchTerm}
-            onStatusChange={setStatusFilter}
-            onBalanceChange={setBalanceFilter}
-            onAreaChange={setAreaFilter}
-            onDueTodayChange={setDueToday}
-            onDueTomorrowChange={setDueTomorrow}
-            onDueNext5DaysChange={setDueNext5Days}
-            onSortChange={setSortBy}
-            onOrderChange={setOrder}
+            onSearchChange={(val) =>
+              setFilters((prev) => ({ ...prev, searchTerm: val }))
+            }
+            onStatusChange={(val) =>
+              setFilters((prev) => ({ ...prev, statusFilter: val }))
+            }
+            onBalanceChange={(val) =>
+              setFilters((prev) => ({ ...prev, balanceFilter: val }))
+            }
+            onAreaChange={(val) =>
+              setFilters((prev) => ({ ...prev, areaFilter: val }))
+            }
+            onDueTodayChange={(val) =>
+              setFilters((prev) => ({ ...prev, dueToday: val }))
+            }
+            onDueTomorrowChange={(val) =>
+              setFilters((prev) => ({ ...prev, dueTomorrow: val }))
+            }
+            onDueNext5DaysChange={(val) =>
+              setFilters((prev) => ({ ...prev, dueNext5Days: val }))
+            }
+            onSortChange={(val) =>
+              setFilters((prev) => ({ ...prev, sortBy: val }))
+            }
+            onOrderChange={(val) =>
+              setFilters((prev) => ({ ...prev, order: val }))
+            }
           />
         </CardContent>
       </Card>
 
-      {/* Table */}
-      <Card>
-        <CardHeader className="hidden sm:block">
-          <CardTitle>All Customers ({customers.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CustomerTable customers={customers} loading={loading} />
-          <CustomerPagination
-            currentPage={page}
-            totalPages={totalPages}
-            onPageChange={setPage}
-          />
-        </CardContent>
-      </Card>
+      <div className=" top-0  lg:hidden">
+        <div className="flex space-x-2">
+          <button className="px-4 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded-full">
+            Due Today
+          </button>
+          <button className="px-4 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded-full">
+            Due Tomorrow
+          </button>
+          <button className="px-4 py-1 text-sm font-medium text-white bg-gray-800 rounded-full">
+            Unpaid
+          </button>
+        </div>
+      </div>
+      <div>
+        <CustomerTable customers={customers} loading={loading} />
+        <CustomerPagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
+      </div>
     </div>
   );
 }

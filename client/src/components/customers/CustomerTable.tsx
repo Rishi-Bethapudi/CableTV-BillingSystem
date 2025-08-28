@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Customer } from '@/utils/data';
-import { Eye } from 'lucide-react';
+import { Eye, MapPin } from 'lucide-react';
 
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
@@ -93,58 +93,60 @@ export default function CustomerTable({ customers }: Props) {
       </div>
 
       {/* Mobile Card View */}
-      <div className="md:hidden space-y-4">
+      <div className="md:hidden space-y-1">
         {customers.length === 0 ? (
           <div className="text-center text-muted-foreground py-6">
             No customers match your filters.
           </div>
         ) : (
-          customers.map((customer) => (
-            <Link
-              key={customer.sCode}
-              to={`/customers/${customer.sCode}`}
-              className="block rounded-lg border p-4 shadow-sm bg-white dark:bg-slate-900 hover:shadow-md transition"
+          customers.map((customer, index) => (
+            <div
+              key={index}
+              className="bg-white p-2 w-full rounded-lg shadow-sm flex items-center"
+              onClick={() => navigate('details')}
             >
-              <div className="flex justify-between items-center mb-2">
-                <div className="font-semibold text-lg">
-                  {customer.firstName} {customer.lastName}
-                </div>
-                <Badge
-                  variant={
-                    customer.status === 'Active' ? 'default' : 'secondary'
-                  }
-                >
-                  {customer.status}
-                </Badge>
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
+                  [
+                    'bg-blue-500',
+                    'bg-purple-500',
+                    'bg-orange-500',
+                    'bg-teal-500',
+                  ][index % 4]
+                }`}
+              >
+                {customer.name.charAt(0)}
               </div>
-
-              <div className="text-sm text-muted-foreground mb-2">
-                📞 {customer.phone}
+              <div className="flex-1 ml-4">
+                <p className="font-semibold text-gray-900">{customer.name}</p>
+                <div className="text-xs text-gray-500 flex items-center space-x-2 mt-1">
+                  <span>Active</span>
+                  <span>|</span>
+                  <span>
+                    Due Date:{' '}
+                    {new Date(customer.expiryDate).toLocaleDateString('en-IN')}
+                  </span>
+                </div>
+                {customer.locality !== 'N/A' && (
+                  <div className="text-xs text-gray-500 flex items-center mt-1">
+                    <MapPin size={12} className="mr-1" />
+                    {customer.locality}
+                  </div>
+                )}
               </div>
-
-              {/* Grid for details */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                <div>
-                  <span className="font-medium">💳 Balance:</span> ₹
-                  {customer.balance}
-                </div>
-                <div>
-                  <span className="font-medium">🏠 Area:</span> {customer.area}
-                </div>
-                <div>
-                  <span className="font-medium">🧾 Bill:</span> ₹
-                  {customer.lastBillAmount}
-                </div>
-                <div>
-                  <span className="font-medium">⏰ Exp:</span>{' '}
-                  {new Date(customer.expired).toLocaleDateString('en-IN')}
-                </div>
+              <div
+                className={`px-3 py-1 text-sm font-bold rounded-md ${
+                  customer.balanceAmount > 0
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-gray-800 text-white'
+                }`}
+              >
+                ₹{customer.balanceAmount.toLocaleString('en-IN')}
+                {customer.balanceAmount > 0 && (
+                  <p className="text-xs font-normal text-right">Due</p>
+                )}
               </div>
-
-              <div className="text-xs text-muted-foreground mt-2">
-                Code: {customer.sCode}
-              </div>
-            </Link>
+            </div>
           ))
         )}
       </div>

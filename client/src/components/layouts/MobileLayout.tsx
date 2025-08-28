@@ -54,7 +54,7 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* --- Main Content --- */}
-      <main className="flex-1 overflow-y-auto p-4 pb-20">{children}</main>
+      <main className="flex-1 overflow-y-auto  pb-20">{children}</main>
 
       {/* --- Bottom Navigation --- */}
       <BottomNavBar />

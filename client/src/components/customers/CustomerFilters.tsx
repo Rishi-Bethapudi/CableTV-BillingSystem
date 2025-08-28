@@ -60,6 +60,7 @@ export default function CustomerFilters({
     setDueTomorrow(false);
     setDueNext5Days(false);
     setSearch('');
+    onSearchChange('');
   };
 
   useEffect(() => {
