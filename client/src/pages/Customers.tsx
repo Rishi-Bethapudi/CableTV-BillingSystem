@@ -2,20 +2,46 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Download, Plus, Upload } from 'lucide-react';
+import {
+  Download,
+  Plus,
+  Upload,
+  Search,
+  MoreVertical,
+  Filter,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { downloadCustomersToExcel } from '@/utils/excelUtils';
 import CustomerTable from '@/components/customers/CustomerTable';
 import CustomerFilters from '@/components/customers/CustomerFilters';
 import CustomerPagination from '@/components/customers/CustomerPagination';
 import apiClient from '@/utils/apiClient';
+import { useLayout } from '@/components/layouts/LayoutContext';
 
 export default function CustomersPage() {
+  const { setHeaderActions } = useLayout();
   const [customers, setCustomers] = useState<any[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    setHeaderActions(
+      <div className="flex gap-1">
+        <Button variant="ghost" size="icon" onClick={() => {}}>
+          <Search className="h-5 w-5" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={() => {}}>
+          <Filter className="h-5 w-5" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={() => {}}>
+          <MoreVertical className="h-5 w-5" />
+        </Button>
+      </div>
+    );
+
+    return () => setHeaderActions(null); // clear on unmount
+  }, []);
   // Filters
   const [filters, setFilters] = useState({
     searchTerm: '',
@@ -121,7 +147,7 @@ export default function CustomersPage() {
       </div>
 
       {/* Filters */}
-      <Card className="hidden sm:block">
+      {/* <Card className="hidden sm:block">
         <CardHeader className="hidden sm:block">
           <CardTitle>Filters</CardTitle>
         </CardHeader>
@@ -156,7 +182,58 @@ export default function CustomersPage() {
             }
           />
         </CardContent>
-      </Card>
+      </Card> */}
+      {/* Filters Panel (Desktop Only) */}
+      <div className="hidden sm:block rounded-md border bg-white">
+        {/* Header row with title + search */}
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <h2 className="text-lg font-semibold">Filters</h2>
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search customers..."
+              className="pl-10"
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, searchTerm: e.target.value }))
+              }
+            />
+          </div>
+        </div>
+
+        {/* Body (all other filters) */}
+        <div className="p-4">
+          <CustomerFilters
+            onSearchChange={(val) =>
+              setFilters((prev) => ({ ...prev, searchTerm: val }))
+            }
+            onStatusChange={(val) =>
+              setFilters((prev) => ({ ...prev, statusFilter: val }))
+            }
+            onBalanceChange={(val) =>
+              setFilters((prev) => ({ ...prev, balanceFilter: val }))
+            }
+            onAreaChange={(val) =>
+              setFilters((prev) => ({ ...prev, areaFilter: val }))
+            }
+            onDueTodayChange={(val) =>
+              setFilters((prev) => ({ ...prev, dueToday: val }))
+            }
+            onDueTomorrowChange={(val) =>
+              setFilters((prev) => ({ ...prev, dueTomorrow: val }))
+            }
+            onDueNext5DaysChange={(val) =>
+              setFilters((prev) => ({ ...prev, dueNext5Days: val }))
+            }
+            onSortChange={(val) =>
+              setFilters((prev) => ({ ...prev, sortBy: val }))
+            }
+            onOrderChange={(val) =>
+              setFilters((prev) => ({ ...prev, order: val }))
+            }
+          />
+        </div>
+      </div>
 
       <div className=" top-0  lg:hidden">
         <div className="flex space-x-2">

@@ -43,9 +43,21 @@ export default function CustomerFilters({
   const [search, setSearch] = useState('');
   const [popoverOpen, setPopoverOpen] = useState(false);
 
-  const [dueToday, setDueToday] = useState(false);
-  const [dueTomorrow, setDueTomorrow] = useState(false);
-  const [dueNext5Days, setDueNext5Days] = useState(false);
+  const [dueFilters, setDueFilters] = useState({
+    dueToday: false,
+    dueTomorrow: false,
+    dueNext5Days: false,
+  });
+
+  const filterOptions = [
+    { key: 'dueToday', label: 'Due Today' },
+    { key: 'dueTomorrow', label: 'Due Tomorrow' },
+    { key: 'dueNext5Days', label: 'Due in 5 Days' },
+  ] as const;
+
+  const toggleFilter = (key: keyof typeof dueFilters) => {
+    setDueFilters((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const resetFilters = () => {
     onStatusChange('');
@@ -56,13 +68,16 @@ export default function CustomerFilters({
     onDueNext5DaysChange(false);
     onSortChange('');
     onOrderChange('');
-    setDueToday(false);
-    setDueTomorrow(false);
-    setDueNext5Days(false);
+    setDueFilters({
+      dueToday: false,
+      dueTomorrow: false,
+      dueNext5Days: false,
+    });
     setSearch('');
     onSearchChange('');
   };
 
+  // debounce search
   useEffect(() => {
     const debounce = setTimeout(() => {
       onSearchChange(search);
@@ -70,10 +85,12 @@ export default function CustomerFilters({
     return () => clearTimeout(debounce);
   }, [search]);
 
-  // These update parent
-  useEffect(() => onDueTodayChange(dueToday), [dueToday]);
-  useEffect(() => onDueTomorrowChange(dueTomorrow), [dueTomorrow]);
-  useEffect(() => onDueNext5DaysChange(dueNext5Days), [dueNext5Days]);
+  // sync due filters with parent
+  useEffect(() => {
+    onDueTodayChange(dueFilters.dueToday);
+    onDueTomorrowChange(dueFilters.dueTomorrow);
+    onDueNext5DaysChange(dueFilters.dueNext5Days);
+  }, [dueFilters]);
 
   return (
     <div className="flex flex-col gap-4 w-full">
@@ -97,6 +114,7 @@ export default function CustomerFilters({
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-64 space-y-4" align="end">
+            {/* Balance */}
             <Select onValueChange={onBalanceChange}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select Balance" />
@@ -108,6 +126,7 @@ export default function CustomerFilters({
               </SelectContent>
             </Select>
 
+            {/* Status */}
             <Select onValueChange={onStatusChange}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Filter by status" />
@@ -120,6 +139,7 @@ export default function CustomerFilters({
               </SelectContent>
             </Select>
 
+            {/* Area */}
             <Select onValueChange={onAreaChange}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Filter by area" />
@@ -132,36 +152,30 @@ export default function CustomerFilters({
               </SelectContent>
             </Select>
 
+            {/* Due filters */}
             <div className="space-y-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={dueToday}
-                  onChange={(e) => setDueToday(e.target.checked)}
-                  className="accent-primary"
-                />
-                Due Today
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={dueTomorrow}
-                  onChange={(e) => setDueTomorrow(e.target.checked)}
-                  className="accent-primary"
-                />
-                Due Tomorrow
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={dueNext5Days}
-                  onChange={(e) => setDueNext5Days(e.target.checked)}
-                  className="accent-primary"
-                />
-                Due in 5 Days
-              </label>
+              {filterOptions.map(({ key, label }) => (
+                <label
+                  key={key}
+                  className={`flex items-center gap-2 text-sm px-3 py-1 rounded-md cursor-pointer transition-colors
+                    ${
+                      dueFilters[key]
+                        ? 'bg-primary text-white'
+                        : 'bg-gray-100 hover:bg-gray-200'
+                    }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={dueFilters[key]}
+                    onChange={() => toggleFilter(key)}
+                    className="accent-primary"
+                  />
+                  {label}
+                </label>
+              ))}
             </div>
 
+            {/* Sort */}
             <Select onValueChange={onSortChange}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Sort by" />
@@ -173,6 +187,7 @@ export default function CustomerFilters({
               </SelectContent>
             </Select>
 
+            {/* Order */}
             <Select onValueChange={onOrderChange}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Order" />
@@ -192,17 +207,7 @@ export default function CustomerFilters({
 
       {/* Desktop */}
       <div className="hidden lg:flex items-center gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search customers..."
-            className="pl-10"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
+        {/* Balance */}
         <Select onValueChange={onBalanceChange}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Select Balance" />
@@ -214,6 +219,7 @@ export default function CustomerFilters({
           </SelectContent>
         </Select>
 
+        {/* Status */}
         <Select onValueChange={onStatusChange}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Filter by status" />
@@ -226,6 +232,7 @@ export default function CustomerFilters({
           </SelectContent>
         </Select>
 
+        {/* Area */}
         <Select onValueChange={onAreaChange}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Filter by area" />
@@ -238,34 +245,30 @@ export default function CustomerFilters({
           </SelectContent>
         </Select>
 
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={dueToday}
-            onChange={(e) => setDueToday(e.target.checked)}
-            className="accent-primary"
-          />
-          Due Today
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={dueTomorrow}
-            onChange={(e) => setDueTomorrow(e.target.checked)}
-            className="accent-primary"
-          />
-          Due Tomorrow
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={dueNext5Days}
-            onChange={(e) => setDueNext5Days(e.target.checked)}
-            className="accent-primary"
-          />
-          Due in 5 Days
-        </label>
+        {/* Due filters */}
+        <div className="flex gap-2">
+          {filterOptions.map(({ key, label }) => (
+            <label
+              key={key}
+              className={`flex items-center gap-2 text-sm px-3 py-1 rounded-md cursor-pointer transition-colors
+                ${
+                  dueFilters[key]
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-100 hover:bg-gray-200'
+                }`}
+            >
+              <input
+                type="checkbox"
+                checked={dueFilters[key]}
+                onChange={() => toggleFilter(key)}
+                className="accent-primary"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
 
+        {/* Sort */}
         <Select onValueChange={onSortChange}>
           <SelectTrigger className="w-36">
             <SelectValue placeholder="Sort by" />
@@ -277,6 +280,7 @@ export default function CustomerFilters({
           </SelectContent>
         </Select>
 
+        {/* Order */}
         <Select onValueChange={onOrderChange}>
           <SelectTrigger className="w-32">
             <SelectValue placeholder="Order" />

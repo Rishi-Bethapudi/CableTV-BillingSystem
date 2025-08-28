@@ -29,6 +29,7 @@ export default function CustomerTable({ customers }: Props) {
             <TableRow>
               <TableHead>Customer Code</TableHead>
               <TableHead>Name</TableHead>
+              <TableHead>Hardware</TableHead>
               <TableHead>Balance</TableHead>
               <TableHead>Area</TableHead>
               <TableHead>Last Bill Amount</TableHead>
@@ -47,46 +48,91 @@ export default function CustomerTable({ customers }: Props) {
                 </TableCell>
               </TableRow>
             ) : (
-              customers.map((customer) => (
-                <TableRow
-                  key={customer._id}
-                  className="group cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                  onClick={() => navigate(`/customers/${customer._id}`)}
-                >
-                  <TableCell>{customer.customerCode}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">{customer.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {customer.mobile}
+              customers.map((customer) => {
+                const isExpired = new Date(customer.expiryDate) < new Date();
+                return (
+                  <TableRow
+                    key={customer._id}
+                    className="group cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    onClick={() => navigate(`/customers/${customer._id}`)}
+                  >
+                    <TableCell className="py-2 px-2 text-sm">
+                      {customer.customerCode}
+                    </TableCell>
+
+                    <TableCell>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">{customer.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {customer.mobile}
+                          </div>
                         </div>
                       </div>
+                    </TableCell>
+                    <TableCell className="py-2 px-2 text-xs text-gray-700">
+                      <div className="flex flex-col gap-0.5">
+                        {customer.stbName && (
+                          <span>STB: {customer.stbName}</span>
+                        )}
+                        {customer.stbNumber && (
+                          <span>STB No: {customer.stbNumber}</span>
+                        )}
+                        {customer.cardNumber && (
+                          <span>Card: {customer.cardNumber}</span>
+                        )}
+                      </div>
+                    </TableCell>
 
-                      {/* Show eye icon only on hover */}
-                      <Eye
-                        className="ml-2 h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation(); // prevent row click
-                          navigate(`/customers/${customer._id}`);
-                        }}
-                      />
-                    </div>
-                  </TableCell>
+                    {/* Balance: green if positive, red if negative */}
+                    <TableCell
+                      className={`py-2 px-2 text-sm font-semibold ${
+                        customer.balanceAmount < 0
+                          ? 'text-red-600'
+                          : 'text-green-600'
+                      }`}
+                    >
+                      ₹{customer.balanceAmount.toLocaleString('en-IN')}
+                    </TableCell>
 
-                  <TableCell>{customer.balanceAmount}</TableCell>
-                  <TableCell>{customer.locality}</TableCell>
-                  <TableCell>{customer.lastPaymentAmount}</TableCell>
-                  <TableCell>
-                    {new Date(customer.expiryDate).toLocaleDateString('en-IN')}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={customer.active ? 'default' : 'secondary'}>
-                      {customer.active ? 'Active' : 'Expired'}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))
+                    <TableCell className="py-2 px-2 text-sm">
+                      {customer.locality}
+                    </TableCell>
+                    <TableCell className="py-2 px-2 text-sm">
+                      ₹{customer.lastPaymentAmount.toLocaleString('en-IN')}
+                    </TableCell>
+
+                    {/* Expiry Date: red if expired */}
+                    <TableCell
+                      className={`py-2 px-2 text-sm font-medium ${
+                        isExpired ? 'text-red-600' : 'text-gray-800'
+                      }`}
+                    >
+                      {new Date(customer.expiryDate).toLocaleDateString(
+                        'en-IN'
+                      )}
+                    </TableCell>
+
+                    {/* Status Badge: red if expired/inactive, green if active */}
+                    <TableCell>
+                      <Badge
+                        variant={
+                          customer.active && !isExpired
+                            ? 'default'
+                            : 'destructive'
+                        }
+                        className={`px-2 py-1 text-sm ${
+                          customer.active && !isExpired
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {customer.active && !isExpired ? 'Active' : 'Expired'}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -101,12 +147,12 @@ export default function CustomerTable({ customers }: Props) {
         ) : (
           customers.map((customer, index) => (
             <div
-              key={index}
-              className="bg-white p-2 w-full rounded-lg shadow-sm flex items-center"
-              onClick={() => navigate('details')}
+              key={customer._id}
+              className="bg-white p-1.5 w-full rounded-lg shadow-sm flex items-center"
+              onClick={() => navigate(`/customers/${customer._id}`)}
             >
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
                   [
                     'bg-blue-500',
                     'bg-purple-500',
@@ -117,25 +163,40 @@ export default function CustomerTable({ customers }: Props) {
               >
                 {customer.name.charAt(0)}
               </div>
-              <div className="flex-1 ml-4">
-                <p className="font-semibold text-gray-900">{customer.name}</p>
-                <div className="text-xs text-gray-500 flex items-center space-x-2 mt-1">
-                  <span>Active</span>
-                  <span>|</span>
-                  <span>
-                    Due Date:{' '}
+
+              <div className="flex-1 ml-3">
+                <p className="font-semibold text-gray-900 truncate max-w-[120px]">
+                  {customer.name}
+                </p>
+                <div className="text-xs flex items-center space-x-2 mt-0.5">
+                  <span
+                    className={
+                      customer.active ? 'text-green-600' : 'text-red-600'
+                    }
+                  >
+                    {customer.active ? 'Active' : 'Expired'}
+                  </span>
+                  <span className="text-gray-500">|</span>
+                  <span
+                    className={
+                      customer.active ? 'text-gray-500' : 'text-red-600'
+                    }
+                  >
+                    Due:{' '}
                     {new Date(customer.expiryDate).toLocaleDateString('en-IN')}
                   </span>
                 </div>
+
                 {customer.locality !== 'N/A' && (
-                  <div className="text-xs text-gray-500 flex items-center mt-1">
-                    <MapPin size={12} className="mr-1" />
+                  <div className="text-xs text-gray-500 flex items-center mt-0.5 truncate max-w-[100px]">
+                    <MapPin size={12} className="mr-1 shrink-0" />
                     {customer.locality}
                   </div>
                 )}
               </div>
+
               <div
-                className={`px-3 py-1 text-sm font-bold rounded-md ${
+                className={`px-2 py-0.5 text-xs font-bold rounded-md shrink-0 ${
                   customer.balanceAmount > 0
                     ? 'bg-green-100 text-green-800'
                     : 'bg-gray-800 text-white'
@@ -143,7 +204,7 @@ export default function CustomerTable({ customers }: Props) {
               >
                 ₹{customer.balanceAmount.toLocaleString('en-IN')}
                 {customer.balanceAmount > 0 && (
-                  <p className="text-xs font-normal text-right">Due</p>
+                  <p className="text-[10px] font-normal text-right">Due</p>
                 )}
               </div>
             </div>

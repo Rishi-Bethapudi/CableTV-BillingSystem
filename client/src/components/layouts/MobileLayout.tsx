@@ -21,8 +21,12 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen flex-col bg-slate-50 dark:bg-slate-900">
       {/* --- Header --- */}
-      <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background px-4">
-        {/* Hamburger Menu Button */}
+      <header
+        className={`sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background px-4 ${
+          !headerActions ? 'hidden' : ''
+        }`}
+      >
+        {/* Hamburger Menu */}
         <Button
           variant="ghost"
           size="icon"
@@ -32,25 +36,9 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
           <Menu className="h-5 w-5" />
         </Button>
 
-        <div className="flex-1" />
+        <div className="flex-1 font-semibold text-lg">Cable</div>
 
-        {/* Action Icons */}
-        <div className="flex items-center gap-1">
-          {headerActions}
-          <Button variant="ghost" size="icon" onClick={handleSearchClick}>
-            <Search className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleNotificationsClick}
-          >
-            <Bell className="h-5 w-5" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={handleProfileClick}>
-            <User className="h-5 w-5" />
-          </Button>
-        </div>
+        <div className="flex items-center gap-1">{headerActions}</div>
       </header>
 
       {/* --- Main Content --- */}
