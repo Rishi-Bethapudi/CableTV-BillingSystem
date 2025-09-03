@@ -14,11 +14,9 @@ const createBilling = async (req, res) => {
   const { customerId, productId, note } = req.body;
 
   if (!customerId || !productId) {
-    return res
-      .status(400)
-      .json({
-        message: 'Customer ID and Product ID are required for billing.',
-      });
+    return res.status(400).json({
+      message: 'Customer ID and Product ID are required for billing.',
+    });
   }
 
   try {
@@ -27,11 +25,9 @@ const createBilling = async (req, res) => {
     if (!customer)
       return res.status(404).json({ message: 'Customer not found.' });
     if (customer.operatorId.toString() !== req.user.operatorId) {
-      return res
-        .status(403)
-        .json({
-          message: 'Forbidden: You are not authorized to bill this customer.',
-        });
+      return res.status(403).json({
+        message: 'Forbidden: You are not authorized to bill this customer.',
+      });
     }
 
     const product = await Product.findById(productId);
@@ -82,6 +78,7 @@ const createBilling = async (req, res) => {
 
     // --- 6. Update the Customer record ---
     customer.balanceAmount = balanceAfter;
+    customer.lastPaymentDate = new Date();
     customer.expiryDate = newExpiryDate;
     customer.productId = productId; // Update to the new product/plan
     customer.active = true; // Ensure customer is marked active on billing

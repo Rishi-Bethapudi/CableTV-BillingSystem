@@ -41,6 +41,7 @@ const customerSchema = new mongoose.Schema(
     discount: { type: Number, default: 0 },
 
     lastPaymentAmount: { type: Number, default: 0 },
+    lastPaymentDate: Date,
     remark: String,
   },
   { timestamps: true }
