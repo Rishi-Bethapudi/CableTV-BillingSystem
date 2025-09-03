@@ -258,7 +258,7 @@ const updateCustomer = async (req, res) => {
       customerId,
       { $set: req.body },
       { new: true, runValidators: true } // 'new: true' returns the updated doc, 'runValidators' ensures schema rules are met
-    ).populate('agent', 'name');
+    ).populate('agentId', 'name');
 
     res.status(200).json(updatedCustomer);
   } catch (error) {
