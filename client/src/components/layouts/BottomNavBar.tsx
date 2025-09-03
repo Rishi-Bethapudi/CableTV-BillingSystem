@@ -10,7 +10,7 @@ const navItems = [
 
 export function BottomNavBar() {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 shadow-md bg-background">
       <div className="grid h-16 max-w-lg grid-cols-4 mx-auto">
         {navItems.map((item) => (
           <NavLink
@@ -18,7 +18,7 @@ export function BottomNavBar() {
             to={item.to}
             end={item.to === '/'}
             className={({ isActive }) =>
-              `inline-flex flex-col items-center justify-center gap-1.5 p-2 text-xs font-medium ${
+              `inline-flex flex-col items-center justify-center gap-1.5 p-2 text-xs font-medium transition-colors ${
                 isActive ? 'text-primary' : 'text-muted-foreground'
               }`
             }

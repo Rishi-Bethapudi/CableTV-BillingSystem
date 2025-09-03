@@ -23,10 +23,10 @@ const CustomerEditSection = lazy(() => import('./CustomerEditSection'));
 
 export default function CustomerRightPanel({ customer, activeSection }: Props) {
   return (
-    <div className="space-y-6 transition-all animate-in fade-in zoom-in duration-300">
+    <div className="w-full space-y-6 transition-all animate-in fade-in zoom-in duration-300">
       <Suspense
         fallback={
-          <div className="flex justify-center items-center p-6">
+          <div className="flex justify-center items-center p-6 min-h-[200px]">
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
         }

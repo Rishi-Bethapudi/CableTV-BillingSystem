@@ -1,17 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { useParams, useLocation } from 'react-router-dom';
 import CustomerHeader from '@/components/customer/CustomerHeader';
 import CustomerMainDetails from '@/components/customer/CustomerMainDetails';
 import CustomerSidebar from '@/components/customer/CustomerSidebar';
@@ -19,33 +7,15 @@ import CustomerRightPanel from '@/components/customer/CustomerRightPanel';
 
 export default function CustomerDetails() {
   const { id } = useParams();
+  const location = useLocation();
+  const [customer, setCustomer] = useState(location.state?.customer || null);
   const [activeSection, setActiveSection] = useState<string | null>(
     'collect-payment'
   );
-
-  // Sample customer data - in real app, this would come from API
-  const customer = {
-    id: 1,
-    firstName: 'Anjaneyulu',
-    lastName: 'Janga',
-    name: 'Anjaneyulu Janga',
-    mobile: '+91 9963676402',
-    area: 'Kandrapadu',
-    agent: 'Agent 1',
-    status: 'Active',
-    balance: 0,
-    lastBillDate: '2025-06-27',
-    expiryDate: '2025-07-27',
-    stbNumber: 'DSNW202dec08',
-    membershipNo: '100740915',
-    stbName: 'DASAN - Corpus',
-    address: 'Kandrapadu, Andhra Pradesh',
-    email: 'anjaneyulu@example.com',
-    connectionDate: '2023-01-15',
-    lastPayment: 350,
-    lastPaymentDate: '2025-05-29',
-  };
-
+  if (!customer) {
+    // fallback: fetch customer details by id
+    return <div>Loading customer...</div>;
+  }
   const handleSidebarAction = (action: string) => {
     setActiveSection(activeSection === action ? null : action);
   };

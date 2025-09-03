@@ -38,7 +38,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
     <div
       className={cn(
         'bg-slate-900 text-white transition-all duration-300 flex flex-col h-full md:h-screen fixed md:relative z-50',
-        isCollapsed ? 'w-16' : 'w-64'
+        isCollapsed ? 'w-16' : 'w-50'
       )}
     >
       {/* Header */}

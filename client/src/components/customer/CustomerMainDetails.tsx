@@ -1,106 +1,103 @@
 // File: components/customer/CustomerMainDetails.tsx
-
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Customer } from '@/utils/data';
-
-interface Props {
-  //   customer: Customer;
+interface CustomerProps {
+  customer: {
+    name: string;
+    mobile?: string;
+    locality?: string;
+    balance?: number;
+    lastBillDate?: string;
+    stbName?: string;
+    stbNumber?: string;
+    cardNumber?: string;
+  };
 }
 
-function DetailCard({
-  title,
-  value,
-}: {
-  title: string;
-  value: string | number;
-}) {
+export default function CustomerMainDetails({ customer }: CustomerProps) {
   return (
-    <Card className="shadow-sm">
-      <CardHeader className="pb-2">
-        <p className="text-sm text-muted-foreground">{title}</p>
-      </CardHeader>
-      <CardContent>
-        <p className="text-base lg:text-lg font-semibold text-foreground">
-          {value}
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
-
-export default function CustomerMainDetails({ customer }) {
-  return (
-    <div className="space-y-6">
-      {/* Card 1: Customer Overview */}
-
-      <Card>
-        <CardHeader className="pb-0"></CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="font-semibold">Balance</TableHead>
-                <TableHead className="font-semibold">Last Bill Date</TableHead>
-                <TableHead className="font-semibold">Area</TableHead>
-                <TableHead className="font-semibold">Mobile</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow>
-                <TableCell className="font-medium">
-                  ₹{customer.balance}
-                </TableCell>
-                <TableCell className="font-medium">
-                  {new Date(customer.lastBillDate).toLocaleDateString('en-GB', {
+    <div className="space-y-3">
+      {/* Customer Overview */}
+      <div className="bg-white dark:bg-gray-800 shadow rounded-md p-4 sm:p-6">
+        <h2 className="text-lg font-semibold mb-3">Customer Overview</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="flex flex-col">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              Balance
+            </span>
+            <span className="font-semibold text-gray-900 dark:text-white">
+              ₹{customer.balance?.toLocaleString() ?? 0}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              Last Bill Date
+            </span>
+            <span className="font-semibold text-gray-900 dark:text-white">
+              {customer.lastBillDate
+                ? new Date(customer.lastBillDate).toLocaleDateString('en-GB', {
                     day: '2-digit',
                     month: 'short',
                     year: 'numeric',
-                  })}
-                </TableCell>
-                <TableCell className="font-medium">{customer.area}</TableCell>
-                <TableCell className="font-medium">
-                  {customer.mobile.replace('+91 ', '')}
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="pb-0">
-          <CardTitle className="text-lg">Hardware Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="font-semibold">STB Name</TableHead>
-                <TableHead className="font-semibold">STB No</TableHead>
-                <TableHead className="font-semibold">Card No</TableHead>
-                <TableHead className="font-semibold">Membership No</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow>
-                <TableCell className="font-medium">
-                  {customer.stbName}
-                </TableCell>
-                <TableCell>{customer.stbNumber}</TableCell>
-                <TableCell className="text-slate-400">N/A</TableCell>
-                <TableCell>{customer.membershipNo}</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                  })
+                : 'N/A'}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              Area
+            </span>
+            <span className="font-semibold text-gray-900 dark:text-white">
+              {customer.locality ?? 'N/A'}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              Mobile
+            </span>
+            <span className="font-semibold text-gray-900 dark:text-white">
+              {customer.mobile ? customer.mobile.replace('+91 ', '') : 'N/A'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Hardware Details */}
+      <div className="bg-white dark:bg-gray-800 shadow rounded-md p-4 sm:p-6">
+        <h2 className="text-lg font-semibold mb-3">Hardware Details</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="flex flex-col">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              STB Name
+            </span>
+            <span className="font-semibold text-gray-900 dark:text-white">
+              {customer.stbName ?? 'N/A'}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              STB No
+            </span>
+            <span className="font-semibold text-gray-900 dark:text-white">
+              {customer.stbNumber ?? 'N/A'}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              Card No
+            </span>
+            <span className="font-semibold text-gray-400">
+              {customer.cardNumber ?? 'N/A'}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              Membership No
+            </span>
+            <span className="font-semibold text-gray-900 dark:text-white">
+              {customer.cardNumber ?? 'N/A'}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

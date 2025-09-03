@@ -27,32 +27,6 @@ export default function CustomersPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  // useEffect(() => {
-  //   setHeaderActions(
-  //     <div className="flex gap-1">
-  //       <Button variant="ghost" size="icon" onClick={() => {}}>
-  //         <Search className="h-5 w-5" />
-  //         <Input
-  //           type="search"
-  //           placeholder="Search customers..."
-  //           className="pl-10"
-  //           onChange={(e) =>
-  //             setFilters((prev) => ({ ...prev, searchTerm: e.target.value }))
-  //           }
-  //         />
-  //       </Button>
-  //       <Button variant="ghost" size="icon" onClick={() => {}}>
-  //         <Filter className="h-5 w-5" />
-  //       </Button>
-  //       <Button variant="ghost" size="icon" onClick={() => {}}>
-  //         <MoreVertical className="h-5 w-5" />
-  //       </Button>
-  //     </div>
-  //   );
-
-  //   return () => setHeaderActions(null); // clear on unmount
-  // }, []);
-
   // Filters
   const [filters, setFilters] = useState({
     searchTerm: '',
@@ -65,18 +39,21 @@ export default function CustomersPage() {
     sortBy: 'createdAt',
     order: 'desc',
   });
+
+  // Header actions
   useEffect(() => {
     setHeaderActions(
       <div className="flex items-center gap-2">
-        {/* Search Button / Input */}
+        {/* Search */}
         {showSearch ? (
-          <div className="flex items-center border rounded-md px-2">
-            <Search className="h-4 w-4 text-gray-500" />
+          <div className="flex items-center border rounded-md px-2 w-full sm:w-64">
+            <Search className="h-4 w-4 text-gray-500 shrink-0" />
             <Input
               autoFocus
               type="search"
               placeholder="Search customers..."
-              className="pl-2 h-7 text-xs border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+              className="pl-2 h-7 text-xs border-0 focus-visible:ring-0 focus-visible:ring-offset-0 flex-1"
+              onBlur={() => setShowSearch(false)}
               onChange={(e) =>
                 setFilters((prev) => ({ ...prev, searchTerm: e.target.value }))
               }
@@ -100,21 +77,23 @@ export default function CustomersPage() {
           </Button>
         )}
 
-        {/* Other buttons */}
-        <Button variant="ghost" size="icon" onClick={() => {}}>
+        {/* Filter */}
+        <Button variant="ghost" size="icon">
           <Filter className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={() => {}}>
+
+        {/* More */}
+        <Button variant="ghost" size="icon">
           <MoreVertical className="h-5 w-5" />
         </Button>
       </div>
     );
+    return () => setHeaderActions(null);
+  }, [showSearch, setHeaderActions]);
 
-    return () => setHeaderActions(null); // clear on unmount
-  }, [showSearch, setFilters, setHeaderActions]);
   // Pagination
   const [page, setPage] = useState(1);
-  const limit = 6;
+  const limit = 25;
 
   const fetchCustomers = useCallback(async () => {
     setLoading(true);
@@ -129,27 +108,16 @@ export default function CustomersPage() {
         order: filters.order,
       });
 
-      // balance filter
-      switch (filters.balanceFilter) {
-        case 'zero':
-          query.append('paid', 'true');
-          break;
-        case 'due':
-          query.append('unpaid', 'true');
-          break;
-        case 'advance':
-          query.append('advance', 'true');
-          break;
-      }
+      if (filters.balanceFilter === 'zero') query.append('paid', 'true');
+      if (filters.balanceFilter === 'due') query.append('unpaid', 'true');
+      if (filters.balanceFilter === 'advance') query.append('advance', 'true');
 
-      // due filters
       if (filters.dueToday) query.append('dueToday', 'true');
       if (filters.dueTomorrow) query.append('dueTomorrow', 'true');
       if (filters.dueNext5Days) query.append('dueNext5Days', 'true');
 
       const res = await apiClient.get(`/customers?${query.toString()}`);
       const data = res.data;
-      console.log(data);
 
       setCustomers(data?.data || []);
       setTotalPages(data?.pagination?.totalPages ?? 1);
@@ -165,7 +133,6 @@ export default function CustomersPage() {
     fetchCustomers();
   }, [fetchCustomers]);
 
-  // Reset page to 1 when filters change
   useEffect(() => {
     setPage(1);
   }, [filters]);
@@ -176,7 +143,7 @@ export default function CustomersPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full max-w-screen overflow-x-hidden">
       {/* Header */}
       <div className="hidden sm:flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mb-4">
         <div>
@@ -203,12 +170,11 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {/* Filters Panel (Desktop Only) */}
-      <div className="hidden sm:block rounded-md border bg-white">
-        {/* Header row with title + search */}
+      {/* Filters (Desktop) */}
+      <div className="hidden sm:block rounded-md border bg-white w-full">
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <h2 className="text-lg font-semibold">Filters</h2>
-          <div className="relative w-64">
+          <div className="relative w-full max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
@@ -220,8 +186,6 @@ export default function CustomersPage() {
             />
           </div>
         </div>
-
-        {/* Body (all other filters) */}
         <div className="p-4">
           <CustomerFilters
             onSearchChange={(val) =>
@@ -255,8 +219,9 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      <div className=" top-0  lg:hidden">
-        <div className="flex space-x-2">
+      {/* Mobile Quick Filters */}
+      <div className="lg:hidden">
+        <div className="flex space-x-2 overflow-x-auto no-scrollbar">
           <button className="px-4 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded-full">
             Due Today
           </button>
@@ -268,14 +233,17 @@ export default function CustomersPage() {
           </button>
         </div>
       </div>
-      <div>
+
+      {/* Table + Pagination */}
+      <div className="w-full overflow-x-auto">
         <CustomerTable customers={customers} loading={loading} />
-        <CustomerPagination
-          currentPage={page}
-          totalPages={totalPages}
-          onPageChange={setPage}
-        />
       </div>
+
+      <CustomerPagination
+        currentPage={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

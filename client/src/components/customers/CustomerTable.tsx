@@ -15,16 +15,24 @@ import { useNavigate } from 'react-router-dom';
 
 interface Props {
   customers: Customer[];
+  loading?: boolean;
 }
 
-export default function CustomerTable({ customers }: Props) {
+export default function CustomerTable({ customers, loading }: Props) {
   const navigate = useNavigate();
 
+  if (loading) {
+    return (
+      <div className="text-center text-muted-foreground py-6">
+        Loading customers...
+      </div>
+    );
+  }
   return (
     <>
       {/* Desktop Table */}
       <div className="hidden md:block rounded-md border overflow-x-auto">
-        <Table>
+        <Table className="min-w-full table-auto">
           <TableHeader>
             <TableRow>
               <TableHead>Customer Code</TableHead>
@@ -54,7 +62,11 @@ export default function CustomerTable({ customers }: Props) {
                   <TableRow
                     key={customer._id}
                     className="group cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                    onClick={() => navigate(`/customers/${customer._id}`)}
+                    onClick={() =>
+                      navigate(`/customers/${customer._id}`, {
+                        state: { customer },
+                      })
+                    }
                   >
                     <TableCell className="py-2 px-2 text-sm">
                       {customer.customerCode}
@@ -196,16 +208,16 @@ export default function CustomerTable({ customers }: Props) {
               </div>
 
               <div
-                className={`px-2 py-0.5 text-xs font-bold rounded-md shrink-0 ${
+                className={`px-2 py-0.5 text-xs font-bold rounded-md mr-2 ${
                   customer.balanceAmount > 0
                     ? 'bg-green-100 text-green-800'
-                    : 'bg-gray-800 text-white'
+                    : 'bg-red-100 text-red-800'
                 }`}
               >
                 ₹{customer.balanceAmount.toLocaleString('en-IN')}
-                {customer.balanceAmount > 0 && (
-                  <p className="text-[10px] font-normal text-right">Due</p>
-                )}
+                <p className="text-[10px] font-normal text-right">
+                  {customer.balanceAmount > 0 ? 'Due' : 'Adv'}
+                </p>
               </div>
             </div>
           ))
