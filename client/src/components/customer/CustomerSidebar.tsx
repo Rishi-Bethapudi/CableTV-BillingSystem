@@ -42,9 +42,9 @@ const sidebarItems: SidebarItem[] = [
   { key: 'additional-charge', label: 'Additional Charge', icon: Plus },
   { key: 'balance-history', label: 'Balance History', icon: DollarSign },
   { key: 'hardware-details', label: 'Hardware Details', icon: Monitor },
-  { key: 'customer-follow-up', label: 'Customer Follow Up', icon: Calendar },
+  // { key: 'customer-follow-up', label: 'Customer Follow Up', icon: Calendar },
   { key: 'customer-edit', label: 'Customer Edit', icon: Edit },
-  { key: 'upload-documents', label: 'Upload Documents', icon: Upload },
+  // { key: 'upload-documents', label: 'Upload Documents', icon: Upload },
 ];
 
 export default function CustomerSidebar({

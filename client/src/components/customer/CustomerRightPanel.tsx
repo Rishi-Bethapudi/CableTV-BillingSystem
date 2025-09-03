@@ -38,21 +38,35 @@ export default function CustomerRightPanel({ customer, activeSection }: Props) {
             case 'renew':
               return <RenewSection customer={customer} />;
             case 'subscription':
-              return <SubscriptionSection customer={customer} />;
+              return (
+                <SubscriptionSection customer={customer} isVisible={true} />
+              );
             case 'adjust-balance':
-              return <AdjustBalanceSection customer={customer} />;
+              return (
+                <AdjustBalanceSection customer={customer} isVisible={true} />
+              );
             case 'add-on-bill':
-              return <AddOnBillSection customer={customer} />;
+              return <AddOnBillSection customer={customer} isVisible={true} />;
             case 'active-inactive':
-              return <ActiveInactiveSection customer={customer} />;
+              return (
+                <ActiveInactiveSection customer={customer} isVisible={true} />
+              );
             case 'additional-charge':
-              return <AdditionalChargeSection />;
+              return (
+                <AdditionalChargeSection customer={customer} isVisible={true} />
+              );
             case 'balance-history':
-              return <BalanceHistorySection />;
+              return (
+                <BalanceHistorySection customer={customer} isVisible={true} />
+              );
             case 'hardware-details':
-              return <HardwareDetailsSection customer={customer} />;
+              return (
+                <HardwareDetailsSection customer={customer} isVisible={true} />
+              );
             case 'customer-edit':
-              return <CustomerEditSection customer={customer} />;
+              return (
+                <CustomerEditSection customer={customer} isVisible={true} />
+              );
             default:
               return <CollectPaymentSection customer={customer} />;
           }

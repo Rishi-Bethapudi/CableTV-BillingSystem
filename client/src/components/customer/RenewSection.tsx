@@ -11,14 +11,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-interface CustomerData {
-  lastBillDate: string;
-  expiryDate: string;
-}
-
+import { Customer as CustomerData } from '@/utils/data';
 interface RenewSectionProps {
   customer: CustomerData;
-  isVisible: boolean;
+  isVisible?: boolean;
 }
 
 function RenewSection({ customer, isVisible }: RenewSectionProps) {
@@ -59,11 +55,13 @@ function RenewSection({ customer, isVisible }: RenewSectionProps) {
           {/* Left Section */}
           <div className="space-y-3">
             {/* Customer Name */}
-            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg flex items-center justify-between">
+            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg flex items-center justify-start">
               <span className="text-sm text-muted-foreground">
                 Customer Name:
               </span>
-              <span className="font-semibold">{customer?.firstName}</span>
+              <span className="font-semibold justify-center">
+                {customer?.name}
+              </span>
             </div>
 
             {/* Current Balance */}
@@ -72,7 +70,7 @@ function RenewSection({ customer, isVisible }: RenewSectionProps) {
                 Current Balance:
               </span>
               <span className="font-semibold text-white bg-slate-700 px-2 py-1 rounded-md">
-                ₹{customer?.balance}
+                ₹{customer?.balanceAmount}
               </span>
             </div>
 
