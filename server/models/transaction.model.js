@@ -27,7 +27,7 @@ const transactionSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ['Billing', 'Collection', 'Adjustment'], // Billing=Charge, Collection=Payment
+      enum: ['Billing', 'Collection', 'Adjustment', 'AddOn'], // Billing=Charge, Collection=Payment
     },
     amount: {
       type: Number,

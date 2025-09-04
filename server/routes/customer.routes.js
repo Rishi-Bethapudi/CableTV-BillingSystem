@@ -9,7 +9,11 @@ const {
   importCustomersFromExcel,
   exportCustomersToExcel,
 } = require('../controllers/customer.controller'); // Assuming controller functions are defined elsewhere
-
+const {
+  adjustBalance,
+  addOnBilling,
+  getCustomerTransactions,
+} = require('../controllers/transaction.controller');
 const {
   authMiddleware,
   operatorOnly,
@@ -71,6 +75,29 @@ router.put('/:id', authMiddleware, operatorOnly, updateCustomer);
  * @note    The controller must also perform the same check as GET /:id.
  */
 router.delete('/:id', authMiddleware, operatorOnly, deleteCustomer);
+
+// @route   POST /api/customers/:id/adjust-balance
+router.post(
+  '/:id/adjust-balance',
+  authMiddleware,
+  operatorOrAgentOnly,
+  adjustBalance
+);
+
+// @route   POST /api/customers/:id/add-on
+router.post('/:id/add-on', authMiddleware, operatorOrAgentOnly, addOnBilling);
+
+/**
+ * @route   GET /api/customers/:customerId/transactions
+ * @desc    Get the full ledger/transaction history for a single customer.
+ * @access  Private (Operator or Agent)
+ */
+router.get(
+  '/:customerId/transactions',
+  authMiddleware,
+  operatorOnly,
+  getCustomerTransactions
+);
 
 /*
 ================================================================================================

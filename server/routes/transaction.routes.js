@@ -3,7 +3,6 @@ const router = express.Router();
 const {
   createCollection,
   createBilling,
-  getCustomerTransactions,
 } = require('../controllers/transaction.controller');
 const {
   authMiddleware,
@@ -25,12 +24,5 @@ router.post('/billing', createBilling);
  * @access  Private (Operator or Agent)
  */
 router.post('/collection', createCollection);
-
-/**
- * @route   GET /api/transactions/customer/:customerId
- * @desc    Get the full ledger/transaction history for a single customer.
- * @access  Private (Operator or Agent)
- */
-router.get('/customer/:customerId', getCustomerTransactions);
 
 module.exports = router;
