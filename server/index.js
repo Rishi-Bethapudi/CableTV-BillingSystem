@@ -9,6 +9,10 @@ const adminRoutes = require('./routes/admin.routes');
 const operatorRoutes = require('./routes/operator.routes');
 const authRoutes = require('./routes/auth.routes');
 const customerRoutes = require('./routes/customer.routes');
+const transactionRoutes = require('./routes/transaction.routes');
+const complaintRoutes = require('./routes/complaint.routes');
+const reportRoutes = require('./routes/reports.routes');
+const expenseRoutes = require('./routes/expense.routes');
 const { initCronJobs } = require('./services/scheduler.service');
 // --- Load Environment Variables ---
 dotenv.config();
@@ -44,11 +48,14 @@ app.use(cookieParser());
 
 // --- API Routes ---
 // Mount the imported route files to their specific base paths.
+app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/operators', operatorRoutes);
-app.use('/api/auth', authRoutes);
 app.use('/api/customers', customerRoutes);
-
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/complaints', complaintRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/expenses', expenseRoutes);
 // --- Root Endpoint for Health Check ---
 app.get('/', (req, res) => {
   res.status(200).json({
