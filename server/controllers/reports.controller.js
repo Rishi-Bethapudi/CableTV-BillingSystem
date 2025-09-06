@@ -11,7 +11,20 @@ const {
   addDays,
   format,
 } = require('date-fns');
+const STAT_TYPE = {
+  MONEY: 0,
+  COUNT: 1,
+};
 
+const SUMMARY_TYPE = {
+  COLLECTION: 1,
+  TODAY: 0,
+  PENDING: 2,
+  RENEWALS: 5,
+  EXPIRED: 6,
+  CUSTOMERS: 3,
+  COMPLAINTS: 13,
+};
 /**
  * @desc    Get a detailed report of all collections with filters.
  * @route   GET /api/reports/collections
@@ -288,21 +301,22 @@ const getCollectionSummary = async (req, res) => {
     res.status(500).json({ message: 'Server error while generating report.' });
   }
 };
+
 const getDashboardSummary = async (req, res) => {
   try {
     const operatorId = new mongoose.Types.ObjectId(req.user.id);
     const now = new Date();
 
-    // --- Define Date Ranges ---
+    // --- Date Ranges ---
     const todayStart = startOfDay(now);
     const todayEnd = endOfDay(now);
     const monthStart = startOfMonth(now);
     const monthEnd = endOfMonth(now);
     const tomorrowStart = startOfDay(addDays(now, 1));
 
-    // --- Define All Queries ---
+    // --- All Queries ---
     const queries = [
-      // 0. Monthly Total Collection { total, count }
+      // 0. Monthly Total Collection
       Transaction.aggregate([
         {
           $match: {
@@ -315,7 +329,7 @@ const getDashboardSummary = async (req, res) => {
           $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } },
         },
       ]),
-      // 1. Today's Collection { total, count }
+      // 1. Today's Collection
       Transaction.aggregate([
         {
           $match: {
@@ -328,7 +342,7 @@ const getDashboardSummary = async (req, res) => {
           $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } },
         },
       ]),
-      // 2. Total Pending Amount { total, count }
+      // 2. Total Pending Amount
       Customer.aggregate([
         { $match: { operatorId, balanceAmount: { $gt: 0 } } },
         {
@@ -339,7 +353,7 @@ const getDashboardSummary = async (req, res) => {
           },
         },
       ]),
-      // 3. Monthly Online Collection { total, count }
+      // 3. Monthly Online Collection
       Transaction.aggregate([
         {
           $match: {
@@ -365,68 +379,70 @@ const getDashboardSummary = async (req, res) => {
         type: 'billing',
         createdAt: { $gte: monthStart, $lte: monthEnd },
       }),
-      // 6. Upcoming Renewals (count)
+      // 6. Upcoming Renewals (expiry after today)
       Customer.countDocuments({
         operatorId,
         active: true,
         expiryDate: { $gte: tomorrowStart },
       }),
-      // 7. Expired Renewals (count)
+      // 7. Expired Renewals (expiry before today)
       Customer.countDocuments({
         operatorId,
         active: true,
-        expiryDate: { $lt: tomorrowStart },
+        expiryDate: { $lt: todayStart },
       }),
-      // 8. Total Customers (count)
+      // 8. Total Customers
       Customer.countDocuments({ operatorId }),
-      // 9. Active Customers (count)
+      // 9. Active Customers
       Customer.countDocuments({ operatorId, active: true }),
-      // 10. This Month New Customers (count)
+      // 10. This Month New Customers
       Customer.countDocuments({
         operatorId,
         createdAt: { $gte: monthStart, $lte: monthEnd },
       }),
-      // 11. Pending Complaints (count)
+      // 11. Pending Complaints
       Complaint.countDocuments({ operatorId, status: 'Pending' }),
     ];
 
-    // --- Execute All Queries in Parallel ---
+    // --- Execute Queries ---
     const results = await Promise.all(
       queries.map((q) =>
         q.catch((e) => {
-          console.error('A dashboard query failed:', e);
-          return null; // Return null on failure to prevent crashing Promise.all
+          console.error('Dashboard query failed:', e);
+          return null;
         })
       )
     );
 
-    // Helper to safely extract results from aggregations or counts
-    const getResult = (index, field) => results[index]?.[0]?.[field] || 0;
-    const getCountResult = (index) => results[index] || 0;
+    // Helpers
+    const getResult = (index, field) => results[index]?.[0]?.[field] ?? 0;
+    const getCountResult = (index) => results[index] ?? 0;
+
+    // Customer calculations
     const totalCustomers = getCountResult(8);
     const activeCustomers = getCountResult(9);
     const inactiveCustomers = totalCustomers - activeCustomers;
 
-    // --- Shape the Final Response ---
+    // --- Response ---
     const responseData = {
       data: [
         {
-          id: 5,
+          id: 1,
           name: 'Monthly Total Collection',
           stat: getResult(0, 'total'),
           des: getResult(0, 'count'),
           action: '/web/collection',
-          stat_type: 0,
-          summary_type: 1,
+          stat_type: STAT_TYPE.MONEY,
+          summary_type: SUMMARY_TYPE.COLLECTION,
         },
         {
           id: 2,
-          name: 'Todays Collection',
+          name: "Today's Collection",
           stat: getResult(1, 'total'),
           des: getResult(1, 'count'),
           action: '/web/collection?t=date_search&v=today',
-          stat_type: 0,
-          summary_type: 0,
+          stat_type: STAT_TYPE.MONEY,
+          summary_type: SUMMARY_TYPE.TODAY,
         },
         {
           id: 3,
@@ -434,32 +450,32 @@ const getDashboardSummary = async (req, res) => {
           stat: getResult(2, 'total'),
           des: getResult(2, 'count'),
           action: '/web/customers?t=balance',
-          stat_type: 0,
-          summary_type: 2,
+          stat_type: STAT_TYPE.MONEY,
+          summary_type: SUMMARY_TYPE.PENDING,
         },
         {
-          id: 1,
-          name: 'Monthly Online collection',
+          id: 4,
+          name: 'Monthly Online Collection',
           stat: getResult(3, 'total'),
           des: getResult(3, 'count'),
           action: '/web/collection?t=online',
-          stat_type: 0,
-          summary_type: 1,
+          stat_type: STAT_TYPE.MONEY,
+          summary_type: SUMMARY_TYPE.COLLECTION,
         },
         {
-          id: 7,
-          name: 'Todays Renewals',
+          id: 5,
+          name: "Today's Renewals",
           stat: getCountResult(4),
           des: 0,
           action: `/web/customer-renew?t=date_search&v=${format(
             now,
             'yyyy-MM-dd'
           )}`,
-          stat_type: 1,
-          summary_type: 4,
+          stat_type: STAT_TYPE.COUNT,
+          summary_type: SUMMARY_TYPE.RENEWALS,
         },
         {
-          id: 8,
+          id: 6,
           name: 'This Month Renewals',
           stat: getCountResult(5),
           des: 0,
@@ -467,53 +483,53 @@ const getDashboardSummary = async (req, res) => {
             monthStart,
             'yyyy-MM-dd'
           )} to ${format(monthEnd, 'yyyy-MM-dd')}`,
-          stat_type: 1,
-          summary_type: 5,
+          stat_type: STAT_TYPE.COUNT,
+          summary_type: SUMMARY_TYPE.RENEWALS,
         },
         {
-          id: 8,
+          id: 7,
           name: 'Upcoming Renewals',
           stat: getCountResult(6),
           des: 0,
           action: '/web/customer-renew?t=date_search&v=upcoming',
-          stat_type: 1,
-          summary_type: 5,
+          stat_type: STAT_TYPE.COUNT,
+          summary_type: SUMMARY_TYPE.RENEWALS,
         },
         {
-          id: 9,
+          id: 8,
           name: 'Expired Renewals',
           stat: getCountResult(7),
           des: 0,
           action: '/web/customer-renew?t=date_search&a=exp_renew',
-          stat_type: 1,
-          summary_type: 6,
+          stat_type: STAT_TYPE.COUNT,
+          summary_type: SUMMARY_TYPE.EXPIRED,
         },
         {
-          id: 12,
+          id: 9,
           name: 'Total Customers',
           stat: totalCustomers,
           des: 0,
           action: '/web/customers',
-          stat_type: 1,
-          summary_type: 3,
+          stat_type: STAT_TYPE.COUNT,
+          summary_type: SUMMARY_TYPE.CUSTOMERS,
         },
         {
-          id: 6,
-          name: 'Total Active Customers',
+          id: 10,
+          name: 'Active Customers',
           stat: activeCustomers,
           des: inactiveCustomers,
           action: '/web/customers?t=status&v=1',
-          stat_type: 1,
-          summary_type: 3,
+          stat_type: STAT_TYPE.COUNT,
+          summary_type: SUMMARY_TYPE.CUSTOMERS,
         },
         {
           id: 11,
-          name: 'Total InActive Customers',
+          name: 'Inactive Customers',
           stat: inactiveCustomers,
           des: 0,
           action: '/web/customers?t=status&v=0',
-          stat_type: 1,
-          summary_type: 3,
+          stat_type: STAT_TYPE.COUNT,
+          summary_type: SUMMARY_TYPE.CUSTOMERS,
         },
         {
           id: 12,
@@ -524,17 +540,17 @@ const getDashboardSummary = async (req, res) => {
             monthStart,
             'yyyy-MM-dd'
           )} to ${format(monthEnd, 'yyyy-MM-dd')}`,
-          stat_type: 1,
-          summary_type: 3,
+          stat_type: STAT_TYPE.COUNT,
+          summary_type: SUMMARY_TYPE.CUSTOMERS,
         },
         {
           id: 13,
-          name: 'Total Pending Complaints',
+          name: 'Pending Complaints',
           stat: getCountResult(11),
           des: 0,
           action: '/web/complaints',
-          stat_type: 0,
-          summary_type: 13,
+          stat_type: STAT_TYPE.COUNT,
+          summary_type: SUMMARY_TYPE.COMPLAINTS,
         },
       ],
       banner_image: [
