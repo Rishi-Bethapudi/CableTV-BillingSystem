@@ -19,8 +19,9 @@ import CustomerFilters from '@/components/customers/CustomerFilters';
 import CustomerPagination from '@/components/customers/CustomerPagination';
 import apiClient from '@/utils/apiClient';
 import { useLayout } from '@/components/layouts/LayoutContext';
-
+import { useNavigate } from 'react-router-dom';
 export default function CustomersPage() {
+  const navigate = useNavigate();
   const { setHeaderActions } = useLayout();
   const [showSearch, setShowSearch] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
@@ -164,7 +165,7 @@ export default function CustomersPage() {
               <Upload className="h-4 w-4 mr-2" /> Upload Excel
             </Button>
           </div>
-          <Button>
+          <Button onClick={() => navigate('/add-customer')}>
             <Plus className="h-4 w-4 mr-2" /> Add Customer
           </Button>
         </div>

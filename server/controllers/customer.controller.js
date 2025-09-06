@@ -17,28 +17,35 @@ const createCustomer = async (req, res) => {
       planAmount,
       locality,
       stbNumber,
+      stbName,
+      cardNumber,
       agentId,
       balanceAmount = 0,
+      billingAddress,
+      productIds = [], // array of productIds
+      additionalCharge = 0,
+      discount = 0,
+      lastPaymentAmount = 0,
+      remark = '',
+      billingInterval = 30,
     } = req.body;
 
-    // 1️⃣ Validate required fields
     if (!name || !mobile || !planAmount) {
-      return res.status(400).json({
-        message: 'Please provide name, mobile, and planAmount.',
-      });
+      return res
+        .status(400)
+        .json({ message: 'Please provide name, mobile, and planAmount.' });
     }
 
-    // 2️⃣ Operator ID from the logged-in token
     const operatorId = req.user.id;
 
-    // 3️⃣ Generate Sequence Number & Customer Code
+    // Generate sequence number
     const lastCustomer = await Customer.findOne({ operatorId }).sort({
       sequenceNo: -1,
     });
     const newSequenceNo = lastCustomer ? lastCustomer.sequenceNo + 1 : 1;
-    const customerCode = `CUST-${newSequenceNo}`;
+    const customerCode = `CUST${String(newSequenceNo).padStart(3, '0')}`;
 
-    // 4️⃣ Check duplicate (same mobile OR stbNumber if provided)
+    // Duplicate check
     let duplicateQuery = [{ mobile }];
     if (stbNumber) duplicateQuery.push({ stbNumber });
 
@@ -46,45 +53,49 @@ const createCustomer = async (req, res) => {
       operatorId,
       $or: duplicateQuery,
     });
-
     if (existingCustomer) {
       let field =
         existingCustomer.mobile === mobile ? 'mobile number' : 'STB number';
-      return res.status(409).json({
-        message: `Customer with this ${field} already exists.`,
-      });
+      return res
+        .status(409)
+        .json({ message: `Customer with this ${field} already exists.` });
     }
 
-    // 5️⃣ Handle expiry date
+    // Expiry calculation
     const connectionStartDate = new Date();
-    const billingInterval = req.body.billingInterval || 30;
     let expiryDate = new Date(connectionStartDate);
-
     if (balanceAmount >= planAmount) {
       const monthsPaid = Math.floor(balanceAmount / planAmount);
       expiryDate.setDate(expiryDate.getDate() + monthsPaid * billingInterval);
     }
 
-    // 6️⃣ Build and save the customer
     const newCustomer = new Customer({
-      ...req.body,
       operatorId,
-      agentId: agentId || undefined,
+      agentId: agentId || null,
       customerCode,
       sequenceNo: newSequenceNo,
+      name,
+      mobile,
+      locality,
+      stbName,
+      stbNumber,
+      cardNumber,
+      billingAddress,
+      balanceAmount,
       connectionStartDate,
       expiryDate,
-      balanceAmount,
       active: req.body.active !== undefined ? req.body.active : true,
+      productId: productIds, // ✅ updated to array
+      additionalCharge,
+      discount,
+      lastPaymentAmount,
+      remark,
     });
 
     const savedCustomer = await newCustomer.save();
     res.status(201).json(savedCustomer);
   } catch (error) {
     console.error('Error creating customer:', error);
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({ message: error.message });
-    }
     res.status(500).json({ message: 'Server error while creating customer.' });
   }
 };

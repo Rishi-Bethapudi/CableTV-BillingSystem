@@ -32,11 +32,13 @@ const customerSchema = new mongoose.Schema(
     stbNumber: String,
     cardNumber: String,
 
-    productId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
-      required: true,
-    },
+    productId: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Product',
+        required: true,
+      },
+    ],
     additionalCharge: { type: Number, default: 0 },
     discount: { type: Number, default: 0 },
 

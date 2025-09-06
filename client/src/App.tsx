@@ -14,6 +14,7 @@ import { RootState } from './redux/store';
 // --- Page Imports ---
 import Dashboard from './pages/Dashboard';
 import Customers from './pages/Customers';
+import AddCustomer from './pages/AddCustomer';
 import CustomerDetails from './pages/CustomerDetails';
 import Products from './pages/Products';
 import Agents from './pages/Agents';
@@ -44,6 +45,16 @@ const AppRoutes = () => {
           <ProtectedRoute>
             <Layout>
               <Dashboard />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/add-customer"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <AddCustomer />
             </Layout>
           </ProtectedRoute>
         }
