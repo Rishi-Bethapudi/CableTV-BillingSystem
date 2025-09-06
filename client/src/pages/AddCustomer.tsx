@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Calendar,
   User,
@@ -16,7 +16,7 @@ import {
   ArrowLeft,
   X,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+// import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +32,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import ConfirmationModal from '@/components/customer/ConfirmationModal';
+import apiClient from '@/utils/apiClient';
+
 interface FormData {
   // Personal Details
   fullName: string;
@@ -46,7 +48,7 @@ interface FormData {
 
   // Billing & Plan Details
   connectionStartDate: string;
-  subscriptionPlan: string;
+  subscriptionPlans: string[]; // ✅ changed to array
   openingBalance: string;
   additionalCharges: string;
   discount: string;
@@ -62,15 +64,26 @@ interface STBOption {
   label: string;
 }
 
-interface SubscriptionPlan {
-  value: string;
-  label: string;
+interface Product {
+  id: string;
+  name: string;
   price: number;
+  description?: string;
+}
+
+interface OperatorData {
+  localities?: string[];
 }
 
 const AddCustomerPage: React.FC = () => {
+  // const router = useRouter();
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [operatorLocalities, setOperatorLocalities] = useState<string[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [isLoadingOperator, setIsLoadingOperator] = useState(true);
+
   const [formData, setFormData] = useState<FormData>({
     // Personal Details
     fullName: '',
@@ -85,7 +98,7 @@ const AddCustomerPage: React.FC = () => {
 
     // Billing & Plan Details
     connectionStartDate: new Date().toISOString().split('T')[0],
-    subscriptionPlan: '',
+    subscriptionPlans: [],
     openingBalance: '',
     additionalCharges: '',
     discount: '',
@@ -101,11 +114,41 @@ const AddCustomerPage: React.FC = () => {
     { value: 'ZAP-4K', label: 'ZAP-4K' },
   ];
 
-  const subscriptionPlans: SubscriptionPlan[] = [
-    { value: 'APSFL-BASIC', label: 'APSFL Basic - ₹350', price: 350 },
-    { value: 'INTERNET-OTT', label: 'Internet & OTT - ₹450', price: 450 },
-    { value: 'ALL-SPORTS-HD', label: 'All Sports HD - ₹550', price: 550 },
-  ];
+  // Fetch products on component mount
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setIsLoadingProducts(true);
+        const response = await apiClient.get('/products');
+        setProducts(response.data || []);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        // You might want to show a toast notification here
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  // Fetch operator localities on component mount
+  useEffect(() => {
+    const fetchOperatorData = async () => {
+      try {
+        setIsLoadingOperator(true);
+        const response = await apiClient.get('/operators/me');
+        setOperatorLocalities(response.data?.localities || []);
+      } catch (error) {
+        console.error('Error fetching operator data:', error);
+        // You might want to show a toast notification here
+      } finally {
+        setIsLoadingOperator(false);
+      }
+    };
+
+    fetchOperatorData();
+  }, []);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -140,36 +183,56 @@ const AddCustomerPage: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Find selected product to get plan amount
+      const selectedProduct = products.find(
+        (p) => p.id === formData.subscriptionPlan
+      );
+      const planAmount = selectedProduct ? selectedProduct.price : 0;
 
-      console.log('Form submitted:', formData);
+      // Prepare payload according to API requirements
+      const payload = {
+        name: formData.fullName,
+        mobile: formData.mobileNumber,
+        locality: formData.locality,
+        address: formData.billingAddress,
+        stbModel: formData.stbModel,
+        stbNumber: formData.stbNumber,
+        cardNumber: formData.cardNumber,
+        connectionStartDate: formData.connectionStartDate,
+        productId: formData.subscriptionPlan,
+        planAmount: planAmount,
+        balanceAmount: parseFloat(formData.openingBalance) || 0,
+        additionalCharges: parseFloat(formData.additionalCharges) || 0,
+        discount: parseFloat(formData.discount) || 0,
+        remark: formData.remarks,
+      };
 
-      // Here you would typically make an API call to save the customer
-      // const response = await fetch('/api/customers', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(formData)
-      // })
+      const response = await apiClient.post('/customers', payload);
 
-      alert('Customer added successfully!');
+      if (response.status === 200 || response.status === 201) {
+        alert('Customer added successfully!');
 
-      // Reset form after successful submission
-      setFormData({
-        fullName: '',
-        mobileNumber: '',
-        locality: '',
-        billingAddress: '',
-        stbModel: '',
-        stbNumber: '',
-        cardNumber: '',
-        connectionStartDate: new Date().toISOString().split('T')[0],
-        subscriptionPlan: '',
-        openingBalance: '',
-        additionalCharges: '',
-        discount: '',
-        remarks: '',
-      });
+        // Reset form after successful submission
+        setFormData({
+          fullName: '',
+          mobileNumber: '',
+          locality: '',
+          billingAddress: '',
+          stbModel: '',
+          stbNumber: '',
+          cardNumber: '',
+          connectionStartDate: new Date().toISOString().split('T')[0],
+          subscriptionPlan: '',
+          openingBalance: '',
+          additionalCharges: '',
+          discount: '',
+          remarks: '',
+        });
+        setErrors({});
+
+        // Navigate back or to customers list
+        // router.back();
+      }
     } catch (error) {
       console.error('Error submitting form:', error);
       alert('Error adding customer. Please try again.');
@@ -178,32 +241,45 @@ const AddCustomerPage: React.FC = () => {
     }
   };
 
-  const handleCancel = (): void => {
-    if (confirm('Are you sure you want to cancel? All changes will be lost.')) {
-      setFormData({
-        fullName: '',
-        mobileNumber: '',
-        locality: '',
-        billingAddress: '',
-        stbModel: '',
-        stbNumber: '',
-        cardNumber: '',
-        connectionStartDate: new Date().toISOString().split('T')[0],
-        subscriptionPlan: '',
-        openingBalance: '',
-        additionalCharges: '',
-        discount: '',
-        remarks: '',
-      });
-      setErrors({});
-    }
+  const handleBack = () => {
+    // router.back();
+  };
+
+  const resetForm = () => {
+    setFormData({
+      fullName: '',
+      mobileNumber: '',
+      locality: '',
+      billingAddress: '',
+      stbModel: '',
+      stbNumber: '',
+      cardNumber: '',
+      connectionStartDate: new Date().toISOString().split('T')[0],
+      subscriptionPlan: '',
+      openingBalance: '',
+      additionalCharges: '',
+      discount: '',
+      remarks: '',
+    });
+    setErrors({});
   };
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
+        {/* Header with Back Button */}
         <div className="mb-8">
+          <div className="flex items-center gap-4 mb-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBack}
+              className="inline-flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+          </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Add New Customer
           </h1>
@@ -281,17 +357,42 @@ const AddCustomerPage: React.FC = () => {
                 <div className="space-y-2">
                   <Label htmlFor="locality">Locality</Label>
                   <div className="relative">
-                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="locality"
-                      type="text"
-                      value={formData.locality}
-                      onChange={(e) =>
-                        handleInputChange('locality', e.target.value)
-                      }
-                      className="pl-10"
-                      placeholder="Enter area or neighborhood"
-                    />
+                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400 z-10" />
+                    {operatorLocalities.length > 0 ? (
+                      <Select
+                        value={formData.locality}
+                        onValueChange={(value) =>
+                          handleInputChange('locality', value)
+                        }
+                      >
+                        <SelectTrigger className="pl-10">
+                          <SelectValue placeholder="Select locality" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {operatorLocalities.map((locality, index) => (
+                            <SelectItem key={index} value={locality}>
+                              {locality}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="locality"
+                        type="text"
+                        value={formData.locality}
+                        onChange={(e) =>
+                          handleInputChange('locality', e.target.value)
+                        }
+                        className="pl-10"
+                        placeholder={
+                          isLoadingOperator
+                            ? 'Loading localities...'
+                            : 'Enter area or neighborhood'
+                        }
+                        disabled={isLoadingOperator}
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -415,24 +516,76 @@ const AddCustomerPage: React.FC = () => {
                 </div>
 
                 <div className="md:col-span-2 space-y-2">
-                  <Label htmlFor="subscriptionPlan">Subscription Plan</Label>
+                  <Label htmlFor="subscriptionPlans">Subscription Plans</Label>
                   <Select
-                    value={formData.subscriptionPlan}
-                    onValueChange={(value) =>
-                      handleInputChange('subscriptionPlan', value)
-                    }
+                    value=""
+                    onValueChange={(value) => {
+                      if (!formData.subscriptionPlans) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          subscriptionPlans: [value],
+                        }));
+                      } else if (!formData.subscriptionPlans.includes(value)) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          subscriptionPlans: [...prev.subscriptionPlans, value],
+                        }));
+                      }
+                    }}
+                    disabled={isLoadingProducts}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select subscription plan" />
+                      <SelectValue
+                        placeholder={
+                          isLoadingProducts
+                            ? 'Loading products...'
+                            : 'Select subscription plan(s)'
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {subscriptionPlans.map((plan) => (
-                        <SelectItem key={plan.value} value={plan.value}>
-                          {plan.label}
+                      {products.map((product) => (
+                        <SelectItem key={product.id} value={product.id}>
+                          {product.name} - ₹{product.price}
+                          {product.description && (
+                            <span className="text-sm text-gray-500 block">
+                              {product.description}
+                            </span>
+                          )}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+
+                  {/* Show selected products as tags */}
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {formData.subscriptionPlans?.map((planId) => {
+                      const product = products.find((p) => p.id === planId);
+                      return (
+                        <div
+                          key={planId}
+                          className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full text-sm"
+                        >
+                          {product?.name || 'Unknown'}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                subscriptionPlans:
+                                  prev.subscriptionPlans?.filter(
+                                    (id) => id !== planId
+                                  ),
+                              }))
+                            }
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -517,7 +670,7 @@ const AddCustomerPage: React.FC = () => {
             <Button
               type="button"
               onClick={() => setShowSaveModal(true)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLoadingProducts}
               className="inline-flex items-center gap-2"
             >
               <Save className="h-4 w-4" />
@@ -526,26 +679,12 @@ const AddCustomerPage: React.FC = () => {
           </div>
         </div>
       </div>
+
       <ConfirmationModal
         open={showCancelModal}
         message="Are you sure you want to cancel? All changes will be lost."
         onConfirm={() => {
-          setFormData({
-            fullName: '',
-            mobileNumber: '',
-            locality: '',
-            billingAddress: '',
-            stbModel: '',
-            stbNumber: '',
-            cardNumber: '',
-            connectionStartDate: new Date().toISOString().split('T')[0],
-            subscriptionPlan: '',
-            openingBalance: '',
-            additionalCharges: '',
-            discount: '',
-            remarks: '',
-          });
-          setErrors({});
+          resetForm();
           setShowCancelModal(false);
         }}
         onCancel={() => setShowCancelModal(false)}
