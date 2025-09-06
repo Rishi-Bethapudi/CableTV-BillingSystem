@@ -65,9 +65,9 @@ interface STBOption {
 }
 
 interface Product {
-  id: string;
+  _id: string;
   name: string;
-  price: number;
+  customerPrice: number;
   description?: string;
 }
 
@@ -171,7 +171,6 @@ const AddCustomerPage: React.FC = () => {
   const handleInputChange = (field: keyof FormData, value: string): void => {
     setFormData((prev) => ({ ...prev, [field]: value }));
 
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: '' }));
     }
@@ -184,11 +183,13 @@ const AddCustomerPage: React.FC = () => {
 
     try {
       // Find selected product to get plan amount
-      const selectedProduct = products.find(
-        (p) => p.id === formData.subscriptionPlan
+      const selectedProducts = products.filter((p) =>
+        formData.subscriptionPlans.includes(p._id)
       );
-      const planAmount = selectedProduct ? selectedProduct.price : 0;
-
+      const totalPlanAmount = selectedProducts.reduce(
+        (sum, p) => sum + p.customerPrice,
+        0
+      );
       // Prepare payload according to API requirements
       const payload = {
         name: formData.fullName,
@@ -199,8 +200,8 @@ const AddCustomerPage: React.FC = () => {
         stbNumber: formData.stbNumber,
         cardNumber: formData.cardNumber,
         connectionStartDate: formData.connectionStartDate,
-        productId: formData.subscriptionPlan,
-        planAmount: planAmount,
+        productId: formData.subscriptionPlans,
+        planAmount: totalPlanAmount,
         balanceAmount: parseFloat(formData.openingBalance) || 0,
         additionalCharges: parseFloat(formData.additionalCharges) || 0,
         discount: parseFloat(formData.discount) || 0,
@@ -222,7 +223,7 @@ const AddCustomerPage: React.FC = () => {
           stbNumber: '',
           cardNumber: '',
           connectionStartDate: new Date().toISOString().split('T')[0],
-          subscriptionPlan: '',
+          subscriptionPlans: [],
           openingBalance: '',
           additionalCharges: '',
           discount: '',
@@ -255,7 +256,7 @@ const AddCustomerPage: React.FC = () => {
       stbNumber: '',
       cardNumber: '',
       connectionStartDate: new Date().toISOString().split('T')[0],
-      subscriptionPlan: '',
+      subscriptionPlans: [],
       openingBalance: '',
       additionalCharges: '',
       discount: '',
@@ -545,13 +546,8 @@ const AddCustomerPage: React.FC = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {products.map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name} - ₹{product.price}
-                          {product.description && (
-                            <span className="text-sm text-gray-500 block">
-                              {product.description}
-                            </span>
-                          )}
+                        <SelectItem key={product._id} value={product._id}>
+                          {product.name} - ₹{product.customerPrice}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -560,7 +556,7 @@ const AddCustomerPage: React.FC = () => {
                   {/* Show selected products as tags */}
                   <div className="flex flex-wrap gap-2 mt-2">
                     {formData.subscriptionPlans?.map((planId) => {
-                      const product = products.find((p) => p.id === planId);
+                      const product = products.find((p) => p._id === planId);
                       return (
                         <div
                           key={planId}

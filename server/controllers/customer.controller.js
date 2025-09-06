@@ -30,10 +30,8 @@ const createCustomer = async (req, res) => {
       billingInterval = 30,
     } = req.body;
 
-    if (!name || !mobile || !planAmount) {
-      return res
-        .status(400)
-        .json({ message: 'Please provide name, mobile, and planAmount.' });
+    if (!name || !mobile) {
+      return res.status(400).json({ message: 'Please provide name, mobile.' });
     }
 
     const operatorId = req.user.id;
