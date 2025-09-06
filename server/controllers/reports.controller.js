@@ -3,7 +3,14 @@ const Customer = require('../models/customer.model');
 const mongoose = require('mongoose');
 const Complaint = require('../models/complaint.model');
 const Agent = require('../models/agent.model');
-const { startOfMonth, endOfMonth, startOfDay, endOfDay, addDays, format } = require('date-fns');
+const {
+  startOfMonth,
+  endOfMonth,
+  startOfDay,
+  endOfDay,
+  addDays,
+  format,
+} = require('date-fns');
 
 /**
  * @desc    Get a detailed report of all collections with filters.
@@ -666,7 +673,7 @@ const getDashboardStats = async (req, res) => {
 
 module.exports = {
   getCollectionSummary,
-  getDashboardSummary
+  getDashboardSummary,
   getCollectionReport,
   getIncomeReport,
   getDashboardStats,
