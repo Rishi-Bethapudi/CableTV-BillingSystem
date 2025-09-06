@@ -137,7 +137,7 @@ const getCollectionSummary = async (req, res) => {
     // This is the most critical step for performance and security.
     const matchStage = {
       operatorId: operatorId,
-      type: 'collection',
+      type: 'Collection',
     };
 
     if (startDate && endDate) {
@@ -321,7 +321,7 @@ const getDashboardSummary = async (req, res) => {
         {
           $match: {
             operatorId,
-            type: 'collection',
+            type: 'Collection',
             createdAt: { $gte: monthStart, $lte: monthEnd },
           },
         },
@@ -334,7 +334,7 @@ const getDashboardSummary = async (req, res) => {
         {
           $match: {
             operatorId,
-            type: 'collection',
+            type: 'Collection',
             createdAt: { $gte: todayStart, $lte: todayEnd },
           },
         },
@@ -358,8 +358,8 @@ const getDashboardSummary = async (req, res) => {
         {
           $match: {
             operatorId,
-            type: 'collection',
-            paymentMode: 'ONLINE',
+            type: 'Collection',
+            paymentMode: 'Online',
             createdAt: { $gte: monthStart, $lte: monthEnd },
           },
         },
@@ -370,13 +370,13 @@ const getDashboardSummary = async (req, res) => {
       // 4. Today's Renewals (count)
       Transaction.countDocuments({
         operatorId,
-        type: 'billing',
+        type: 'Billing',
         createdAt: { $gte: todayStart, $lte: todayEnd },
       }),
       // 5. This Month Renewals (count)
       Transaction.countDocuments({
         operatorId,
-        type: 'billing',
+        type: 'Billing',
         createdAt: { $gte: monthStart, $lte: monthEnd },
       }),
       // 6. Upcoming Renewals (expiry after today)
