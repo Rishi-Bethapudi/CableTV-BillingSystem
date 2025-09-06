@@ -13,6 +13,11 @@ const productSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    category: {
+      type: String,
+      enum: ['Basic', 'Premium', 'Add-on'],
+      default: 'basic',
+    },
     // The price you charge the customer
     customerPrice: {
       type: Number,

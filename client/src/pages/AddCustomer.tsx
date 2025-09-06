@@ -230,9 +230,6 @@ const AddCustomerPage: React.FC = () => {
           remarks: '',
         });
         setErrors({});
-
-        // Navigate back or to customers list
-        // router.back();
       }
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -240,10 +237,6 @@ const AddCustomerPage: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleBack = () => {
-    // router.back();
   };
 
   const resetForm = () => {
@@ -270,17 +263,6 @@ const AddCustomerPage: React.FC = () => {
       <div className="max-w-4xl mx-auto">
         {/* Header with Back Button */}
         <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleBack}
-              className="inline-flex items-center gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-          </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Add New Customer
           </h1>

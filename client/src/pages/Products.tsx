@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLayout } from '@/components/layouts/LayoutContext';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import apiClient from '@/utils/apiClient';
 import {
   Card,
   CardContent,
@@ -77,55 +77,38 @@ export default function Products() {
   } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
-      console.log('Fetching products...');
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching products:', error);
-        throw error;
+      try {
+        const response = await apiClient.get('/products');
+        return response.data as Product[];
+      } catch (err: any) {
+        console.error('Error fetching products:', err);
+        throw err;
       }
-
-      console.log('Products fetched:', data);
-      return data as Product[];
     },
   });
 
   const handleDeleteProduct = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete "${name}"?`)) {
-      return;
-    }
+    if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
 
     try {
-      const { error } = await supabase.from('products').delete().eq('id', id);
-
-      if (error) throw error;
-
+      await apiClient.delete(`/products/${id}`);
       toast.success('Product deleted successfully');
       refetch();
-    } catch (error) {
-      console.error('Error deleting product:', error);
+    } catch (err) {
+      console.error('Error deleting product:', err);
       toast.error('Failed to delete product');
     }
   };
 
   const handleToggleActive = async (id: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('products')
-        .update({ is_active: !currentStatus })
-        .eq('id', id);
-
-      if (error) throw error;
-
+      await apiClient.put(`/products/${id}`, { is_active: !currentStatus });
       toast.success(
         `Product ${!currentStatus ? 'activated' : 'deactivated'} successfully`
       );
       refetch();
-    } catch (error) {
-      console.error('Error updating product status:', error);
+    } catch (err) {
+      console.error('Error updating product status:', err);
       toast.error('Failed to update product status');
     }
   };
@@ -135,7 +118,6 @@ export default function Products() {
       toast.error('No product data to download');
       return;
     }
-
     downloadProductsToExcel(products, 'products_export.xlsx');
     toast.success('Product data downloaded successfully');
   };
@@ -144,26 +126,24 @@ export default function Products() {
     try {
       const productData = await parseProductsFromExcel(file);
 
-      // Process and insert the data
-      const insertData = productData.map((product) => ({
-        product_code: product.product_code,
-        name: product.name,
-        description: product.description || null,
-        category: product.category,
-        monthly_price: product.monthly_price,
-        installation_fee: product.installation_fee || 0,
-        is_active: product.is_active !== false, // Default to true if not specified
-      }));
-
-      const { error } = await supabase.from('products').insert(insertData);
-
-      if (error) throw error;
+      // Insert each product via API
+      for (const product of productData) {
+        await apiClient.post('/products', {
+          product_code: product.product_code,
+          name: product.name,
+          description: product.description || null,
+          category: product.category,
+          monthly_price: product.monthly_price,
+          installation_fee: product.installation_fee || 0,
+          is_active: product.is_active !== false,
+        });
+      }
 
       refetch();
       toast.success(`Successfully imported ${productData.length} products`);
-    } catch (error) {
-      console.error('Error uploading products:', error);
-      throw error;
+    } catch (err) {
+      console.error('Error uploading products:', err);
+      toast.error('Failed to upload products');
     }
   };
 
@@ -178,9 +158,7 @@ export default function Products() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-lg text-red-600">
-          Error loading products: {error.message}
-        </div>
+        <div className="text-lg text-red-600">Error loading products</div>
       </div>
     );
   }

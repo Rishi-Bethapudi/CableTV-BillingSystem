@@ -1,11 +1,23 @@
-
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -28,7 +40,12 @@ interface EditProductDialogProps {
   onSuccess: () => void;
 }
 
-export function EditProductDialog({ product, open, onOpenChange, onSuccess }: EditProductDialogProps) {
+export function EditProductDialog({
+  product,
+  open,
+  onOpenChange,
+  onSuccess,
+}: EditProductDialogProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     product_code: '',
@@ -66,7 +83,9 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
           name: formData.name,
           description: formData.description || null,
           monthly_price: parseFloat(formData.monthly_price),
-          installation_fee: formData.installation_fee ? parseFloat(formData.installation_fee) : 0,
+          installation_fee: formData.installation_fee
+            ? parseFloat(formData.installation_fee)
+            : 0,
           category: formData.category,
           is_active: formData.is_active,
         })
@@ -93,7 +112,7 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
             Update the cable TV package or service details
           </DialogDescription>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="product_code" className="text-right">
@@ -102,12 +121,14 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
             <Input
               id="product_code"
               value={formData.product_code}
-              onChange={(e) => setFormData({ ...formData, product_code: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, product_code: e.target.value })
+              }
               className="col-span-3"
               required
             />
           </div>
-          
+
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">
               Name
@@ -115,17 +136,24 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
             <Input
               id="name"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
               className="col-span-3"
               required
             />
           </div>
-          
+
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="category" className="text-right">
               Category
             </Label>
-            <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+            <Select
+              value={formData.category}
+              onValueChange={(value) =>
+                setFormData({ ...formData, category: value })
+              }
+            >
               <SelectTrigger className="col-span-3">
                 <SelectValue />
               </SelectTrigger>
@@ -137,7 +165,7 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
               </SelectContent>
             </Select>
           </div>
-          
+
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="monthly_price" className="text-right">
               Monthly Price
@@ -147,12 +175,14 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
               type="number"
               step="0.01"
               value={formData.monthly_price}
-              onChange={(e) => setFormData({ ...formData, monthly_price: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, monthly_price: e.target.value })
+              }
               className="col-span-3"
               required
             />
           </div>
-          
+
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="installation_fee" className="text-right">
               Installation Fee
@@ -162,11 +192,13 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
               type="number"
               step="0.01"
               value={formData.installation_fee}
-              onChange={(e) => setFormData({ ...formData, installation_fee: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, installation_fee: e.target.value })
+              }
               className="col-span-3"
             />
           </div>
-          
+
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="description" className="text-right">
               Description
@@ -174,12 +206,14 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
             <Textarea
               id="description"
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               className="col-span-3"
               rows={3}
             />
           </div>
-          
+
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="is_active" className="text-right">
               Active
@@ -187,12 +221,18 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Ed
             <Switch
               id="is_active"
               checked={formData.is_active}
-              onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+              onCheckedChange={(checked) =>
+                setFormData({ ...formData, is_active: checked })
+              }
             />
           </div>
-          
+
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
