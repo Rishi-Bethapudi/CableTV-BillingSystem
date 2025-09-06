@@ -79,7 +79,18 @@ export default function Products() {
     queryFn: async () => {
       try {
         const response = await apiClient.get('/products');
-        return response.data as Product[];
+        const mappedProducts: Product[] = response.data.map((p: any) => ({
+          id: p._id,
+          product_code: p.productCode || p.product_code || '',
+          name: p.name,
+          description: p.description || null,
+          monthly_price: p.customerPrice || 0,
+          installation_fee: p.operatorCost || 0, // or another field if applicable
+          category: p.category || 'Basic',
+          is_active: p.isActive,
+          created_at: p.createdAt,
+        }));
+        return mappedProducts;
       } catch (err: any) {
         console.error('Error fetching products:', err);
         throw err;
