@@ -22,7 +22,7 @@ import Expenses from './pages/Expenses';
 import Collection from './pages/Collection';
 import NotFound from './pages/NotFound';
 import LoginPage from './pages/LoginPage';
-
+import TestCollection from './pages/TestCollection';
 const queryClient = new QueryClient();
 
 const AppRoutes = () => {
@@ -65,6 +65,16 @@ const AppRoutes = () => {
           <ProtectedRoute>
             <Layout>
               <Customers />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/testCollection"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <TestCollection />
             </Layout>
           </ProtectedRoute>
         }
