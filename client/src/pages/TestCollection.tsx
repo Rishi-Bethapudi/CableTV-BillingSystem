@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import { useState, useRef } from 'react';
+import { useReactToPrint } from 'react-to-print';
+import * as XLSX from 'xlsx';
+import { CollectionFilters } from '@/components/collection/CollectionFilters';
+import { CollectionSummaryCard } from '@/components/collection/CollectionSummaryCard';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
 
 const CollectionDashboard = () => {
   const [activeTab, setActiveTab] = useState('summary');
-  const [filters, setFilters] = useState({
-    dateRange: '1 September 2025 to 30 September 2025',
-    agent: 'Select Agent',
-    area: 'Select Area',
-    paymentMode: 'Select Payment Mode',
-  });
+  const [filters, setFilters] = useState<any>(null);
 
   // Sample data structure based on the images
   const transactionData = {
@@ -237,7 +238,41 @@ const CollectionDashboard = () => {
       ],
     },
   };
+  const applyFilters = () => {
+    if (!filters) return transactionData;
 
+    return Object.fromEntries(
+      Object.entries(transactionData).filter(([date, data]) => {
+        const txDate = new Date(date);
+        const start = new Date(filters.startDate);
+        const end = new Date(filters.endDate);
+
+        // Date filter
+        if (txDate < start || txDate > end) return false;
+
+        // Customer filters (apply inside details)
+        data.customerDetails = data.customerDetails.filter((cust: any) => {
+          if (filters.agent !== 'all' && cust.collectedBy !== filters.agent)
+            return false;
+          if (filters.area !== 'all' && cust.area !== filters.area)
+            return false;
+          if (filters.payment !== 'all') {
+            const isOnline = cust.portalRecharge;
+            if (filters.payment === 'cash' && isOnline) return false;
+            if (filters.payment === 'online' && !isOnline) return false;
+          }
+          if (filters.dataShow === 'paid' && cust.paidAmount <= 0) return false;
+          if (filters.dataShow === 'pending' && cust.currentBalance <= 0)
+            return false;
+          return true;
+        });
+
+        return true;
+      })
+    );
+  };
+
+  const filteredData = applyFilters();
   const handleFilterChange = (filterName, value) => {
     setFilters((prev) => ({ ...prev, [filterName]: value }));
   };
@@ -252,123 +287,145 @@ const CollectionDashboard = () => {
   };
 
   const handleExcelExport = () => {
-    alert('Excel export functionality would be implemented here');
+    const rows = [];
+    Object.entries(filteredData).forEach(([date, data]) => {
+      data.customerDetails.forEach((c) => {
+        rows.push({
+          Date: date,
+          Name: c.name,
+          Area: c.area,
+          PrevBalance: c.previousBalance,
+          Paid: c.paidAmount,
+          Discount: c.discount,
+          CurrBalance: c.currentBalance,
+          CollectedBy: c.collectedBy,
+          CustomerCode: c.customerCode,
+          StbNo: c.stbNo,
+          CardNo: c.cardNo,
+          Portal: c.portalRecharge ? 'Online' : 'Cash',
+        });
+      });
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Collection');
+    XLSX.writeFile(wb, 'collection-report.xlsx');
   };
+
+  // --- PRINT ---
+  const printRef = useRef();
+  const handlePrint = useReactToPrint({
+    content: () => printRef.current,
+  });
 
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-full mx-auto p-3">
         {/* Header */}
-        <div className="bg-white p-4 rounded-lg shadow-sm mb-4">
-          <h1 className="text-2xl font-normal text-gray-800 mb-3">
-            Collection
-          </h1>
-          <div className="text-gray-600 text-xs mb-3">
-            ...ing days...भुगतान 2 बैंक कार्य दिवसों के भीतर आपके बैंक खाते में
-            जमा कर दिया जाएगा
-          </div>
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Collection</h1>
         </div>
-
-        {/* Filters */}
-        <div className="bg-gray-50 p-3 rounded-lg mb-4">
-          <h3 className="mb-3 text-gray-800 font-medium text-sm">
-            Filters and Options
-          </h3>
-          <div className="flex gap-2 items-center flex-wrap">
-            <select className="px-2 py-1 border border-gray-300 rounded bg-white text-xs min-w-32">
-              <option>Data show on Create Date</option>
-            </select>
-            <select
-              className="px-2 py-1 border border-gray-300 rounded bg-white text-xs min-w-40"
-              value={filters.dateRange}
-              onChange={(e) => handleFilterChange('dateRange', e.target.value)}
-            >
-              <option>1 September 2025 to 30 September 2025</option>
-            </select>
-            <select
-              className="px-2 py-1 border border-gray-300 rounded bg-white text-xs min-w-24"
-              value={filters.agent}
-              onChange={(e) => handleFilterChange('agent', e.target.value)}
-            >
-              <option>Select Agent</option>
-            </select>
-            <select
-              className="px-2 py-1 border border-gray-300 rounded bg-white text-xs min-w-24"
-              value={filters.area}
-              onChange={(e) => handleFilterChange('area', e.target.value)}
-            >
-              <option>Select Area</option>
-            </select>
-            <select
-              className="px-2 py-1 border border-gray-300 rounded bg-white text-xs min-w-32"
-              value={filters.paymentMode}
-              onChange={(e) =>
-                handleFilterChange('paymentMode', e.target.value)
-              }
-            >
-              <option>Select Payment Mode</option>
-            </select>
-            <button
-              onClick={handleReset}
-              className="px-3 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors"
-            >
-              Reset
-            </button>
-          </div>
+        <CollectionFilters onFilterChange={setFilters} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <CollectionSummaryCard title="Total Paid" amount={33950} />
+          <CollectionSummaryCard title="Total Payments" amount={33950} />
         </div>
-
         {/* Tabs */}
-        <div className="flex mb-4">
-          <button
-            onClick={() => setActiveTab('summary')}
-            className={`px-4 py-2 text-xs font-medium ${
-              activeTab === 'summary'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-600 text-white hover:bg-gray-700'
-            } rounded-l`}
-          >
-            📊 Summary
-          </button>
-          <button
-            onClick={() => setActiveTab('online')}
-            className={`px-4 py-2 text-xs font-medium ${
-              activeTab === 'online'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-600 text-white hover:bg-gray-700'
-            } rounded-r`}
-          >
-            💳 Online Transactions
-          </button>
-        </div>
+        <Tabs
+          defaultValue="summary"
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="w-full"
+        >
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
+            <TabsTrigger value="summary">Summary</TabsTrigger>
+            <TabsTrigger value="online">Online</TabsTrigger>
+            <TabsTrigger value="cash">Cash</TabsTrigger>
+            <TabsTrigger value="area">Area Wise</TabsTrigger>
+          </TabsList>
 
-        {/* Summary Section */}
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex gap-3">
-            <div className="bg-white p-4 rounded-lg shadow-sm text-center min-w-32">
-              <div className="text-xl font-bold text-orange-500 mb-1">
-                ₹ 10180
-              </div>
-              <div className="text-gray-600 text-xs">Total Paid</div>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm text-center min-w-32">
-              <div className="text-xl font-bold text-orange-500 mb-1">
-                ₹ 10180
-              </div>
-              <div className="text-gray-600 text-xs">Total Payments</div>
-            </div>
+          <div ref={printRef}>
+            {/* SUMMARY TAB */}
+            <TabsContent value="summary" className="mt-6">
+              {Object.entries(filteredData).map(([date, data]) => (
+                <DailyReportTable key={date} date={date} data={data} />
+              ))}
+            </TabsContent>
+
+            {/* ONLINE TAB */}
+            <TabsContent value="online" className="mt-6">
+              {Object.entries(filteredData).map(([date, data]) => {
+                const online = data.customerDetails.filter(
+                  (c) => c.portalRecharge
+                );
+                if (!online.length) return null;
+                return (
+                  <DailyReportTable
+                    key={date}
+                    date={date}
+                    data={{ ...data, customerDetails: online }}
+                  />
+                );
+              })}
+            </TabsContent>
+
+            {/* CASH TAB */}
+            <TabsContent value="cash" className="mt-6">
+              {Object.entries(filteredData).map(([date, data]) => {
+                const cash = data.customerDetails.filter(
+                  (c) => !c.portalRecharge
+                );
+                if (!cash.length) return null;
+                return (
+                  <DailyReportTable
+                    key={date}
+                    date={date}
+                    data={{ ...data, customerDetails: cash }}
+                  />
+                );
+              })}
+            </TabsContent>
+            {/* AREA WISE TAB */}
+            <TabsContent value="area" className="mt-6">
+              {Object.entries(filteredData).map(([date, data]) => (
+                <Card key={date} className="mb-4">
+                  <CardContent className="p-4">
+                    <h2 className="font-bold text-gray-700 mb-2">{date}</h2>
+                    {Object.entries(data.areas).map(([area, areaData]) => (
+                      <div key={area} className="mb-4">
+                        <h3 className="font-semibold text-gray-600 mb-1">
+                          {area}
+                        </h3>
+                        <table className="w-full border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-gray-50">
+                              <th className="border p-1">Mode</th>
+                              <th className="border p-1">Customers</th>
+                              <th className="border p-1">Amount</th>
+                              <th className="border p-1">Discount</th>
+                              <th className="border p-1">Payment</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {areaData.modes.map((m, i) => (
+                              <tr key={i}>
+                                <td className="border p-1">{m.mode}</td>
+                                <td className="border p-1">{m.customers}</td>
+                                <td className="border p-1">₹{m.amount}</td>
+                                <td className="border p-1">₹{m.discount}</td>
+                                <td className="border p-1">₹{m.payment}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              ))}
+            </TabsContent>
           </div>
-          <button
-            onClick={handleExcelExport}
-            className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 transition-colors flex items-center gap-1"
-          >
-            📊 Excel
-          </button>
-        </div>
-
-        {/* Date Sections */}
-        {Object.entries(transactionData).map(([date, data]) => (
-          <DailyReportTable key={date} date={date} data={data} />
-        ))}
+        </Tabs>
       </div>
     </div>
   );
@@ -397,7 +454,7 @@ const DailyReportTable = ({ date, data }) => {
               colSpan={3}
               className="p-2 text-left font-semibold text-gray-800 border border-gray-200 text-xs"
             >
-              Customer: {data.summary.customers}
+              Customers: {data.summary.customers}
             </th>
             <th
               colSpan={3}
@@ -618,5 +675,31 @@ const DailyReportTable = ({ date, data }) => {
     </div>
   );
 };
+{
+  /* <Tabs defaultValue="summary" className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="summary">Summary</TabsTrigger>
+            <TabsTrigger value="online-transactions">
+              Online Transactions
+            </TabsTrigger>
+          </TabsList>
 
+          <TabsContent value="summary" className="mt-6">
+            {/* Date Sections */
+}
+//     {Object.entries(transactionData).map(([date, data]) => (
+//       <DailyReportTable key={date} date={date} data={data} />
+//     ))}
+//   </TabsContent>
+
+//   <TabsContent value="online-transactions" className="mt-6">
+//     <Card>
+//       <CardContent className="p-8 text-center">
+//         <p className="text-gray-500">
+//           Online transactions data will be displayed here
+//         </p>
+//       </CardContent>
+//     </Card>
+//   </TabsContent>
+// </Tabs> */}
 export default CollectionDashboard;

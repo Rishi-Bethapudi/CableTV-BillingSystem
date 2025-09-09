@@ -94,7 +94,7 @@ export default function CustomersPage() {
 
   // Pagination
   const [page, setPage] = useState(1);
-  const limit = 25;
+  const limit = 20;
 
   const fetchCustomers = useCallback(async () => {
     setLoading(true);

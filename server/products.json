@@ -1,0 +1,227 @@
+[
+  {
+    "operatorId": null,
+    "name": "Internet & OTT",
+    "category": "Premium",
+    "customerPrice": 450.0,
+    "operatorCost": 315.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "A10",
+    "category": "Premium",
+    "customerPrice": 1000.0,
+    "operatorCost": 700.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "A2",
+    "category": "Premium",
+    "customerPrice": 350.0,
+    "operatorCost": 245.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "A20 - SS",
+    "category": "Premium",
+    "customerPrice": 500.0,
+    "operatorCost": 350.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "A2IPHD",
+    "category": "Premium",
+    "customerPrice": 500.0,
+    "operatorCost": 350.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "A2IPSD",
+    "category": "Premium",
+    "customerPrice": 450.0,
+    "operatorCost": 315.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "A3",
+    "category": "Premium",
+    "customerPrice": 400.0,
+    "operatorCost": 280.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "A3RBTV",
+    "category": "Premium",
+    "customerPrice": 600.0,
+    "operatorCost": 420.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "A4IPSD",
+    "category": "Premium",
+    "customerPrice": 600.0,
+    "operatorCost": 420.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "ANT20 - RBTV",
+    "category": "Premium",
+    "customerPrice": 600.0,
+    "operatorCost": 420.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "APSFL Home Essential",
+    "category": "Premium",
+    "customerPrice": 450.0,
+    "operatorCost": 315.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "APSFL Home Premium",
+    "category": "Premium",
+    "customerPrice": 600.0,
+    "operatorCost": 420.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "APSFL Home_PIE",
+    "category": "Basic",
+    "customerPrice": 250.0,
+    "operatorCost": 175.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "Broadband 40Mbps",
+    "category": "Premium",
+    "customerPrice": 400.0,
+    "operatorCost": 280.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "FTA 2",
+    "category": "Add-on",
+    "customerPrice": 25.0,
+    "operatorCost": 17.5,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "GTPL",
+    "category": "Basic",
+    "customerPrice": 300.0,
+    "operatorCost": 210.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "Internet - OTT",
+    "category": "Premium",
+    "customerPrice": 500.0,
+    "operatorCost": 350.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "RBTV OTT",
+    "category": "Basic",
+    "customerPrice": 250.0,
+    "operatorCost": 175.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "Smart PlayTV",
+    "category": "Basic",
+    "customerPrice": 250.0,
+    "operatorCost": 175.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "SSLC",
+    "category": "Basic",
+    "customerPrice": 250.0,
+    "operatorCost": 175.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "APSFL Basic",
+    "category": "Premium",
+    "customerPrice": 350.0,
+    "operatorCost": 245.0,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "Colors Wala Gujarat Budget Plus",
+    "category": "Add-on",
+    "customerPrice": 22.0,
+    "operatorCost": 15.4,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "Colors Wala Gujarat Value",
+    "category": "Add-on",
+    "customerPrice": 25.0,
+    "operatorCost": 17.5,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "Colors Wala Gujarat Value HD",
+    "category": "Add-on",
+    "customerPrice": 35.0,
+    "operatorCost": 24.5,
+    "billingInterval": 30,
+    "isActive": true
+  },
+  {
+    "operatorId": null,
+    "name": "Colors Wala Gujarat Value Plus",
+    "category": "Add-on",
+    "customerPrice": 25.0,
+    "operatorCost": 17.5,
+    "billingInterval": 30,
+    "isActive": true
+  }
+]

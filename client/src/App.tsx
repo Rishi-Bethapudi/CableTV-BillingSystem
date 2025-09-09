@@ -19,7 +19,7 @@ import CustomerDetails from './pages/CustomerDetails';
 import Products from './pages/Products';
 import Agents from './pages/Agents';
 import Expenses from './pages/Expenses';
-import Collection from './pages/Collection';
+import CollectionDashboard from './pages/Collection';
 import NotFound from './pages/NotFound';
 import LoginPage from './pages/LoginPage';
 import TestCollection from './pages/TestCollection';
@@ -124,7 +124,7 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <Layout>
-              <Collection />
+              <CollectionDashboard />
             </Layout>
           </ProtectedRoute>
         }

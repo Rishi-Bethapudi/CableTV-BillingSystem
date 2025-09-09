@@ -63,9 +63,9 @@ export default function CustomerSidebar({
               className={`w-full justify-start text-left ${
                 isActive
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : isPrimary
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
                   : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-200'
+              } ${
+                isPrimary && !isActive ? 'font-semibold border-blue-300' : ''
               }`}
               variant="ghost"
             >

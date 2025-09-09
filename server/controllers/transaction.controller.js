@@ -103,14 +103,23 @@ const createBilling = async (req, res) => {
  * @route   POST /api/transactions/collection
  * @access  Private (Operator or Agent)
  */
+// POST /api/transactions/collection
 const createCollection = async (req, res) => {
-  const { customerId, amount, method, note } = req.body;
+  const {
+    customerId,
+    amount,
+    discount = 0,
+    method,
+    note,
+    recordedAt,
+  } = req.body;
 
   if (!customerId || !amount) {
     return res
       .status(400)
       .json({ message: 'Customer ID and amount are required.' });
   }
+
   if (amount <= 0) {
     return res
       .status(400)
@@ -121,16 +130,24 @@ const createCollection = async (req, res) => {
     const customer = await Customer.findById(customerId);
     if (!customer)
       return res.status(404).json({ message: 'Customer not found.' });
+
     if (customer.operatorId.toString() !== req.user.operatorId) {
       return res.status(403).json({ message: 'Forbidden.' });
     }
 
-    // --- Generate Auto-Incrementing Receipt Number ---
+    // Apply discount if provided
+    const finalAmount = amount - discount;
+    if (finalAmount <= 0) {
+      return res
+        .status(400)
+        .json({ message: 'Final amount after discount must be positive.' });
+    }
+
+    // Generate receipt number
     const receiptNumber = await Counter.getReceiptNumber(req.user.operatorId);
 
-    // --- Create the Transaction Record ---
     const balanceBefore = customer.balanceAmount;
-    const balanceAfter = balanceBefore - amount; // Subtract payment from balance
+    const balanceAfter = balanceBefore - finalAmount;
 
     const newTransaction = new Transaction({
       customerId,
@@ -138,27 +155,27 @@ const createCollection = async (req, res) => {
       collectedBy: req.user.id,
       collectedByType: req.user.role === 'operator' ? 'Operator' : 'Agent',
       type: 'Collection',
-      amount: -Math.abs(amount), // Record as a negative value
+      amount: -Math.abs(finalAmount), // negative for collected payment
+      discount: discount || 0,
       balanceBefore,
       balanceAfter,
       method: method || 'Cash',
       receiptNumber,
       note,
+      recordedAt: recordedAt ? new Date(recordedAt) : new Date(),
     });
 
-    // --- Update the Customer record ---
-    // THIS DOES NOT AFFECT THE EXPIRY DATE
+    // Update customer
     customer.balanceAmount = balanceAfter;
-    customer.lastPaymentAmount = amount;
+    customer.lastPaymentAmount = finalAmount;
     customer.lastPaymentDate = new Date();
-    // --- Save changes and respond ---
+
     await newTransaction.save();
     await customer.save();
 
-    // --- Prepare SMS message for the frontend ---
     const smsMessage = `Dear ${
       customer.name
-    }, payment of Rs.${amount} received. Your new balance is Rs.${balanceAfter.toFixed(
+    }, payment of Rs.${finalAmount} received. Your new balance is Rs.${balanceAfter.toFixed(
       2
     )}. Thank you.`;
 

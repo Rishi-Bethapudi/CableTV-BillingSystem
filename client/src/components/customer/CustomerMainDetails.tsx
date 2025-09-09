@@ -4,8 +4,8 @@ interface CustomerProps {
     name: string;
     mobile?: string;
     locality?: string;
-    balance?: number;
-    lastBillDate?: string;
+    balanceAmount?: number;
+    lastPaymentDate?: string;
     stbName?: string;
     stbNumber?: string;
     cardNumber?: string;
@@ -24,7 +24,7 @@ export default function CustomerMainDetails({ customer }: CustomerProps) {
               Balance
             </span>
             <span className="font-semibold text-gray-900 dark:text-white">
-              ₹{customer.balance?.toLocaleString() ?? 0}
+              ₹{customer.balanceAmount?.toLocaleString() ?? 0}
             </span>
           </div>
           <div className="flex flex-col">

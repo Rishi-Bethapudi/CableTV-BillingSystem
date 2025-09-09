@@ -1,12 +1,13 @@
 // File: components/customer/CustomerRightPanel.tsx
 
 import { Suspense, lazy } from 'react';
-import { Customer } from '@/utils/data';
+import type { Customer } from '@/utils/data';
 import { Loader2 } from 'lucide-react';
 
 interface Props {
   customer: Customer;
   activeSection: string;
+  refetchCustomer: () => void;
 }
 
 // Lazy load sections
@@ -21,7 +22,17 @@ const BalanceHistorySection = lazy(() => import('./BalanceHistorySection'));
 const HardwareDetailsSection = lazy(() => import('./HardwareDetailsSection'));
 const CustomerEditSection = lazy(() => import('./CustomerEditSection'));
 
-export default function CustomerRightPanel({ customer, activeSection }: Props) {
+interface Props {
+  customer: Customer;
+  activeSection: string;
+  onRefresh: () => void; // <-- accept onRefresh
+}
+
+export default function CustomerRightPanel({
+  customer,
+  activeSection,
+  onRefresh,
+}: Props) {
   return (
     <div className="w-full space-y-6 transition-all animate-in fade-in zoom-in duration-300">
       <Suspense
@@ -34,41 +45,91 @@ export default function CustomerRightPanel({ customer, activeSection }: Props) {
         {(() => {
           switch (activeSection) {
             case 'collect-payment':
-              return <CollectPaymentSection customer={customer} />;
+              return (
+                <CollectPaymentSection
+                  customer={customer}
+                  onRefresh={onRefresh}
+                />
+              );
             case 'renew':
-              return <RenewSection customer={customer} />;
+              return (
+                <RenewSection
+                  customer={customer}
+                  isVisible={true}
+                  onRefresh={onRefresh}
+                />
+              );
             case 'subscription':
               return (
-                <SubscriptionSection customer={customer} isVisible={true} />
+                <SubscriptionSection
+                  customer={customer}
+                  isVisible={true}
+                  onRefresh={onRefresh}
+                />
               );
             case 'adjust-balance':
               return (
-                <AdjustBalanceSection customer={customer} isVisible={true} />
+                <AdjustBalanceSection
+                  customer={customer}
+                  isVisible={true}
+                  onRefresh={onRefresh}
+                />
               );
             case 'add-on-bill':
-              return <AddOnBillSection customer={customer} isVisible={true} />;
+              return (
+                <AddOnBillSection
+                  customer={customer}
+                  isVisible={true}
+                  onRefresh={onRefresh}
+                />
+              );
             case 'active-inactive':
               return (
-                <ActiveInactiveSection customer={customer} isVisible={true} />
+                <ActiveInactiveSection
+                  customer={customer}
+                  isVisible={true}
+                  onRefresh={onRefresh}
+                />
               );
             case 'additional-charge':
               return (
-                <AdditionalChargeSection customer={customer} isVisible={true} />
+                <AdditionalChargeSection
+                  customer={customer}
+                  isVisible={true}
+                  onRefresh={onRefresh}
+                />
               );
             case 'balance-history':
               return (
-                <BalanceHistorySection customer={customer} isVisible={true} />
+                <BalanceHistorySection
+                  customer={customer}
+                  isVisible={true}
+                  onRefresh={onRefresh}
+                />
               );
             case 'hardware-details':
               return (
-                <HardwareDetailsSection customer={customer} isVisible={true} />
+                <HardwareDetailsSection
+                  customer={customer}
+                  isVisible={true}
+                  onRefresh={onRefresh}
+                />
               );
             case 'customer-edit':
               return (
-                <CustomerEditSection customer={customer} isVisible={true} />
+                <CustomerEditSection
+                  customer={customer}
+                  isVisible={true}
+                  onRefresh={onRefresh}
+                />
               );
             default:
-              return <CollectPaymentSection customer={customer} />;
+              return (
+                <CollectPaymentSection
+                  customer={customer}
+                  onRefresh={onRefresh}
+                />
+              );
           }
         })()}
       </Suspense>

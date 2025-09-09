@@ -21,14 +21,22 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import apiClient from '@/utils/apiClient';
-import { Customer } from '@/utils/data';
+import type { Customer } from '@/utils/data';
 
 interface CollectPaymentSectionProps {
   customer: Customer;
   isVisible?: boolean;
+  onRefresh: () => void;
 }
 type TransactionResponse = any;
-
+interface CollectPaymentPayload {
+  customerId: string;
+  amount: number;
+  discount: number;
+  method: string;
+  note: string;
+  recordedAt: string;
+}
 export default function CollectPaymentSection({
   customer,
 }: CollectPaymentSectionProps) {
@@ -43,20 +51,17 @@ export default function CollectPaymentSection({
   // state for modal
   const [historyType, setHistoryType] = useState<string | null>(null);
 
-  const { mutate, isLoading } = useMutation<TransactionResponse, Error>({
-    mutationFn: async () => {
-      const payload = {
-        customerId: customer._id,
-        paymentAmount: Number(paymentAmount),
-        discount: Number(discount),
-        paymentMode,
-        comment,
-        recordedAt: new Date(recordTime).toISOString(),
-      };
-      const res = await apiClient.post('/transactions', payload);
+  const { mutate, isPending } = useMutation<
+    TransactionResponse,
+    Error,
+    CollectPaymentPayload
+  >({
+    mutationFn: async (payload: CollectPaymentPayload) => {
+      const res = await apiClient.post('/transactions/collection', payload);
       return res.data;
     },
     onSuccess: () => {
+      // if (onRefresh) onRefresh();
       toast.success('Payment recorded successfully');
       setPaymentAmount('');
       setDiscount('');
@@ -64,7 +69,10 @@ export default function CollectPaymentSection({
       setComment('');
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Something went wrong');
+      console.error('Transaction error:', err);
+      toast.error(
+        err?.response?.data?.message || err.message || 'Something went wrong'
+      );
     },
   });
 
@@ -73,29 +81,20 @@ export default function CollectPaymentSection({
       toast.warning('Please enter payment amount');
       return;
     }
-    mutate();
+    mutate({
+      customerId: customer._id,
+      amount: Number(paymentAmount) || 0,
+      discount: Number(discount) || 0,
+      method: paymentMode,
+      note: comment,
+      recordedAt: new Date(recordTime).toISOString(),
+    });
   };
 
-  const newBalance =
-    customer.balanceAmount -
-    (Number(paymentAmount) || 0) -
-    (Number(discount) || 0);
+  const discountValue = Number(discount) || 0;
+  const paymentValue = Number(paymentAmount) || 0;
 
-  // Dummy history data (replace with API later)
-  const historyData = {
-    balance: [
-      { date: '2025-09-01', action: 'Added Recharge', amount: 400 },
-      { date: '2025-08-15', action: 'Collected Payment', amount: -200 },
-    ],
-    bill: [
-      { date: '2025-08-01', action: 'Monthly Bill', amount: 250 },
-      { date: '2025-07-01', action: 'Monthly Bill', amount: 250 },
-    ],
-    payment: [
-      { date: '2025-08-10', action: 'Cash Payment', amount: 200 },
-      { date: '2025-07-12', action: 'UPI Payment', amount: 250 },
-    ],
-  };
+  const newBalance = customer.balanceAmount - paymentValue - discountValue;
 
   return (
     <>
@@ -132,7 +131,11 @@ export default function CollectPaymentSection({
                   key: 'balance',
                   label: 'Balance Amount',
                   value: `₹${customer.balanceAmount}`,
-                  sub: 'Till Date',
+                  subtitle: customer.expiryDate
+                    ? `Expiry: ${new Date(
+                        customer.expiryDate
+                      ).toLocaleDateString()}`
+                    : 'No Expiry',
                 },
                 {
                   key: 'bill',
@@ -143,21 +146,33 @@ export default function CollectPaymentSection({
                   key: 'payment',
                   label: 'Last Payment',
                   value: `₹${customer.lastPaymentAmount}`,
-                  sub: `on ${customer.lastPaymentDate}`,
+                  subtitle: customer.lastPaymentDate
+                    ? `Collected on ${new Date(
+                        customer.lastPaymentDate
+                      ).toLocaleDateString()}`
+                    : 'No Payment Recorded',
                 },
-              ].map(({ key, label, value, sub }) => (
+              ].map(({ key, label, value, subtitle }) => (
                 <div
                   key={key}
-                  onClick={() => setHistoryType(key)}
-                  className="cursor-pointer bg-slate-100 dark:bg-slate-800 p-4 rounded-lg shadow-sm flex-1 min-w-[150px] min-h-[100px] flex flex-col justify-center hover:ring-2 hover:ring-blue-500 transition"
+                  onClick={() => {}}
+                  className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
                 >
-                  <Label className="text-sm text-muted-foreground">
-                    {label}
-                  </Label>
-                  <div className="text-xl font-bold">{value}</div>
-                  {sub && (
-                    <p className="text-xs text-muted-foreground mt-1">{sub}</p>
-                  )}
+                  <div className="flex flex-col items-center text-center">
+                    <h3 className="text-gray-600 text-sm font-medium mb-3">
+                      {label}
+                    </h3>
+
+                    <div className="text-2xl font-bold text-gray-900 mb-3">
+                      {value}
+                    </div>
+
+                    {subtitle && (
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <span>{subtitle}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -242,11 +257,11 @@ export default function CollectPaymentSection({
 
               <Button
                 onClick={handleRecord}
-                disabled={isLoading}
+                disabled={isPending}
                 className="w-full bg-slate-800 hover:bg-slate-900 text-white flex items-center justify-center gap-2"
               >
-                {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isLoading ? 'Recording...' : 'Record'}
+                {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isPending ? 'Recording...' : 'Record'}
               </Button>
             </div>
           </div>
@@ -265,31 +280,6 @@ export default function CollectPaymentSection({
                 : 'Payment History'}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 max-h-[400px] overflow-y-auto">
-            {historyType &&
-              historyData[historyType as keyof typeof historyData].map(
-                (item, i) => (
-                  <div
-                    key={i}
-                    className="flex justify-between items-center border-b pb-2 text-sm"
-                  >
-                    <div>
-                      <p className="font-medium">{item.action}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {item.date}
-                      </p>
-                    </div>
-                    <span
-                      className={`font-bold ${
-                        item.amount >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}
-                    >
-                      {item.amount >= 0 ? '+' : ''}₹{item.amount}
-                    </span>
-                  </div>
-                )
-              )}
-          </div>
         </DialogContent>
       </Dialog>
     </>

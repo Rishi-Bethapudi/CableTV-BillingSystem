@@ -15,10 +15,11 @@ export interface Customer {
   stbName: string;
   stbNumber: string;
   cardNumber: string;
-  productId: string;
+  productId: [string]; // array of product IDs
   additionalCharge: number;
   discount: number;
   lastPaymentAmount: number;
+  lastPaymentDate: string; // or Date
   remark: string;
   createdAt: string; // or Date
   updatedAt: string; // or Date
