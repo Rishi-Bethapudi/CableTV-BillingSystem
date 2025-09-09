@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,20 +13,51 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import apiClient from '@/utils/apiClient'; // axios instance
 
 interface AdditionalChargeSectionProps {
   isVisible: boolean;
+  customerId: string;
+  onRefresh?: () => void; // optional callback to refresh customer data
 }
 
-function AdditionalChargeSection({ isVisible }: AdditionalChargeSectionProps) {
-  const [type, setType] = useState('charge');
+function AdditionalChargeSection({
+  isVisible,
+  customerId,
+  onRefresh,
+}: AdditionalChargeSectionProps) {
+  const [type, setType] = useState<'charge' | 'discount'>('charge');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
 
-  const handleSubmit = () => {
-    console.log('Adding charge/discount:', { type, amount, description });
-    setAmount('');
-    setDescription('');
+  const { mutateAsync, isPending } = useMutation<
+    any,
+    Error,
+    { amount: number; note: string }
+  >(async (payload) => {
+    if (!payload.amount || payload.amount <= 0) {
+      throw new Error('Amount must be greater than 0');
+    }
+
+    const res = await apiClient.post(
+      `/customers/${customerId}/additionalCharge`,
+      payload
+    );
+    return res.data;
+  });
+
+  const handleSubmit = async () => {
+    try {
+      await mutateAsync({ amount: Number(amount), note: description });
+      toast.success('Additional charge applied successfully');
+      setAmount('');
+      setDescription('');
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.message || err.message || 'Something went wrong'
+      );
+    }
   };
 
   if (!isVisible) return null;
@@ -37,7 +70,10 @@ function AdditionalChargeSection({ isVisible }: AdditionalChargeSectionProps) {
       <CardContent className="p-4 space-y-4">
         <div className="space-y-2">
           <Label>Type</Label>
-          <Select value={type} onValueChange={setType}>
+          <Select
+            value={type}
+            onValueChange={(val) => setType(val as 'charge' | 'discount')}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -70,13 +106,16 @@ function AdditionalChargeSection({ isVisible }: AdditionalChargeSectionProps) {
 
         <Button
           onClick={handleSubmit}
+          disabled={isPending}
           className={`w-full ${
             type === 'charge'
               ? 'bg-red-600 hover:bg-red-700'
               : 'bg-green-600 hover:bg-green-700'
           } text-white`}
         >
-          Apply {type === 'charge' ? 'Charge' : 'Discount'}
+          {isPending
+            ? 'Applying...'
+            : `Apply ${type === 'charge' ? 'Charge' : 'Discount'}`}
         </Button>
       </CardContent>
     </Card>

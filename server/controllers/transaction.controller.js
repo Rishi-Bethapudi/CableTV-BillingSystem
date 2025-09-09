@@ -98,7 +98,8 @@ const createBilling = async (req, res) => {
   }
 };
 const createAdditionalCharge = async (req, res) => {
-  const { customerId, amount, note } = req.body;
+  const { id: customerId } = req.params;
+  const { amount, note } = req.body;
 
   if (!customerId || !amount) {
     return res
