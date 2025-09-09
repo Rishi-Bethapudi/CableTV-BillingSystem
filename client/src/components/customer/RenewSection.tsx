@@ -7,8 +7,13 @@ import type { Customer } from '@/utils/data';
 interface RenewSubscriptionProps {
   customer: Customer;
   isVisible: boolean;
+  onRefresh: () => void;
 }
-const RenewSubscription = ({ customer, isVisible }: RenewSubscriptionProps) => {
+const RenewSubscription = ({
+  customer,
+  isVisible,
+  onRefresh,
+}: RenewSubscriptionProps) => {
   // Sample customer data - replace with your actual data
   // const [customer] = useState({
   //   id: '687cfdcc9624e0a93a377f4a',
@@ -130,6 +135,7 @@ const RenewSubscription = ({ customer, isVisible }: RenewSubscriptionProps) => {
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
       toast.success('Subscription renewed successfully!');
+      if (onRefresh) onRefresh();
     } catch (error) {
       console.error('Error renewing subscription:', error);
       alert('Failed to renew subscription. Please try again.');

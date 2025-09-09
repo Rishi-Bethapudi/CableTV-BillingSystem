@@ -1,26 +1,53 @@
 import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import apiClient from '@/utils/apiClient';
 
 interface CustomerData {
+  _id: string;
   status: string;
 }
 
 interface ActiveInactiveSectionProps {
   customer: CustomerData;
-  isVisible: boolean;
+  isVisible?: boolean;
+  onRefresh: () => void;
 }
 
-function ActiveInactiveSection({
+export default function ActiveInactiveSection({
   customer,
-  isVisible,
+  isVisible = true,
+  onRefresh,
 }: ActiveInactiveSectionProps) {
   const [isActive, setIsActive] = useState(customer.status === 'Active');
 
+  const { mutate, isPending } = useMutation({
+    mutationFn: async (newStatus: boolean) => {
+      const payload = { active: newStatus };
+      const res = await apiClient.put(`/customers/${customer._id}`, payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success(
+        `Customer ${isActive ? 'deactivated' : 'activated'} successfully`
+      );
+      onRefresh(); // refresh parent customer data
+    },
+    onError: (err: any) => {
+      console.error('Status update error:', err);
+      toast.error(
+        err?.response?.data?.message || err.message || 'Failed to update status'
+      );
+    },
+  });
+
   const handleStatusChange = () => {
-    console.log('Changing status to:', isActive ? 'Inactive' : 'Active');
+    mutate(!isActive);
+    setIsActive(!isActive); // optimistic UI
   };
 
   if (!isVisible) return null;
@@ -36,7 +63,8 @@ function ActiveInactiveSection({
           <Switch
             id="status-toggle"
             checked={isActive}
-            onCheckedChange={setIsActive}
+            onCheckedChange={handleStatusChange}
+            disabled={isPending}
           />
         </div>
 
@@ -53,17 +81,17 @@ function ActiveInactiveSection({
 
         <Button
           onClick={handleStatusChange}
+          disabled={isPending}
           className={`w-full ${
             isActive
               ? 'bg-red-600 hover:bg-red-700'
               : 'bg-green-600 hover:bg-green-700'
           } text-white`}
         >
-          {isActive ? 'Deactivate' : 'Activate'} Customer
+          {isPending ? 'Updating...' : isActive ? 'Deactivate' : 'Activate'}{' '}
+          Customer
         </Button>
       </CardContent>
     </Card>
   );
 }
-
-export default ActiveInactiveSection;

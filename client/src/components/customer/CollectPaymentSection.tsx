@@ -39,10 +39,11 @@ interface CollectPaymentPayload {
 }
 export default function CollectPaymentSection({
   customer,
+  onRefresh,
 }: CollectPaymentSectionProps) {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [discount, setDiscount] = useState('');
-  const [paymentMode, setPaymentMode] = useState('CASH');
+  const [paymentMode, setPaymentMode] = useState('Cash');
   const [comment, setComment] = useState('');
   const [recordTime, setRecordTime] = useState(
     new Date().toISOString().slice(0, 16)
@@ -61,12 +62,12 @@ export default function CollectPaymentSection({
       return res.data;
     },
     onSuccess: () => {
-      // if (onRefresh) onRefresh();
       toast.success('Payment recorded successfully');
       setPaymentAmount('');
       setDiscount('');
-      setPaymentMode('CASH');
+      setPaymentMode('Cash');
       setComment('');
+      if (onRefresh) onRefresh();
     },
     onError: (err: any) => {
       console.error('Transaction error:', err);
@@ -207,10 +208,10 @@ export default function CollectPaymentSection({
                       <SelectValue placeholder="Select mode" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="CASH">CASH</SelectItem>
-                      <SelectItem value="ONLINE">ONLINE</SelectItem>
-                      <SelectItem value="CARD">CARD</SelectItem>
+                      <SelectItem value="Cash">CASH</SelectItem>
                       <SelectItem value="UPI">UPI</SelectItem>
+                      <SelectItem value="Cheque">Cheque</SelectItem>
+                      <SelectItem value="Online">ONLINE</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

@@ -58,7 +58,7 @@ const transactionSchema = new mongoose.Schema(
     // Additional details
     method: {
       type: String,
-      enum: ['Cash', 'Online', 'Cheque', 'Adjustment'],
+      enum: ['Cash', 'Online', 'Cheque', 'Adjustment', 'UPI'],
       default: 'Cash',
     },
     note: {

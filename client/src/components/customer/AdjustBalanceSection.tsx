@@ -48,7 +48,7 @@ function AdjustBalanceSection({
       // });
       toast.success('Balance adjusted successfully.');
       // 🔄 Refresh parent data
-      onRefresh();
+      if (onRefresh) await onRefresh();
 
       setNewBalance('');
       setReason('');

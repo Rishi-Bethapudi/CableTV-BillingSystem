@@ -13,6 +13,7 @@ const {
   adjustBalance,
   addOnBilling,
   getCustomerTransactions,
+  createAdditionalCharge,
 } = require('../controllers/transaction.controller');
 const {
   authMiddleware,
@@ -86,6 +87,13 @@ router.post(
 
 // @route   POST /api/customers/:id/add-on
 router.post('/:id/add-on', authMiddleware, operatorOrAgentOnly, addOnBilling);
+// @route   POST /api/customers/:id/additionalCharge
+router.post(
+  '/:id/additionalCharge',
+  authMiddleware,
+  operatorOrAgentOnly,
+  createAdditionalCharge
+);
 
 /**
  * @route   GET /api/customers/:customerId/transactions

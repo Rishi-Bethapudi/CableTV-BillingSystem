@@ -97,6 +97,51 @@ const createBilling = async (req, res) => {
     res.status(500).json({ message: 'Server error while recording billing.' });
   }
 };
+const createAdditionalCharge = async (req, res) => {
+  const { customerId, amount, note } = req.body;
+
+  if (!customerId || !amount) {
+    return res
+      .status(400)
+      .json({ message: 'Customer ID and amount are required.' });
+  }
+
+  try {
+    const customer = await Customer.findById(customerId);
+    if (!customer)
+      return res.status(404).json({ message: 'Customer not found.' });
+
+    const balanceBefore = customer.balanceAmount;
+    const balanceAfter = balanceBefore + amount;
+
+    const newTransaction = new Transaction({
+      customerId,
+      operatorId: req.user.operatorId,
+      collectedBy: req.user.id,
+      collectedByType: req.user.role === 'operator' ? 'Operator' : 'Agent',
+      type: 'AdditionalCharge',
+      amount,
+      balanceBefore,
+      balanceAfter,
+      note,
+    });
+
+    customer.balanceAmount = balanceAfter;
+    await newTransaction.save();
+    await customer.save();
+
+    res.status(201).json({
+      message: 'Additional charge applied successfully.',
+      transaction: newTransaction,
+      updatedCustomer: customer,
+    });
+  } catch (error) {
+    console.error('Error creating additional charge:', error);
+    res
+      .status(500)
+      .json({ message: 'Server error while applying additional charge.' });
+  }
+};
 
 /**
  * @desc    Record a payment (collection) from a customer to settle their balance.
@@ -336,6 +381,7 @@ const addOnBilling = async (req, res) => {
 
 module.exports = {
   createBilling,
+  createAdditionalCharge,
   createCollection,
   getCustomerTransactions,
   adjustBalance,
