@@ -24,3 +24,25 @@ export interface Customer {
   createdAt: string; // or Date
   updatedAt: string; // or Date
 }
+export interface CollectedBy {
+  _id: string;
+  name: string;
+}
+export interface Transaction {
+  _id: string;
+  customerId: string;
+  operatorId: string;
+  collectedBy: CollectedBy;
+  collectedByType: string;
+  type: 'Billing' | 'Payment' | 'Adjustment';
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  invoiceId: string;
+  receiptNumber: string;
+  costOfGoodsSold: number;
+  method: string;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+}

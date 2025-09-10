@@ -241,25 +241,56 @@ const createCollection = async (req, res) => {
 
 /**
  * @desc    Get the full ledger for a single customer.
- * @route   GET /api/transactions/customer/:customerId
+ * @route   GET /api/customer/:customerId/transactions
  * @access  Private (Operator or Agent)
  */
 const getCustomerTransactions = async (req, res) => {
   try {
     const { customerId } = req.params;
-    const customer = await Customer.findById(customerId);
+    const { page = 1, limit = 10, startDate, endDate, mode } = req.query;
 
-    if (!customer)
+    // Validate customer
+    const customer = await Customer.findById(customerId);
+    if (!customer) {
       return res.status(404).json({ message: 'Customer not found.' });
+    }
     if (customer.operatorId.toString() !== req.user.operatorId) {
       return res.status(403).json({ message: 'Forbidden.' });
     }
 
-    const transactions = await Transaction.find({ customerId })
-      .sort({ createdAt: -1 })
-      .populate('collectedBy', 'name');
+    // Build filter query
+    const query = { customerId };
 
-    res.status(200).json(transactions);
+    if (startDate && endDate) {
+      query.createdAt = { $gte: new Date(startDate), $lte: new Date(endDate) };
+    }
+
+    if (mode) {
+      query.mode = mode; // e.g. 'cash', 'online'
+    }
+
+    // Pagination calculation
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Fetch transactions
+    const [transactions, total] = await Promise.all([
+      Transaction.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .populate('collectedBy', 'name'),
+      Transaction.countDocuments(query),
+    ]);
+
+    res.status(200).json({
+      transactions,
+      pagination: {
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / limit),
+        limit: parseInt(limit),
+      },
+    });
   } catch (error) {
     console.error('Error fetching transactions:', error);
     res.status(500).json({ message: 'Server error.' });

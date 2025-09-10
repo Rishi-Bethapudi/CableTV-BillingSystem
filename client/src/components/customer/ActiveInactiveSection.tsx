@@ -6,11 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import apiClient from '@/utils/apiClient';
-
-interface CustomerData {
-  _id: string;
-  status: string;
-}
+import type { Customer as CustomerData } from '@/utils/data';
 
 interface ActiveInactiveSectionProps {
   customer: CustomerData;
@@ -23,7 +19,7 @@ export default function ActiveInactiveSection({
   isVisible = true,
   onRefresh,
 }: ActiveInactiveSectionProps) {
-  const [isActive, setIsActive] = useState(customer.status === 'Active');
+  const [isActive, setIsActive] = useState(customer.active || false);
 
   const { mutate, isPending } = useMutation({
     mutationFn: async (newStatus: boolean) => {

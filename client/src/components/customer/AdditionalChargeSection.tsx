@@ -14,16 +14,16 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import apiClient from '@/utils/apiClient'; // axios instance
-
+import type { Customer } from '@/utils/data';
 interface AdditionalChargeSectionProps {
   isVisible: boolean;
-  customerId: string;
+  customer: Customer;
   onRefresh?: () => void; // optional callback to refresh customer data
 }
 
 function AdditionalChargeSection({
   isVisible,
-  customerId,
+  customer,
   onRefresh,
 }: AdditionalChargeSectionProps) {
   const [type, setType] = useState<'charge' | 'discount'>('charge');
@@ -40,7 +40,7 @@ function AdditionalChargeSection({
     }
 
     const res = await apiClient.post(
-      `/customers/${customerId}/additionalCharge`,
+      `/customers/${customer._id}/additionalCharge`,
       payload
     );
     return res.data;
