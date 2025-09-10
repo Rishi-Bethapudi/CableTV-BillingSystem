@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   X,
   Printer,
@@ -25,6 +25,8 @@ function TransactionBillModal({
   customer,
   onClose,
 }: TransactionBillModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+
   const handlePrintBill = () => {
     window.print();
   };
@@ -74,9 +76,42 @@ function TransactionBillModal({
     });
   };
 
+  // Handle click outside to close modal
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        modalRef.current &&
+        !modalRef.current.contains(event.target as Node)
+      ) {
+        onClose();
+      }
+    };
+
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscapeKey);
+
+    // Prevent body scrolling when modal is open
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
+      document.body.style.overflow = 'unset';
+    };
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div
+        ref={modalRef}
+        className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto"
+      >
         <div className="flex justify-between items-center p-4 border-b">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Receipt className="h-5 w-5" />
