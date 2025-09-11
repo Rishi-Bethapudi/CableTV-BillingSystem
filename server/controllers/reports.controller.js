@@ -51,7 +51,7 @@ const formatCollectionReport = (collections) => {
 
     // Update areas and payment modes
     const area = tx.area || 'Unknown';
-    const mode = tx.portalRecharge ? 'Online' : 'Cash';
+    const mode = tx.method || 'Cash';
 
     if (!report[dateKey].areas[area]) {
       report[dateKey].areas[area] = { modes: [] };
@@ -157,7 +157,7 @@ const getCollectionReport = async (req, res) => {
           customerCode: '$customerInfo.customerCode',
           stbNo: '$customerInfo.stbNo',
           cardNo: '$customerInfo.cardNo',
-          portalRecharge: 1,
+          method: 1,
         },
       },
     ];
@@ -180,10 +180,9 @@ const getCollectionReport = async (req, res) => {
         $match: { 'customerInfo.locality': new RegExp(area, 'i') },
       });
     if (payment) {
-      if (payment === 'cash')
-        pipeline.push({ $match: { portalRecharge: false } });
-      if (payment === 'online')
-        pipeline.push({ $match: { portalRecharge: true } });
+      pipeline.push({
+        $match: { method: new RegExp(`^${payment}$`, 'i') }, // e.g. Cash, Online, UPI
+      });
     }
     if (status) {
       if (status === 'paid') pipeline.push({ $match: { amount: { $gt: 0 } } });
@@ -196,8 +195,18 @@ const getCollectionReport = async (req, res) => {
 
     const collections = await Transaction.aggregate(pipeline);
     const formattedData = formatCollectionReport(collections);
+    Object.values(formattedData).forEach((day) => {
+      totalSummary.customers += day.summary.customers;
+      totalSummary.amount += day.summary.amount;
+      totalSummary.discount += day.summary.discount;
+      totalSummary.totalPayment += day.summary.totalPayment;
+    });
 
-    res.status(200).json(formattedData);
+    // Send both detailed report and totals
+    res.status(200).json({
+      report: formattedData,
+      totals: totalSummary,
+    });
   } catch (error) {
     console.error('Error fetching collection report:', error);
     res.status(500).json({ message: 'Server error.' });

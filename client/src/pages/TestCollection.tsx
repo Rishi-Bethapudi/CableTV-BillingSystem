@@ -6,7 +6,7 @@ import { CollectionSummaryCard } from '@/components/collection/CollectionSummary
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 
-const CollectionDashboard = () => {
+const TestCollection = () => {
   const [activeTab, setActiveTab] = useState('summary');
   const [filters, setFilters] = useState<any>(null);
 
@@ -238,6 +238,13 @@ const CollectionDashboard = () => {
       ],
     },
   };
+
+  // fetchCollectionData(){
+  //   // Fetch data from server based on filters
+  // }
+  // useEffect(() => {
+  //   fetchCollectionData();
+  // }, [filters]);
   const applyFilters = () => {
     if (!filters) return transactionData;
 
@@ -702,4 +709,4 @@ const DailyReportTable = ({ date, data }) => {
 //     </Card>
 //   </TabsContent>
 // </Tabs> */}
-export default CollectionDashboard;
+export default TestCollection;

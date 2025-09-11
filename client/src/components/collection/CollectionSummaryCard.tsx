@@ -15,7 +15,7 @@ export function CollectionSummaryCard({
     <Card className="bg-white shadow-sm">
       <CardContent className="p-6 text-center">
         <div className="text-3xl font-bold text-orange-500 mb-2">
-          {currency} {amount.toLocaleString()}
+          {currency} {Number(amount || 0).toLocaleString()}
         </div>
         <div className="text-gray-600 font-medium">{title}</div>
       </CardContent>
