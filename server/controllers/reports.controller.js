@@ -195,6 +195,12 @@ const getCollectionReport = async (req, res) => {
 
     const collections = await Transaction.aggregate(pipeline);
     const formattedData = formatCollectionReport(collections);
+    let totalSummary = {
+      customers: 0,
+      amount: 0,
+      discount: 0,
+      totalPayment: 0,
+    };
     Object.values(formattedData).forEach((day) => {
       totalSummary.customers += day.summary.customers;
       totalSummary.amount += day.summary.amount;
