@@ -1,3 +1,10 @@
+export interface Product {
+  _id: string;
+  name: string;
+  customerPrice: number;
+  billingInterval: number;
+}
+
 export interface Customer {
   _id: string;
   operatorId: string;
@@ -8,26 +15,29 @@ export interface Customer {
   mobile: string;
   billingAddress: string;
   balanceAmount: number;
-  connectionStartDate: string; // or Date if parsed
-  expiryDate: string; // or Date
+  connectionStartDate: string; // ISO string (can convert to Date in app if needed)
+  expiryDate: string; // ISO string
   sequenceNo: number;
   active: boolean;
   stbName: string;
   stbNumber: string;
   cardNumber: string;
-  productId: [string]; // array of product IDs
+  productId: Product[]; // now array of product objects
   additionalCharge: number;
   discount: number;
   lastPaymentAmount: number;
-  lastPaymentDate: string; // or Date
+  lastPaymentDate: string; // ISO string
   remark: string;
-  createdAt: string; // or Date
-  updatedAt: string; // or Date
+  createdAt: string;
+  updatedAt: string;
+  __v?: number; // optional (only present in Mongo responses)
 }
+
 export interface CollectedBy {
   _id: string;
   name: string;
 }
+
 export interface Transaction {
   _id: string;
   customerId: string;

@@ -14,17 +14,7 @@ const RenewSubscription = ({
   isVisible,
   onRefresh,
 }: RenewSubscriptionProps) => {
-  // Sample customer data - replace with your actual data
-  // const [customer] = useState({
-  //   id: '687cfdcc9624e0a93a377f4a',
-  //   name: 'John Doe',
-  //   balanceAmount: 150,
-  //   lastBillDate: '2024-12-15',
-  //   expiryDate: '2025-01-15', // Change this to test expired state: "2024-12-01"
-  //   currentPackageId: '6864a1b1c9e8d4f2a1b3c8d2',
-  //   currentPackageName: 'Premium Package',
-  // });
-
+  console.log('RenewSubscription rendered with customer:', customer);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('30');
@@ -74,7 +64,7 @@ const RenewSubscription = ({
       // Find the package name using customer's currentPackageId
       if (customer?.productId[0] && data.length > 0) {
         const matchedPackage = data.find(
-          (pkg: any) => pkg._id === customer.productId[0]
+          (pkg: any) => pkg._id === customer.productId[0]._id
         );
 
         if (matchedPackage) {
@@ -367,10 +357,21 @@ const RenewSubscription = ({
                     Current Package:
                   </span>
                   <span className="font-bold text-gray-800">
-                    {selectedPackage || 'N/A'}
+                    {customer.productId.length > 0
+                      ? customer.productId[0].name
+                      : 'N/A'}
                   </span>
                 </div>
-
+                {customer.productId.length > 1 && (
+                  <div>
+                    <span className="text-sm text-gray-600">Add-ons:</span>
+                    <ul className="mt-1 list-disc list-inside text-sm text-gray-800">
+                      {customer.productId.slice(1).map((addon) => (
+                        <li key={addon._id}>{addon.name}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {fromDate && (
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">New period:</span>

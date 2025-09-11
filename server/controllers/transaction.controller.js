@@ -10,8 +10,7 @@ const mongoose = require('mongoose');
  * @access  Private (Operator or Agent)
  */
 const createBilling = async (req, res) => {
-  // The productId is now mandatory for billing, as it defines the service.
-  const { customerId, productId, note } = req.body;
+  const { customerId, productId, note, isAddon = false } = req.body;
 
   if (!customerId || !productId) {
     return res.status(400).json({
@@ -20,14 +19,11 @@ const createBilling = async (req, res) => {
   }
 
   try {
-    // --- 1. Fetch all necessary documents ---
     const customer = await Customer.findById(customerId);
     if (!customer)
       return res.status(404).json({ message: 'Customer not found.' });
     if (customer.operatorId.toString() !== req.user.operatorId) {
-      return res.status(403).json({
-        message: 'Forbidden: You are not authorized to bill this customer.',
-      });
+      return res.status(403).json({ message: 'Forbidden.' });
     }
 
     const product = await Product.findById(productId);
@@ -37,28 +33,42 @@ const createBilling = async (req, res) => {
         .json({ message: 'Product not found or not authorized.' });
     }
 
-    // --- 2. Calculate the final billing amount ---
+    // --- 1. Billing Calculation ---
     const basePrice = product.customerPrice;
     const additionalCharges = customer.additionalCharge || 0;
     const discount = customer.discount || 0;
     const finalBillingAmount = basePrice + additionalCharges - discount;
 
-    // --- 3. Calculate the new Expiry Date ---
-    // Determine the starting point for the new subscription period.
-    // If current expiry is in the past, start from today. Otherwise, stack the subscription.
     const today = new Date();
-    const currentExpiry = customer.expiryDate
+    let newExpiryDate = customer.expiryDate
       ? new Date(customer.expiryDate)
-      : today;
-    const startDateForNewPeriod = currentExpiry > today ? currentExpiry : today;
+      : null;
 
-    const newExpiryDate = new Date(startDateForNewPeriod);
-    newExpiryDate.setDate(newExpiryDate.getDate() + product.billingInterval);
+    // --- 2. Expiry & Product Logic ---
+    if (!isAddon) {
+      // Main Plan Billing
+      if (!customer.expiryDate || newExpiryDate < today) {
+        // Expired → reset plan
+        newExpiryDate = new Date(today);
+        newExpiryDate.setDate(
+          newExpiryDate.getDate() + product.billingInterval
+        );
+        customer.productId = [productId]; // replace old product
+      } else {
+        // Active → just update product, do NOT extend expiry
+        customer.productId = [productId];
+        // expiry stays same
+      }
+    } else {
+      // Addon Billing → expiry untouched
+      // Optionally store addonProducts list in customer
+      if (!customer.productId.includes(productId)) {
+        customer.productId.push(productId);
+      }
+    }
 
-    // --- 4. Generate unique Invoice ID ---
+    // --- 3. Transaction & Invoice ---
     const invoiceId = await Counter.getReceiptNumber(req.user.operatorId);
-
-    // --- 5. Create the Transaction Record ---
     const balanceBefore = customer.balanceAmount;
     const balanceAfter = balanceBefore + finalBillingAmount;
 
@@ -67,28 +77,28 @@ const createBilling = async (req, res) => {
       operatorId: req.user.operatorId,
       collectedBy: req.user.id,
       collectedByType: req.user.role === 'operator' ? 'Operator' : 'Agent',
-      type: 'Billing',
-      amount: finalBillingAmount, // The charge amount
+      type: isAddon ? 'AddOn' : 'Billing',
+      amount: finalBillingAmount,
       balanceBefore,
       balanceAfter,
       invoiceId,
-      costOfGoodsSold: product.operatorCost, // For profit tracking
+      costOfGoodsSold: product.operatorCost,
       note,
     });
 
-    // --- 6. Update the Customer record ---
+    // --- 4. Update customer ---
     customer.balanceAmount = balanceAfter;
-    customer.lastPaymentDate = new Date();
-    customer.expiryDate = newExpiryDate;
-    customer.productId = productId; // Update to the new product/plan
-    customer.active = true; // Ensure customer is marked active on billing
+    customer.lastPaymentDate = today;
+    if (!isAddon) customer.expiryDate = newExpiryDate;
+    customer.active = true;
 
-    // --- 7. Save all changes atomically ---
     await newTransaction.save();
     await customer.save();
 
     res.status(201).json({
-      message: 'Customer billed successfully. Service period extended.',
+      message: isAddon
+        ? 'Customer billed successfully for addon.'
+        : 'Customer billed successfully for main plan.',
       transaction: newTransaction,
       updatedCustomer: customer,
     });
@@ -97,6 +107,7 @@ const createBilling = async (req, res) => {
     res.status(500).json({ message: 'Server error while recording billing.' });
   }
 };
+
 const createAdditionalCharge = async (req, res) => {
   const { id: customerId } = req.params;
   const { amount, note } = req.body;

@@ -212,19 +212,19 @@ const getCustomerById = async (req, res) => {
 
     const customer = await Customer.findById(customerId)
       .populate('agentId', 'name email')
+      .populate('productId', 'name customerPrice billingInterval') // 👈 populate products
       .lean();
 
     if (!customer) {
       return res.status(404).json({ message: 'Customer not found.' });
     }
 
-    // SECURITY CHECK: Ensure the customer belongs to the operator/agent's organization
+    // SECURITY CHECK
     if (customer.operatorId.toString() !== req.user.operatorId) {
-      // Log this attempt for security monitoring
       console.warn(
         `SECURITY: User ${req.user.id} (Role: ${req.user.role}) attempted to access customer ${customerId} from another tenant.`
       );
-      return res.status(404).json({ message: 'Customer not found.' }); // Return 404 to avoid revealing existence
+      return res.status(404).json({ message: 'Customer not found.' });
     }
 
     res.status(200).json(customer);
