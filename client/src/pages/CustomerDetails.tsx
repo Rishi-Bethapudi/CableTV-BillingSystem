@@ -22,8 +22,7 @@ export default function CustomerDetails() {
     try {
       setLoading(true);
       setError(null);
-      // const res = await axios.get(`https://ht9t3tq8-5000.inc1.devtunnels.ms/api/customers/${id}`);
-      // const res = await apiClient.get(`/customers/${id}`);
+      const res = await apiClient.get(`/customers/${id}`);
       setCustomer(res.data);
     } catch (err) {
       console.error('Failed to fetch customer:', err);
@@ -61,7 +60,6 @@ export default function CustomerDetails() {
   if (!customer) {
     return <div className="p-6 text-red-500">Customer not found.</div>;
   }
-  console.log('Rendering CustomerDetails with customer:', customer);
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto space-y-3">

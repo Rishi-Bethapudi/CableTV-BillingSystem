@@ -25,6 +25,75 @@ const SUMMARY_TYPE = {
   CUSTOMERS: 3,
   COMPLAINTS: 13,
 };
+const formatCollectionReport = (collections) => {
+  const report = {};
+
+  collections.forEach((tx) => {
+    const dateKey = new Date(tx.date).toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+
+    if (!report[dateKey]) {
+      report[dateKey] = {
+        summary: { customers: 0, amount: 0, discount: 0, totalPayment: 0 },
+        areas: {},
+        customerDetails: [],
+      };
+    }
+
+    // Update summary
+    report[dateKey].summary.customers += 1;
+    report[dateKey].summary.amount += tx.amount || 0;
+    report[dateKey].summary.discount += tx.discount || 0;
+    report[dateKey].summary.totalPayment += tx.amount || 0;
+
+    // Update areas and payment modes
+    const area = tx.area || 'Unknown';
+    const mode = tx.portalRecharge ? 'Online' : 'Cash';
+
+    if (!report[dateKey].areas[area]) {
+      report[dateKey].areas[area] = { modes: [] };
+    }
+
+    const existingMode = report[dateKey].areas[area].modes.find(
+      (m) => m.mode === mode
+    );
+
+    if (existingMode) {
+      existingMode.customers += 1;
+      existingMode.amount += tx.amount || 0;
+      existingMode.discount += tx.discount || 0;
+      existingMode.payment += tx.amount || 0;
+    } else {
+      report[dateKey].areas[area].modes.push({
+        mode,
+        customers: 1,
+        amount: tx.amount || 0,
+        discount: tx.discount || 0,
+        payment: tx.amount || 0,
+      });
+    }
+
+    // Add customer details
+    report[dateKey].customerDetails.push({
+      name: tx.customerName || '',
+      area: tx.area || '',
+      previousBalance: tx.previousBalance || 0,
+      paidAmount: tx.amount || 0,
+      discount: tx.discount || 0,
+      currentBalance: tx.currentBalance || 0,
+      collectedBy: tx.collectedBy || '',
+      customerCode: tx.customerCode || '',
+      stbNo: tx.stbNo || '',
+      cardNo: tx.cardNo || '',
+      portalRecharge: tx.portalRecharge || false,
+    });
+  });
+
+  return report;
+};
 /**
  * @desc    Get a detailed report of all collections with filters.
  * @route   GET /api/reports/collections
@@ -32,19 +101,13 @@ const SUMMARY_TYPE = {
  */
 const getCollectionReport = async (req, res) => {
   try {
-    const operatorId = req.user.id;
-    const { period, agentId, method, area } = req.query;
+    const { startDate, endDate, agentId, area, payment, status } = req.query;
 
-    // --- Aggregation Pipeline ---
+    // Build MongoDB aggregation pipeline
     const pipeline = [
-      // 1. Initial match for collections by this operator
-      {
-        $match: {
-          operatorId: new mongoose.Types.ObjectId(operatorId),
-          type: 'Collection',
-        },
-      },
-      // 2. Join with Customers to get area/locality
+      { $match: { type: 'Collection' } },
+
+      // Join customer info
       {
         $lookup: {
           from: 'customers',
@@ -53,10 +116,12 @@ const getCollectionReport = async (req, res) => {
           as: 'customerInfo',
         },
       },
-      // 3. Join with Agents/Operators to get collector's name
+      { $unwind: '$customerInfo' },
+
+      // Join agent/operator info
       {
         $lookup: {
-          from: 'agents', // Assuming agents collection is named 'agents'
+          from: 'agents',
           localField: 'collectedBy',
           foreignField: '_id',
           as: 'agentInfo',
@@ -70,58 +135,69 @@ const getCollectionReport = async (req, res) => {
           as: 'operatorInfo',
         },
       },
-      // 4. Deconstruct the customerInfo array
-      { $unwind: '$customerInfo' },
+
+      // Project required fields
+      {
+        $project: {
+          _id: 0,
+          receiptNumber: 1,
+          date: '$createdAt',
+          amount: 1,
+          discount: 1,
+          customerName: '$customerInfo.name',
+          area: '$customerInfo.locality',
+          previousBalance: '$customerInfo.balance',
+          currentBalance: '$customerInfo.currentBalance',
+          collectedBy: {
+            $ifNull: [
+              { $arrayElemAt: ['$agentInfo.name', 0] },
+              { $arrayElemAt: ['$operatorInfo.name', 0] },
+            ],
+          },
+          customerCode: '$customerInfo.customerCode',
+          stbNo: '$customerInfo.stbNo',
+          cardNo: '$customerInfo.cardNo',
+          portalRecharge: 1,
+        },
+      },
     ];
 
-    // --- Dynamic Filtering ---
-    // Date Period Filter
-    const today = new Date();
-    if (period === 'today') {
-      const startOfDay = new Date(today.setHours(0, 0, 0, 0));
-      pipeline.push({ $match: { createdAt: { $gte: startOfDay } } });
-    }
-    if (period === 'monthly') {
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      pipeline.push({ $match: { createdAt: { $gte: startOfMonth } } });
+    // Date filters
+    if (startDate || endDate) {
+      const matchDates = {};
+      if (startDate) matchDates.$gte = new Date(startDate);
+      if (endDate) matchDates.$lte = new Date(endDate);
+      pipeline.push({ $match: { createdAt: matchDates } });
     }
 
-    // Other Filters
+    // Additional filters
     if (agentId)
       pipeline.push({
         $match: { collectedBy: new mongoose.Types.ObjectId(agentId) },
       });
-    if (method) pipeline.push({ $match: { method: method } });
     if (area)
       pipeline.push({
         $match: { 'customerInfo.locality': new RegExp(area, 'i') },
       });
+    if (payment) {
+      if (payment === 'cash')
+        pipeline.push({ $match: { portalRecharge: false } });
+      if (payment === 'online')
+        pipeline.push({ $match: { portalRecharge: true } });
+    }
+    if (status) {
+      if (status === 'paid') pipeline.push({ $match: { amount: { $gt: 0 } } });
+      if (status === 'pending')
+        pipeline.push({ $match: { currentBalance: { $gt: 0 } } });
+    }
 
-    // 5. Project and format the final output
-    pipeline.push({
-      $project: {
-        _id: 0,
-        receiptNumber: 1,
-        date: '$createdAt',
-        customerName: '$customerInfo.name',
-        area: '$customerInfo.locality',
-        amount: { $abs: '$amount' }, // Show amount as positive
-        method: 1,
-        collectedBy: {
-          $ifNull: [
-            { $arrayElemAt: ['$agentInfo.name', 0] },
-            { $arrayElemAt: ['$operatorInfo.name', 0] },
-          ],
-        },
-      },
-    });
-
-    // 6. Sort the results
+    // Sort by date descending
     pipeline.push({ $sort: { date: -1 } });
 
     const collections = await Transaction.aggregate(pipeline);
+    const formattedData = formatCollectionReport(collections);
 
-    res.status(200).json(collections);
+    res.status(200).json(formattedData);
   } catch (error) {
     console.error('Error fetching collection report:', error);
     res.status(500).json({ message: 'Server error.' });
