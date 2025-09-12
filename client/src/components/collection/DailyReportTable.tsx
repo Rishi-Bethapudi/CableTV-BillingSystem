@@ -5,6 +5,7 @@ interface DailyReportTableProps {
 import { useNavigate } from 'react-router-dom';
 export const DailyReportTable = ({ date, data }: DailyReportTableProps) => {
   const navigate = useNavigate();
+  console.log('Rendering DailyReportTable for date:', date, data);
   return (
     <div className="bg-white rounded-lg shadow-sm mb-4 overflow-x-auto">
       <table className="w-full min-w-max border-collapse">
@@ -197,9 +198,7 @@ export const DailyReportTable = ({ date, data }: DailyReportTableProps) => {
                         <a
                           href=""
                           className="text-blue-600 hover:underline"
-                          onClick={() =>
-                            navigate(`/customers/${customer?._id}`)
-                          }
+                          onClick={() => navigate(`/customers/${customer?.id}`)}
                         >
                           {customer.name}
                         </a>
