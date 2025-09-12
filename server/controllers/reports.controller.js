@@ -407,9 +407,9 @@ const getDashboardSummary = async (req, res) => {
     const monthEnd = endOfMonth(now);
     const tomorrowStart = startOfDay(addDays(now, 1));
 
-    // --- All Queries ---
+    // --- Queries ---
     const queries = [
-      // 0. Monthly Total Collection
+      // Primary metrics
       Transaction.aggregate([
         {
           $match: {
@@ -421,8 +421,8 @@ const getDashboardSummary = async (req, res) => {
         {
           $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } },
         },
-      ]),
-      // 1. Today's Collection
+      ]), // 0. Monthly Total Collection
+
       Transaction.aggregate([
         {
           $match: {
@@ -434,8 +434,8 @@ const getDashboardSummary = async (req, res) => {
         {
           $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } },
         },
-      ]),
-      // 2. Total Pending Amount
+      ]), // 1. Today's Collection
+
       Customer.aggregate([
         { $match: { operatorId, balanceAmount: { $gt: 0 } } },
         {
@@ -445,59 +445,52 @@ const getDashboardSummary = async (req, res) => {
             count: { $sum: 1 },
           },
         },
-      ]),
-      // 3. Monthly Online Collection
+      ]), // 2. Total Pending Amount
+
       Transaction.aggregate([
         {
           $match: {
             operatorId,
             type: 'Collection',
-            paymentMode: 'Online',
+            method: 'Online',
             createdAt: { $gte: monthStart, $lte: monthEnd },
           },
         },
         {
           $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } },
         },
-      ]),
-      // 4. Today's Renewals (count)
+      ]), // 3. Monthly Online Collection
+
+      // Secondary metrics
       Transaction.countDocuments({
         operatorId,
         type: 'Billing',
         createdAt: { $gte: todayStart, $lte: todayEnd },
-      }),
-      // 5. This Month Renewals (count)
+      }), // 4. Today's Renewals
       Transaction.countDocuments({
         operatorId,
         type: 'Billing',
         createdAt: { $gte: monthStart, $lte: monthEnd },
-      }),
-      // 6. Upcoming Renewals (expiry after today)
+      }), // 5. Month Renewals
       Customer.countDocuments({
         operatorId,
         active: true,
         expiryDate: { $gte: tomorrowStart },
-      }),
-      // 7. Expired Renewals (expiry before today)
+      }), // 6. Upcoming Renewals
       Customer.countDocuments({
         operatorId,
         active: true,
         expiryDate: { $lt: todayStart },
-      }),
-      // 8. Total Customers
-      Customer.countDocuments({ operatorId }),
-      // 9. Active Customers
-      Customer.countDocuments({ operatorId, active: true }),
-      // 10. This Month New Customers
+      }), // 7. Expired Renewals
+      Customer.countDocuments({ operatorId }), // 8. Total Customers
+      Customer.countDocuments({ operatorId, active: true }), // 9. Active Customers
       Customer.countDocuments({
         operatorId,
         createdAt: { $gte: monthStart, $lte: monthEnd },
-      }),
-      // 11. Pending Complaints
-      Complaint.countDocuments({ operatorId, status: 'Pending' }),
+      }), // 10. New Customers
+      Complaint.countDocuments({ operatorId, status: 'Pending' }), // 11. Pending Complaints
     ];
 
-    // --- Execute Queries ---
     const results = await Promise.all(
       queries.map((q) =>
         q.catch((e) => {
@@ -507,153 +500,120 @@ const getDashboardSummary = async (req, res) => {
       )
     );
 
-    // Helpers
-    const getResult = (index, field) => results[index]?.[0]?.[field] ?? 0;
-    const getCountResult = (index) => results[index] ?? 0;
+    // --- Helper Functions ---
+    const getAggResult = (idx, field = 'total') =>
+      results[idx]?.[0]?.[field] ?? 0;
+    const getCountResult = (idx) => results[idx] ?? 0;
 
-    // Customer calculations
     const totalCustomers = getCountResult(8);
     const activeCustomers = getCountResult(9);
     const inactiveCustomers = totalCustomers - activeCustomers;
 
-    // --- Response ---
+    // --- Structured Response ---
     const responseData = {
-      data: [
+      primaryMetrics: [
         {
           id: 1,
           name: 'Monthly Total Collection',
-          stat: getResult(0, 'total'),
-          des: getResult(0, 'count'),
-          action: '/web/collection',
+          stat: getAggResult(0),
+          des: getAggResult(0, 'count'),
           stat_type: STAT_TYPE.MONEY,
-          summary_type: SUMMARY_TYPE.COLLECTION,
+          action: '/collection', // link when card clicked
         },
         {
           id: 2,
           name: "Today's Collection",
-          stat: getResult(1, 'total'),
-          des: getResult(1, 'count'),
-          action: '/web/collection?t=date_search&v=today',
+          stat: getAggResult(1),
+          des: getAggResult(1, 'count'),
           stat_type: STAT_TYPE.MONEY,
-          summary_type: SUMMARY_TYPE.TODAY,
+          action: '/collection',
         },
         {
           id: 3,
           name: 'Total Pending Amount',
-          stat: getResult(2, 'total'),
-          des: getResult(2, 'count'),
-          action: '/web/customers?t=balance',
+          stat: getAggResult(2),
+          des: getAggResult(2, 'count'),
           stat_type: STAT_TYPE.MONEY,
-          summary_type: SUMMARY_TYPE.PENDING,
+          action: '/customers?unpaid=true',
         },
         {
           id: 4,
           name: 'Monthly Online Collection',
-          stat: getResult(3, 'total'),
-          des: getResult(3, 'count'),
-          action: '/web/collection?t=online',
+          stat: getAggResult(3),
+          des: getAggResult(3, 'count'),
           stat_type: STAT_TYPE.MONEY,
-          summary_type: SUMMARY_TYPE.COLLECTION,
+          action: '/collections',
         },
+      ],
+      secondaryMetrics: [
         {
           id: 5,
           name: "Today's Renewals",
           stat: getCountResult(4),
-          des: 0,
-          action: `/web/customer-renew?t=date_search&v=${format(
-            now,
-            'yyyy-MM-dd'
-          )}`,
           stat_type: STAT_TYPE.COUNT,
-          summary_type: SUMMARY_TYPE.RENEWALS,
+          action: '/customers',
         },
         {
           id: 6,
           name: 'This Month Renewals',
           stat: getCountResult(5),
-          des: 0,
+          stat_type: STAT_TYPE.COUNT,
           action: `/web/customer-renew?t=date_search&v=${format(
             monthStart,
             'yyyy-MM-dd'
           )} to ${format(monthEnd, 'yyyy-MM-dd')}`,
-          stat_type: STAT_TYPE.COUNT,
-          summary_type: SUMMARY_TYPE.RENEWALS,
         },
         {
           id: 7,
           name: 'Upcoming Renewals',
           stat: getCountResult(6),
-          des: 0,
-          action: '/web/customer-renew?t=date_search&v=upcoming',
           stat_type: STAT_TYPE.COUNT,
-          summary_type: SUMMARY_TYPE.RENEWALS,
+          action: '/web/customer-renew?t=date_search&v=upcoming',
         },
         {
           id: 8,
           name: 'Expired Renewals',
           stat: getCountResult(7),
-          des: 0,
-          action: '/web/customer-renew?t=date_search&a=exp_renew',
           stat_type: STAT_TYPE.COUNT,
-          summary_type: SUMMARY_TYPE.EXPIRED,
+          action: '/customers?customerStatus=inactive',
         },
         {
           id: 9,
           name: 'Total Customers',
           stat: totalCustomers,
-          des: 0,
-          action: '/web/customers',
           stat_type: STAT_TYPE.COUNT,
-          summary_type: SUMMARY_TYPE.CUSTOMERS,
+          action: '/customers',
         },
         {
           id: 10,
           name: 'Active Customers',
           stat: activeCustomers,
-          des: inactiveCustomers,
-          action: '/web/customers?t=status&v=1',
           stat_type: STAT_TYPE.COUNT,
-          summary_type: SUMMARY_TYPE.CUSTOMERS,
+          action: '/customers?customerStatus=active',
         },
         {
           id: 11,
           name: 'Inactive Customers',
           stat: inactiveCustomers,
-          des: 0,
-          action: '/web/customers?t=status&v=0',
           stat_type: STAT_TYPE.COUNT,
-          summary_type: SUMMARY_TYPE.CUSTOMERS,
+          action: '/customers?customerStatus=inactive',
         },
         {
           id: 12,
-          name: 'This Month New Customers',
+          name: 'New Customers This Month',
           stat: getCountResult(10),
-          des: 0,
+          stat_type: STAT_TYPE.COUNT,
           action: `/web/customers?t=cus_new_date_search&v=${format(
             monthStart,
             'yyyy-MM-dd'
           )} to ${format(monthEnd, 'yyyy-MM-dd')}`,
-          stat_type: STAT_TYPE.COUNT,
-          summary_type: SUMMARY_TYPE.CUSTOMERS,
         },
         {
           id: 13,
           name: 'Pending Complaints',
           stat: getCountResult(11),
-          des: 0,
-          action: '/web/complaints',
           stat_type: STAT_TYPE.COUNT,
-          summary_type: SUMMARY_TYPE.COMPLAINTS,
-        },
-      ],
-      banner_image: [
-        {
-          url: 'https://bixapp.in/assets/img/refer-and-earn.jpeg',
-          action: 'https://bix42.com/refer-earn',
-        },
-        {
-          url: 'https://bixapp.in/assets/img/facebook_like.jpeg',
-          action: 'http://www.facebook.com/bix42',
+          action: '/web/complaints',
         },
       ],
     };
@@ -666,6 +626,7 @@ const getDashboardSummary = async (req, res) => {
       .json({ message: 'Server error while generating dashboard summary.' });
   }
 };
+
 /**
  * @desc    Get a summary of income, costs, and profit.
  * @route   GET /api/reports/income

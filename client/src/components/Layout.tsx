@@ -1,19 +1,23 @@
-// src/components/Layout.tsx (The new main wrapper)
+// src/components/Layout.tsx
 import { usePlatform } from '@/hooks/usePlatform';
 import { WebLayout } from './layouts/WebLayout';
 import { MobileLayout } from './layouts/MobileLayout';
 import { LayoutProvider } from '../components/layouts/LayoutContext';
+import { Outlet } from 'react-router-dom';
 
-export function Layout({ children }: { children: React.ReactNode }) {
+export function Layout() {
   const { isNative, isMobileView } = usePlatform();
 
-  // The LayoutProvider must wrap the chosen layout so pages can communicate with it.
   return (
     <LayoutProvider>
       {isNative || isMobileView ? (
-        <MobileLayout>{children}</MobileLayout>
+        <MobileLayout>
+          <Outlet /> {/* Nested routes will render here */}
+        </MobileLayout>
       ) : (
-        <WebLayout>{children}</WebLayout>
+        <WebLayout>
+          <Outlet /> {/* Nested routes will render here */}
+        </WebLayout>
       )}
     </LayoutProvider>
   );
