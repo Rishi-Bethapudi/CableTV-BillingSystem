@@ -1,4 +1,3 @@
-
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,7 +33,7 @@ export function ExpenseFilters({
   categories,
   paymentMethods,
   onClearFilters,
-  onPageChange
+  onPageChange,
 }: ExpenseFiltersProps) {
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
@@ -75,18 +74,25 @@ export function ExpenseFilters({
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
               {categories.map((category) => (
-                <SelectItem key={category} value={category}>{category}</SelectItem>
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Select value={paymentMethodFilter} onValueChange={handlePaymentMethodChange}>
+          <Select
+            value={paymentMethodFilter}
+            onValueChange={handlePaymentMethodChange}
+          >
             <SelectTrigger className="w-full lg:w-48">
               <SelectValue placeholder="Filter by payment method" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Payment Methods</SelectItem>
               {paymentMethods.map((method) => (
-                <SelectItem key={method} value={method}>{method}</SelectItem>
+                <SelectItem key={method} value={method}>
+                  {method}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

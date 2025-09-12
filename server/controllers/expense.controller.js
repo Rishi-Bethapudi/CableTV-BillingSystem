@@ -1,5 +1,6 @@
 const Expense = require('../models/expense.model');
 const mongoose = require('mongoose');
+const Counter = require('../models/counter.model'); // if you want auto expenseNumber
 
 /**
  * @desc    Create a new expense
@@ -8,7 +9,16 @@ const mongoose = require('mongoose');
  */
 const createExpense = async (req, res) => {
   try {
-    const { category, amount, description, expenseDate } = req.body;
+    const {
+      category,
+      amount,
+      description,
+      expenseDate,
+      vendor,
+      paymentMethod,
+      receiptNumber,
+      notes,
+    } = req.body;
 
     if (!category || !amount) {
       return res
@@ -16,11 +26,26 @@ const createExpense = async (req, res) => {
         .json({ message: 'Category and amount are required.' });
     }
 
+    // Auto-generate expenseNumber if not provided
+    let expenseNumber = req.body.expenseNumber;
+    if (!expenseNumber) {
+      const seq = await Counter.getNextSequence('expenseNumber');
+      expenseNumber = `EXP${seq.toString().padStart(4, '0')}`;
+    }
+
     const newExpense = new Expense({
-      ...req.body,
       operatorId: req.user.id,
       recordedBy: req.user.id,
-      recordedByType: 'Operator', // Assuming only operators can add expenses for now
+      recordedByType: 'Operator', // extend later for agents if needed
+      expenseNumber,
+      expenseDate,
+      category,
+      vendor,
+      paymentMethod,
+      amount,
+      description,
+      receiptNumber,
+      notes,
     });
 
     await newExpense.save();
@@ -38,10 +63,12 @@ const createExpense = async (req, res) => {
  */
 const getExpenses = async (req, res) => {
   try {
-    const { category, startDate, endDate } = req.query;
+    const { category, startDate, endDate, paymentMethod, vendor } = req.query;
     const query = { operatorId: req.user.id };
 
     if (category) query.category = category;
+    if (paymentMethod) query.paymentMethod = paymentMethod;
+    if (vendor) query.vendor = new RegExp(vendor, 'i');
     if (startDate && endDate) {
       query.expenseDate = {
         $gte: new Date(startDate),
@@ -54,6 +81,30 @@ const getExpenses = async (req, res) => {
   } catch (error) {
     console.error('Error fetching expenses:', error);
     res.status(500).json({ message: 'Server error while fetching expenses.' });
+  }
+};
+
+/**
+ * @desc    Get a single expense by ID
+ * @route   GET /api/expenses/:id
+ * @access  Private (Operator only)
+ */
+const getExpenseById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid expense ID.' });
+    }
+
+    const expense = await Expense.findById(id);
+    if (!expense || expense.operatorId.toString() !== req.user.id) {
+      return res.status(404).json({ message: 'Expense not found.' });
+    }
+
+    res.status(200).json(expense);
+  } catch (error) {
+    console.error('Error fetching expense by ID:', error);
+    res.status(500).json({ message: 'Server error while fetching expense.' });
   }
 };
 
@@ -79,6 +130,7 @@ const updateExpense = async (req, res) => {
       { $set: req.body },
       { new: true }
     );
+
     res.status(200).json(updatedExpense);
   } catch (error) {
     console.error('Error updating expense:', error);
@@ -111,4 +163,10 @@ const deleteExpense = async (req, res) => {
   }
 };
 
-module.exports = { createExpense, getExpenses, updateExpense, deleteExpense };
+module.exports = {
+  createExpense,
+  getExpenses,
+  getExpenseById,
+  updateExpense,
+  deleteExpense,
+};

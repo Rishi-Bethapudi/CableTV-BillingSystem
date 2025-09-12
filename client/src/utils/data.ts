@@ -56,3 +56,28 @@ export interface Transaction {
   createdAt: string;
   updatedAt: string;
 }
+export interface Expense {
+  id: number | string;
+  expenseNumber: string;
+  expenseDate: string;
+  category: string;
+  vendor?: string;
+  paymentMethod: string;
+  amount: number;
+  description: string;
+  receiptNumber?: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ExpenseFormData {
+  date: string;
+  category: string;
+  vendor: string;
+  paymentMethod: string;
+  amount: number;
+  description: string;
+  receiptNumber: string;
+  notes: string;
+}
