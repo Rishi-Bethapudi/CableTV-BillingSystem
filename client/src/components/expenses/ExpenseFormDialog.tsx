@@ -36,7 +36,7 @@ export function ExpenseFormDialog({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<ExpenseFormData>({
-    date: new Date().toISOString().split('T')[0],
+    expenseDate: new Date().toISOString().split('T')[0],
     category: '',
     vendor: '',
     paymentMethod: '',
@@ -54,7 +54,7 @@ export function ExpenseFormDialog({
       const success = await onExpenseAdded(formData);
       if (success) {
         setFormData({
-          date: new Date().toISOString().split('T')[0],
+          expenseDate: new Date().toISOString().split('T')[0],
           category: '',
           vendor: '',
           paymentMethod: '',
@@ -100,8 +100,10 @@ export function ExpenseFormDialog({
                 id="date"
                 type="date"
                 required
-                value={formData.date}
-                onChange={(e) => handleInputChange('date', e.target.value)}
+                value={formData.expenseDate}
+                onChange={(e) =>
+                  handleInputChange('expenseDate', e.target.value)
+                }
               />
             </div>
 

@@ -72,7 +72,7 @@ export interface Expense {
 }
 
 export interface ExpenseFormData {
-  date: string;
+  expenseDate: string;
   category: string;
   vendor: string;
   paymentMethod: string;

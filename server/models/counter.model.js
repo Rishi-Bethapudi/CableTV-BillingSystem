@@ -51,5 +51,13 @@ counterSchema.statics.getReceiptNumber = async function (operatorId) {
   // You can format it if you like, e.g., pad with zeros, or just return the number
   return counter.value.toString().padStart(6, '0'); // e.g., "000001", "000002"
 };
+counterSchema.statics.getNextSequence = async function (name) {
+  const counter = await this.findOneAndUpdate(
+    { name },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+  return counter.seq;
+};
 const Counter = mongoose.model('Counter', counterSchema);
 module.exports = Counter;

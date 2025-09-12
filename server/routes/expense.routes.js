@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   createExpense,
   getExpenses,
+  getExpenseById,
   updateExpense,
   deleteExpense,
 } = require('../controllers/expense.controller');
@@ -27,6 +28,13 @@ router.post('/', createExpense);
  * @access  Private (Operator only)
  */
 router.get('/', getExpenses);
+
+/**
+ * @route   PUT /api/expenses/:id
+ * @desc    Update an existing expense record
+ * @access  Private (Operator only)
+ */
+router.get('/:id', getExpenseById);
 
 /**
  * @route   PUT /api/expenses/:id
