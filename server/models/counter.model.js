@@ -6,15 +6,25 @@ const counterSchema = new mongoose.Schema(
     operatorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Operator',
-      required: true,
+      required: false, // not all counters need operator
     },
-    yearMonth: { type: String, required: true }, // '202506'
+    yearMonth: { type: String }, // e.g. '202506'
     value: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
 
-// 🚀 STATIC METHOD TO GET NEXT PAYMENT ID
+// Get next sequence for a generic name (used by expenseNumber, etc.)
+counterSchema.statics.getNextSequence = async function (name) {
+  const counter = await this.findOneAndUpdate(
+    { name },
+    { $inc: { value: 1 } },
+    { new: true, upsert: true }
+  );
+  return counter.value;
+};
+
+// Generate payment ID (operator + month-based)
 counterSchema.statics.getPaymentId = async function (operatorId) {
   const now = new Date();
   const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(
@@ -32,13 +42,13 @@ counterSchema.statics.getPaymentId = async function (operatorId) {
     { new: true, upsert: true }
   );
 
-  const serial = String(counter.value).padStart(2, '0');
-  return `${yearMonth}${serial}`; // e.g. 2025060001
+  const serial = String(counter.value).padStart(4, '0');
+  return `${yearMonth}${serial}`; // e.g. 2025090001
 };
 
+// Generate receipt number (continuous for operator)
 counterSchema.statics.getReceiptNumber = async function (operatorId) {
-  const key = `receipt-${operatorId}`; // A continuous key for the operator
-
+  const key = `receipt-${operatorId}`;
   const counter = await this.findOneAndUpdate(
     { name: key },
     {
@@ -47,17 +57,8 @@ counterSchema.statics.getReceiptNumber = async function (operatorId) {
     },
     { new: true, upsert: true }
   );
+  return counter.value.toString().padStart(6, '0'); // "000001"
+};
 
-  // You can format it if you like, e.g., pad with zeros, or just return the number
-  return counter.value.toString().padStart(6, '0'); // e.g., "000001", "000002"
-};
-counterSchema.statics.getNextSequence = async function (name) {
-  const counter = await this.findOneAndUpdate(
-    { name },
-    { $inc: { seq: 1 } },
-    { new: true, upsert: true }
-  );
-  return counter.seq;
-};
 const Counter = mongoose.model('Counter', counterSchema);
 module.exports = Counter;
