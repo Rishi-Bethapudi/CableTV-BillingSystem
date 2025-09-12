@@ -14,7 +14,6 @@ const RenewSubscription = ({
   isVisible,
   onRefresh,
 }: RenewSubscriptionProps) => {
-  console.log('RenewSubscription rendered with customer:', customer);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('30');
@@ -113,10 +112,12 @@ const RenewSubscription = ({
       customerId: customer._id,
       productId: selectedPkg._id,
       note: 'Subscription renewal',
+      startDate: fromDate,
     };
 
     setRenewLoading(true);
     try {
+      console.log('Renew payload:', payload);
       // Mock API call - replace with actual API endpoint
       await apiClient.post('/transactions/billing', payload);
       // console.log('Renewing subscription with payload:', payload);

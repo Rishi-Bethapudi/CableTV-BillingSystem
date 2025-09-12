@@ -10,7 +10,7 @@ const mongoose = require('mongoose');
  * @access  Private (Operator or Agent)
  */
 const createBilling = async (req, res) => {
-  const { customerId, productId, note, isAddon = false } = req.body;
+  const { customerId, productId, note, isAddon = false, startDate } = req.body;
 
   if (!customerId || !productId) {
     return res.status(400).json({
@@ -22,6 +22,7 @@ const createBilling = async (req, res) => {
     const customer = await Customer.findById(customerId);
     if (!customer)
       return res.status(404).json({ message: 'Customer not found.' });
+
     if (customer.operatorId.toString() !== req.user.operatorId) {
       return res.status(403).json({ message: 'Forbidden.' });
     }
@@ -39,29 +40,27 @@ const createBilling = async (req, res) => {
     const discount = customer.discount || 0;
     const finalBillingAmount = basePrice + additionalCharges - discount;
 
-    const today = new Date();
+    // take startDate from frontend (default: today if missing)
+    const billingDate = startDate ? new Date(startDate) : new Date();
     let newExpiryDate = customer.expiryDate
       ? new Date(customer.expiryDate)
       : null;
 
     // --- 2. Expiry & Product Logic ---
     if (!isAddon) {
-      // Main Plan Billing
-      if (!customer.expiryDate || newExpiryDate < today) {
-        // Expired → reset plan
-        newExpiryDate = new Date(today);
+      if (!customer.expiryDate || newExpiryDate < billingDate) {
+        // expired → reset plan
+        newExpiryDate = new Date(billingDate);
         newExpiryDate.setDate(
           newExpiryDate.getDate() + product.billingInterval
         );
-        customer.productId = [productId]; // replace old product
-      } else {
-        // Active → just update product, do NOT extend expiry
         customer.productId = [productId];
-        // expiry stays same
+      } else {
+        // active → replace product but keep expiry
+        customer.productId = [productId];
       }
     } else {
-      // Addon Billing → expiry untouched
-      // Optionally store addonProducts list in customer
+      // addon → keep expiry unchanged
       if (!customer.productId.includes(productId)) {
         customer.productId.push(productId);
       }
@@ -84,11 +83,12 @@ const createBilling = async (req, res) => {
       invoiceId,
       costOfGoodsSold: product.operatorCost,
       note,
+      createdAt: billingDate, // 👈 tie transaction date to frontend date
     });
 
     // --- 4. Update customer ---
     customer.balanceAmount = balanceAfter;
-    customer.lastPaymentDate = today;
+    customer.lastPaymentDate = billingDate;
     if (!isAddon) customer.expiryDate = newExpiryDate;
     customer.active = true;
 

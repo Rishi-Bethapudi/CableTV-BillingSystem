@@ -2,8 +2,9 @@ interface DailyReportTableProps {
   date: string;
   data: any;
 }
-
+import { useNavigate } from 'react-router-dom';
 export const DailyReportTable = ({ date, data }: DailyReportTableProps) => {
+  const navigate = useNavigate();
   return (
     <div className="bg-white rounded-lg shadow-sm mb-4 overflow-x-auto">
       <table className="w-full min-w-max border-collapse">
@@ -184,9 +185,9 @@ export const DailyReportTable = ({ date, data }: DailyReportTableProps) => {
                     <th className="p-1 text-left font-semibold text-gray-800 border border-gray-200 text-xs min-w-20">
                       Card No
                     </th>
-                    <th className="p-1 text-left font-semibold text-gray-800 border border-gray-200 text-xs min-w-12">
+                    {/* <th className="p-1 text-left font-semibold text-gray-800 border border-gray-200 text-xs min-w-12">
                       Portal
-                    </th>
+                    </th> */}
                   </tr>
                 </thead>
                 <tbody>
@@ -194,9 +195,11 @@ export const DailyReportTable = ({ date, data }: DailyReportTableProps) => {
                     <tr key={index} className="hover:bg-gray-50">
                       <td className="p-1 border border-gray-100 text-xs">
                         <a
-                          href="#"
+                          href=""
                           className="text-blue-600 hover:underline"
-                          onClick={(e) => e.preventDefault()}
+                          onClick={() =>
+                            navigate(`/customers/${customer?._id}`)
+                          }
                         >
                           {customer.name}
                         </a>
@@ -236,9 +239,9 @@ export const DailyReportTable = ({ date, data }: DailyReportTableProps) => {
                       <td className="p-1 border border-gray-100 text-xs">
                         {customer.cardNo}
                       </td>
-                      <td className="p-1 border border-gray-100 text-xs text-center">
+                      {/* <td className="p-1 border border-gray-100 text-xs text-center">
                         {customer.portalRecharge ? '☑' : '☐'}
-                      </td>
+                      </td> */}
                     </tr>
                   ))}
                 </tbody>

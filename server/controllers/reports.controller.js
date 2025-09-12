@@ -78,6 +78,7 @@ const formatCollectionReport = (collections) => {
 
     // Add customer details
     report[dateKey].customerDetails.push({
+      id: tx.customerId,
       name: tx.customerName || '',
       area: tx.area || '',
       previousBalance: tx.previousBalance || 0,
@@ -88,7 +89,7 @@ const formatCollectionReport = (collections) => {
       customerCode: tx.customerCode || '',
       stbNo: tx.stbNo || '',
       cardNo: tx.cardNo || '',
-      portalRecharge: tx.portalRecharge || false,
+      method: tx.method || 'Cash',
     });
   });
 
@@ -144,6 +145,7 @@ const getCollectionReport = async (req, res) => {
           date: '$createdAt',
           amount: 1,
           discount: 1,
+          customerId: 1,
           customerName: '$customerInfo.name',
           area: '$customerInfo.locality',
           previousBalance: '$customerInfo.balance',
