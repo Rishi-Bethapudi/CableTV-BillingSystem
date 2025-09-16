@@ -38,6 +38,7 @@ export default function AddOnBillSection({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPackage, setSelectedPackage] = useState<Product | null>(null);
   const [price, setPrice] = useState('');
+  const [note, setNote] = useState('');
   const [isPriceModified, setIsPriceModified] = useState(false);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -79,7 +80,9 @@ export default function AddOnBillSection({
     setPrice(value);
     setIsPriceModified(true);
   };
-
+  const handleRemarkChange = (value: string) => {
+    setNote(value);
+  };
   // Reset price modification flag when package changes
   const handlePackageSelect = (pkg: Product) => {
     setSelectedPackage(pkg);
@@ -99,6 +102,7 @@ export default function AddOnBillSection({
         customerId: customer._id,
         productId: selectedPackage._id,
         amount: parseInt(price, 10),
+        note,
         isAddon: true,
       };
 
@@ -230,6 +234,19 @@ export default function AddOnBillSection({
               Auto-synced with selected package
             </p>
           )}
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="remark">Remarks</Label>
+          </div>
+          <Input
+            id="remark"
+            type="string"
+            placeholder="Any Remarks..."
+            value={note}
+            onChange={(e) => handleRemarkChange(e.target.value)}
+            className={isPriceModified ? 'border-amber-500' : ''}
+          />
         </div>
 
         {/* New Balance */}

@@ -11,6 +11,8 @@ interface DashboardCardProps {
   currency?: boolean;
   secondaryValue?: string | number;
   secondaryIcon?: LucideIcon;
+  onClick?: () => void; // <-- optional click handler
+  clickable?: boolean; // <-- optional flag for styling clickable card
 }
 
 export function DashboardCard({
@@ -22,9 +24,19 @@ export function DashboardCard({
   currency = false,
   secondaryValue,
   secondaryIcon: SecondaryIcon,
+  onClick,
+  clickable = false,
 }: DashboardCardProps) {
+  console.log('card:', title, value);
   return (
-    <Card className={cn('relative overflow-hidden', className)}>
+    <Card
+      onClick={onClick}
+      className={cn(
+        'relative overflow-hidden',
+        clickable ? 'cursor-pointer hover:shadow-lg transition-shadow' : '',
+        className
+      )}
+    >
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div className="flex-1">
@@ -32,8 +44,10 @@ export function DashboardCard({
               {title}
             </p>
             <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">
-              {currency && typeof value === 'number'
-                ? `₹${value.toLocaleString('en-IN')}`
+              {typeof value === 'number' && currency
+                ? `${value < 0 ? '-₹' : '₹'}${Math.abs(value).toLocaleString(
+                    'en-IN'
+                  )}`
                 : value}
             </p>
             {secondaryValue !== undefined && SecondaryIcon && (

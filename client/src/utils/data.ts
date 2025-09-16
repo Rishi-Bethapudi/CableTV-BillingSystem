@@ -81,3 +81,12 @@ export interface ExpenseFormData {
   receiptNumber: string;
   notes: string;
 }
+
+export interface ProductForm {
+  name: string;
+  category: string;
+  customerPrice: string;
+  operatorCost: string;
+  billingInterval: string;
+  isActive: boolean;
+}

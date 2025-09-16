@@ -101,6 +101,7 @@ export default function Dashboard() {
                 : CheckCircle
             }
             className={`bg-gradient-to-br ${primaryColors[idx]} `}
+            onClick={() => navigate(item.action)}
           />
         ))}
       </div>

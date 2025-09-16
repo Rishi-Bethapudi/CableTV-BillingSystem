@@ -1,68 +1,91 @@
-
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
+import apiClient from '@/utils/apiClient';
+import type { ProductForm } from '@/utils/data';
 interface AddProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }
 
-export function AddProductDialog({ open, onOpenChange, onSuccess }: AddProductDialogProps) {
+export function AddProductDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: AddProductDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    product_code: '',
+  const [formData, setFormData] = useState<ProductForm>({
     name: '',
-    description: '',
-    monthly_price: '',
-    installation_fee: '',
     category: '',
-    is_active: true,
+    customerPrice: '',
+    operatorCost: '',
+    billingInterval: '30', // default monthly
+    isActive: true,
   });
+
+  const handleChange = (field: keyof ProductForm, value: string | boolean) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      category: '',
+      customerPrice: '',
+      operatorCost: '',
+      billingInterval: '30',
+      isActive: true,
+    });
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onOpenChange(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const { error } = await supabase
-        .from('products')
-        .insert({
-          product_code: formData.product_code,
-          name: formData.name,
-          description: formData.description || null,
-          monthly_price: parseFloat(formData.monthly_price),
-          installation_fee: formData.installation_fee ? parseFloat(formData.installation_fee) : 0,
-          category: formData.category,
-          is_active: formData.is_active,
-        });
-
-      if (error) throw error;
+      await apiClient.post('/products', {
+        name: formData.name,
+        category: formData.category,
+        customerPrice: parseFloat(formData.customerPrice),
+        operatorCost: formData.operatorCost
+          ? parseFloat(formData.operatorCost)
+          : 0,
+        billingInterval: parseInt(formData.billingInterval, 10),
+        isActive: formData.isActive,
+      });
 
       toast.success('Product added successfully');
       onSuccess();
-      
-      // Reset form
-      setFormData({
-        product_code: '',
-        name: '',
-        description: '',
-        monthly_price: '',
-        installation_fee: '',
-        category: '',
-        is_active: true,
-      });
-    } catch (error) {
+      resetForm();
+      onOpenChange(false);
+    } catch (error: any) {
       console.error('Error adding product:', error);
-      toast.error('Failed to add product');
+      const message = error.response?.data?.message || 'Failed to add product';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -74,25 +97,12 @@ export function AddProductDialog({ open, onOpenChange, onSuccess }: AddProductDi
         <DialogHeader>
           <DialogTitle>Add New Product</DialogTitle>
           <DialogDescription>
-            Create a new cable TV package or service
+            Create a new product/package for your operator account
           </DialogDescription>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="product_code" className="text-right">
-              Product Code
-            </Label>
-            <Input
-              id="product_code"
-              value={formData.product_code}
-              onChange={(e) => setFormData({ ...formData, product_code: e.target.value })}
-              className="col-span-3"
-              placeholder="PKG-001"
-              required
-            />
-          </div>
-          
+          {/* Product Name */}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">
               Name
@@ -100,88 +110,101 @@ export function AddProductDialog({ open, onOpenChange, onSuccess }: AddProductDi
             <Input
               id="name"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => handleChange('name', e.target.value)}
               className="col-span-3"
               placeholder="Basic Cable Package"
               required
             />
           </div>
-          
+
+          {/* Category */}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="category" className="text-right">
               Category
             </Label>
-            <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+            <Select
+              value={formData.category}
+              onValueChange={(value) => handleChange('category', value)}
+            >
               <SelectTrigger className="col-span-3">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Basic">Basic</SelectItem>
-                <SelectItem value="Standard">Standard</SelectItem>
                 <SelectItem value="Premium">Premium</SelectItem>
                 <SelectItem value="Add-on">Add-on</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          
+
+          {/* Customer Price */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="monthly_price" className="text-right">
-              Monthly Price
+            <Label htmlFor="customerPrice" className="text-right">
+              Customer Price
             </Label>
             <Input
-              id="monthly_price"
+              id="customerPrice"
               type="number"
               step="0.01"
-              value={formData.monthly_price}
-              onChange={(e) => setFormData({ ...formData, monthly_price: e.target.value })}
+              value={formData.customerPrice}
+              onChange={(e) => handleChange('customerPrice', e.target.value)}
               className="col-span-3"
               placeholder="299.00"
               required
             />
           </div>
-          
+
+          {/* Operator Cost */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="installation_fee" className="text-right">
-              Installation Fee
+            <Label htmlFor="operatorCost" className="text-right">
+              Operator Cost
             </Label>
             <Input
-              id="installation_fee"
+              id="operatorCost"
               type="number"
               step="0.01"
-              value={formData.installation_fee}
-              onChange={(e) => setFormData({ ...formData, installation_fee: e.target.value })}
+              value={formData.operatorCost}
+              onChange={(e) => handleChange('operatorCost', e.target.value)}
               className="col-span-3"
-              placeholder="500.00"
+              placeholder="200.00"
             />
           </div>
-          
+
+          {/* Billing Interval */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="description" className="text-right">
-              Description
+            <Label htmlFor="billingInterval" className="text-right">
+              Billing Interval
             </Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="col-span-3"
-              placeholder="Package description..."
-              rows={3}
-            />
+            <Select
+              value={formData.billingInterval}
+              onValueChange={(value) => handleChange('billingInterval', value)}
+            >
+              <SelectTrigger className="col-span-3">
+                <SelectValue placeholder="Select interval" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="30">Monthly (30 days)</SelectItem>
+                <SelectItem value="90">Quarterly (90 days)</SelectItem>
+                <SelectItem value="180">Half-Yearly (180 days)</SelectItem>
+                <SelectItem value="365">Yearly (365 days)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          
+
+          {/* Active Switch */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="is_active" className="text-right">
+            <Label htmlFor="isActive" className="text-right">
               Active
             </Label>
             <Switch
-              id="is_active"
-              checked={formData.is_active}
-              onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+              id="isActive"
+              checked={formData.isActive}
+              onCheckedChange={(checked) => handleChange('isActive', checked)}
             />
           </div>
-          
+
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>

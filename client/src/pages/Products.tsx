@@ -36,7 +36,7 @@ import {
   parseProductsFromExcel,
 } from '@/utils/excelUtils';
 import ExcelUploadDialog from '@/components/ExcelUploadDialog';
-
+import ConfirmationModal from '@/components/customer/ConfirmationModal';
 interface Product {
   id: string;
   product_code: string;
@@ -54,7 +54,11 @@ export default function Products() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
-
+  const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
+  const [deleteProductName, setDeleteProductName] = useState<string | null>(
+    null
+  );
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   useEffect(() => {
     setHeaderActions(
       <div className="flex gap-1">
@@ -98,16 +102,25 @@ export default function Products() {
     },
   });
 
-  const handleDeleteProduct = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
+  const handleDeleteClick = (id: string, name: string) => {
+    setDeleteProductId(id);
+    setDeleteProductName(name);
+    setShowDeleteModal(true);
+  };
+  const confirmDeleteProduct = async () => {
+    if (!deleteProductId) return;
 
     try {
-      await apiClient.delete(`/products/${id}`);
-      toast.success('Product deleted successfully');
+      await apiClient.delete(`/products/${deleteProductId}`);
+      toast.success(`"${deleteProductName}" deleted successfully`);
       refetch();
     } catch (err) {
       console.error('Error deleting product:', err);
       toast.error('Failed to delete product');
+    } finally {
+      setShowDeleteModal(false);
+      setDeleteProductId(null);
+      setDeleteProductName(null);
     }
   };
 
@@ -324,7 +337,7 @@ export default function Products() {
                           variant="outline"
                           size="sm"
                           onClick={() =>
-                            handleDeleteProduct(product.id, product.name)
+                            handleDeleteClick(product.id, product.name)
                           }
                         >
                           <Trash2 className="h-4 w-4" />
@@ -348,7 +361,12 @@ export default function Products() {
           setShowAddDialog(false);
         }}
       />
-
+      <ConfirmationModal
+        open={showDeleteModal}
+        message="Are you sure you want to delete this customer?"
+        onConfirm={confirmDeleteProduct}
+        onCancel={() => setShowDeleteModal(false)}
+      />
       {editingProduct && (
         <EditProductDialog
           product={editingProduct}
