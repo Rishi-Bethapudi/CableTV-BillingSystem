@@ -14,20 +14,19 @@ const createCustomer = async (req, res) => {
     const {
       name,
       mobile,
-      planAmount,
       locality,
       stbNumber,
       stbName,
       cardNumber,
       agentId,
-      balanceAmount = 0,
       billingAddress,
-      productIds = [], // array of productIds
+      balanceAmount = 0,
       additionalCharge = 0,
       discount = 0,
       lastPaymentAmount = 0,
+      lastPaymentDate = null,
+      productIds = [],
       remark = '',
-      billingInterval = 30,
     } = req.body;
 
     if (!name || !mobile) {
@@ -38,7 +37,7 @@ const createCustomer = async (req, res) => {
 
     // Generate sequence number
     const lastCustomer = await Customer.findOne({ operatorId }).sort({
-      sequenceNo: -1,
+      createdAt: -1,
     });
     const newSequenceNo = lastCustomer ? lastCustomer.sequenceNo + 1 : 1;
     const customerCode = `CUST${String(newSequenceNo).padStart(3, '0')}`;
@@ -46,7 +45,6 @@ const createCustomer = async (req, res) => {
     // Duplicate check
     let duplicateQuery = [{ mobile }];
     if (stbNumber) duplicateQuery.push({ stbNumber });
-
     const existingCustomer = await Customer.findOne({
       operatorId,
       $or: duplicateQuery,
@@ -59,12 +57,35 @@ const createCustomer = async (req, res) => {
         .json({ message: `Customer with this ${field} already exists.` });
     }
 
-    // Expiry calculation
-    const connectionStartDate = new Date();
-    let expiryDate = new Date(connectionStartDate);
-    if (balanceAmount >= planAmount) {
-      const monthsPaid = Math.floor(balanceAmount / planAmount);
-      expiryDate.setDate(expiryDate.getDate() + monthsPaid * billingInterval);
+    // Subscriptions build
+    const subscriptions = [];
+    for (let pid of productIds) {
+      const product = await Product.findById(pid);
+      if (!product) continue;
+
+      const startDate = new Date();
+      let expiryDate;
+
+      if (product.billingInterval.unit === 'months') {
+        expiryDate = new Date(startDate);
+        expiryDate.setMonth(
+          startDate.getMonth() + product.billingInterval.value
+        );
+      } else {
+        expiryDate = new Date(
+          startDate.getTime() +
+            product.billingInterval.value * 24 * 60 * 60 * 1000
+        );
+      }
+
+      subscriptions.push({
+        productId: product._id,
+        startDate,
+        expiryDate,
+        billingInterval: product.billingInterval,
+        price: product.customerPrice,
+        status: 'active',
+      });
     }
 
     const newCustomer = new Customer({
@@ -80,13 +101,12 @@ const createCustomer = async (req, res) => {
       cardNumber,
       billingAddress,
       balanceAmount,
-      connectionStartDate,
-      expiryDate,
-      active: req.body.active !== undefined ? req.body.active : true,
-      productId: productIds, // ✅ updated to array
       additionalCharge,
       discount,
       lastPaymentAmount,
+      lastPaymentDate,
+      subscriptions,
+      active: true,
       remark,
     });
 
@@ -106,38 +126,33 @@ const createCustomer = async (req, res) => {
 const getCustomers = async (req, res) => {
   try {
     const operatorId = req.user.operatorId;
-    // const operatorId = '6863f992548073a2ed1891f0';
-
-    // --- Pagination ---
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const skip = (page - 1) * limit;
 
-    // --- Build dynamic query ---
-    const query = { operatorId };
+    const query = { operatorId, deleted: false }; // 👈 exclude deleted customers by default
 
-    // Filter by customerStatus (active/inactive)
+    // Allow admins to include deleted customers if requested
+    if (req.query.includeDeleted === 'true') {
+      delete query.deleted;
+    }
+
+    // Active / inactive filter
     if (req.query.customerStatus === 'active') query.active = true;
     else if (req.query.customerStatus === 'inactive') query.active = false;
 
-    // Filter by locality
     if (req.query.locality) {
       query.locality = new RegExp(req.query.locality, 'i');
     }
 
-    // Filter by payment mode (if you store lastPaymentMode or such on customer)
-    if (req.query.paymentMode) {
-      query.lastPaymentMode = req.query.paymentMode;
-    }
-
-    // --- DUE FILTERS based on expiryDate ---
+    // Expiry filters inside subscriptions
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     if (req.query.dueToday === 'true') {
       const tomorrow = new Date(today);
       tomorrow.setDate(today.getDate() + 1);
-      query.expiryDate = { $gte: today, $lt: tomorrow };
+      query['subscriptions.expiryDate'] = { $gte: today, $lt: tomorrow };
     }
 
     if (req.query.dueTomorrow === 'true') {
@@ -145,37 +160,30 @@ const getCustomers = async (req, res) => {
       tomorrow.setDate(today.getDate() + 1);
       const dayAfter = new Date(today);
       dayAfter.setDate(today.getDate() + 2);
-      query.expiryDate = { $gte: tomorrow, $lt: dayAfter };
+      query['subscriptions.expiryDate'] = { $gte: tomorrow, $lt: dayAfter };
     }
 
     if (req.query.dueNext5Days === 'true') {
       const in5Days = new Date(today);
       in5Days.setDate(today.getDate() + 5);
-      query.expiryDate = { $gte: today, $lt: in5Days };
+      query['subscriptions.expiryDate'] = { $gte: today, $lt: in5Days };
     }
 
-    // --- BALANCE FILTERS ---
-    if (req.query.unpaid === 'true') {
-      query.balanceAmount = { $gt: 0 };
-    }
-    if (req.query.advance === 'true') {
-      query.balanceAmount = { $lt: 0 };
-    }
+    if (req.query.unpaid === 'true') query.balanceAmount = { $gt: 0 };
+    if (req.query.advance === 'true') query.balanceAmount = { $lt: 0 };
 
-    // --- SEARCH by name/mobile/stb ---
     if (req.query.search) {
       const regex = new RegExp(req.query.search, 'i');
       query.$or = [{ name: regex }, { mobile: regex }, { stbNumber: regex }];
     }
 
-    // --- Sorting ---
     const sortField = req.query.sortBy || 'createdAt';
     const sortOrder = req.query.order === 'asc' ? 1 : -1;
     const sort = { [sortField]: sortOrder };
 
-    // --- Execute query ---
     const customers = await Customer.find(query)
-      .populate('agentId', 'name') // if needed
+      .populate('agentId', 'name')
+      .populate('subscriptions.productId', 'name customerPrice')
       .sort(sort)
       .skip(skip)
       .limit(limit)
@@ -210,22 +218,24 @@ const getCustomerById = async (req, res) => {
       return res.status(400).json({ message: 'Invalid customer ID format.' });
     }
 
-    const customer = await Customer.findById(customerId)
+    const query = {
+      _id: customerId,
+      operatorId: req.user.operatorId,
+      deleted: false, // 👈 exclude deleted customers
+    };
+
+    // Allow admins to view deleted customer if explicitly requested
+    if (req.query.includeDeleted === 'true') {
+      delete query.deleted;
+    }
+
+    const customer = await Customer.findOne(query)
       .populate('agentId', 'name email')
-      .populate('productId', 'name customerPrice billingInterval') // 👈 populate products
+      .populate('subscriptions.productId', 'name customerPrice billingInterval')
       .lean();
 
-    if (!customer) {
+    if (!customer)
       return res.status(404).json({ message: 'Customer not found.' });
-    }
-
-    // SECURITY CHECK
-    if (customer.operatorId.toString() !== req.user.operatorId) {
-      console.warn(
-        `SECURITY: User ${req.user.id} (Role: ${req.user.role}) attempted to access customer ${customerId} from another tenant.`
-      );
-      return res.status(404).json({ message: 'Customer not found.' });
-    }
 
     res.status(200).json(customer);
   } catch (error) {
@@ -246,27 +256,43 @@ const updateCustomer = async (req, res) => {
       return res.status(400).json({ message: 'Invalid customer ID format.' });
     }
 
-    // First, verify the customer exists and belongs to the operator
-    const customerToUpdate = await Customer.findById(customerId);
-
-    if (!customerToUpdate) {
+    const customer = await Customer.findById(customerId);
+    if (!customer)
       return res.status(404).json({ message: 'Customer not found.' });
+    if (customer.operatorId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Unauthorized access.' });
     }
 
-    // SECURITY CHECK: Operator can only update their own customers
-    if (customerToUpdate.operatorId.toString() !== req.user.id) {
-      return res.status(403).json({
-        message: 'Forbidden: You are not authorized to update this customer.',
-      });
-    }
-
-    // Prevent operatorId from being changed
+    // Don't allow operatorId/subscriptions overwrite here
     delete req.body.operatorId;
+    delete req.body.subscriptions;
+
+    const updatableFields = [
+      'name',
+      'mobile',
+      'locality',
+      'stbName',
+      'stbNumber',
+      'cardNumber',
+      'billingAddress',
+      'balanceAmount',
+      'additionalCharge',
+      'discount',
+      'lastPaymentAmount',
+      'lastPaymentDate',
+      'remark',
+      'active',
+    ];
+
+    const updates = {};
+    updatableFields.forEach((field) => {
+      if (req.body[field] !== undefined) updates[field] = req.body[field];
+    });
 
     const updatedCustomer = await Customer.findByIdAndUpdate(
       customerId,
-      { $set: req.body },
-      { new: true, runValidators: true } // 'new: true' returns the updated doc, 'runValidators' ensures schema rules are met
+      { $set: updates },
+      { new: true, runValidators: true }
     ).populate('agentId', 'name');
 
     res.status(200).json(updatedCustomer);
@@ -277,7 +303,7 @@ const updateCustomer = async (req, res) => {
 };
 
 /**
- * @desc    Delete a customer
+ * @desc    Soft delete a customer (mark as deleted, don't remove from DB)
  * @route   DELETE /api/customers/:id
  * @access  Private (Operator only)
  */
@@ -294,21 +320,20 @@ const deleteCustomer = async (req, res) => {
       return res.status(404).json({ message: 'Customer not found.' });
     }
 
-    // SECURITY CHECK: Operator can only delete their own customers
     if (customerToDelete.operatorId.toString() !== req.user.id) {
       return res.status(403).json({
         message: 'Forbidden: You are not authorized to delete this customer.',
       });
     }
 
-    await Customer.findByIdAndDelete(customerId);
+    // ✅ Soft delete instead of removing
+    customerToDelete.deleted = true;
+    customerToDelete.active = false;
+    await customerToDelete.save();
 
-    // Optional: Also delete related transactions, etc. (cascade delete)
-    // await Transaction.deleteMany({ customerId: customerId });
-
-    res.status(200).json({ message: 'Customer deleted successfully.' });
+    res.status(200).json({ message: 'Customer soft deleted successfully.' });
   } catch (error) {
-    console.error('Error deleting customer:', error);
+    console.error('Error soft deleting customer:', error);
     res.status(500).json({ message: 'Server error while deleting customer.' });
   }
 };
@@ -337,27 +362,42 @@ const importCustomersFromExcel = async (req, res) => {
       });
     }
 
-    // Add the operatorId to each customer record from the authenticated user
     const operatorId = req.user.id;
-    const customersToImport = customersJson.map((customer) => ({
-      ...customer,
-      operatorId: operatorId,
-      // Add default values for any missing required fields if necessary
-      balanceAmount: customer.balanceAmount || 0,
-      active: customer.active !== undefined ? customer.active : true,
+
+    const customersToImport = customersJson.map((c) => ({
+      operatorId,
+      agentId: c.agentId || null,
+      customerCode: c.customerCode || '', // or generate later
+      name: c.name,
+      mobile: c.mobile,
+      locality: c.locality || '',
+      stbName: c.stbName || '',
+      stbNumber: c.stbNumber || '',
+      cardNumber: c.cardNumber || '',
+      billingAddress: c.billingAddress || '',
+      connectionStartDate: c.connectionStartDate
+        ? new Date(c.connectionStartDate)
+        : null,
+      sequenceNo: c.sequenceNo || null,
+      subscriptions: [], // default empty (can be added later via product assign/renewal)
+      balanceAmount: c.balanceAmount || 0,
+      additionalCharge: c.additionalCharge || 0,
+      discount: c.discount || 0,
+      lastPaymentAmount: c.lastPaymentAmount || 0,
+      lastPaymentDate: c.lastPaymentDate ? new Date(c.lastPaymentDate) : null,
+      remark: c.remark || '',
+      active: c.active !== undefined ? c.active : true,
     }));
 
-    // Use insertMany for efficient bulk insertion
     const result = await Customer.insertMany(customersToImport, {
       ordered: false,
-    }); // ordered: false continues on error
+    });
 
-    res
-      .status(201)
-      .json({ message: `${result.length} customers imported successfully.` });
+    res.status(201).json({
+      message: `${result.length} customers imported successfully.`,
+    });
   } catch (error) {
     console.error('Error importing from Excel:', error);
-    // Handle duplicate key errors specifically
     if (error.code === 11000) {
       return res.status(409).json({
         message:
@@ -366,7 +406,6 @@ const importCustomersFromExcel = async (req, res) => {
     }
     res.status(500).json({ message: 'Failed to import customers from Excel.' });
   } finally {
-    // Clean up the uploaded file from the server
     fs.unlinkSync(filePath);
   }
 };
@@ -380,18 +419,49 @@ const exportCustomersToExcel = async (req, res) => {
   try {
     const operatorId = req.user.id;
     const customers = await Customer.find({ operatorId })
-      .select('-operatorId -__v')
+      .populate('subscriptions.productId', 'name')
       .lean();
 
     if (customers.length === 0) {
       return res.status(404).json({ message: 'No customers found to export.' });
     }
 
-    const worksheet = xlsx.utils.json_to_sheet(customers);
+    // Flatten subscriptions into strings for Excel
+    const exportData = customers.map((c) => {
+      let subs = c.subscriptions
+        .map(
+          (s) =>
+            `${s.productId?.name || 'N/A'} (exp: ${new Date(
+              s.expiryDate
+            ).toLocaleDateString()})`
+        )
+        .join(', ');
+
+      return {
+        CustomerCode: c.customerCode,
+        Name: c.name,
+        Mobile: c.mobile,
+        Locality: c.locality || '',
+        BillingAddress: c.billingAddress || '',
+        STBNumber: c.stbNumber || '',
+        CardNumber: c.cardNumber || '',
+        Balance: c.balanceAmount,
+        AdditionalCharge: c.additionalCharge,
+        Discount: c.discount,
+        LastPaymentAmount: c.lastPaymentAmount || 0,
+        LastPaymentDate: c.lastPaymentDate
+          ? new Date(c.lastPaymentDate).toLocaleDateString()
+          : '',
+        Subscriptions: subs || 'None',
+        Active: c.active ? 'Yes' : 'No',
+        Remark: c.remark || '',
+      };
+    });
+
+    const worksheet = xlsx.utils.json_to_sheet(exportData);
     const workbook = xlsx.utils.book_new();
     xlsx.utils.book_append_sheet(workbook, worksheet, 'Customers');
 
-    // Set headers to prompt download
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -403,7 +473,6 @@ const exportCustomersToExcel = async (req, res) => {
       }.xlsx"`
     );
 
-    // Write the workbook to the response stream
     const buffer = xlsx.write(workbook, { bookType: 'xlsx', type: 'buffer' });
     res.send(buffer);
   } catch (error) {

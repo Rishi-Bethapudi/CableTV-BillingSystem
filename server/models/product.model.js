@@ -1,4 +1,3 @@
-// models/product.model.js
 const mongoose = require('mongoose');
 
 const productSchema = new mongoose.Schema(
@@ -8,36 +7,27 @@ const productSchema = new mongoose.Schema(
       ref: 'Operator',
       required: true,
     },
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+    productCode: { type: String, required: true, trim: true },
+    name: { type: String, required: true, trim: true },
     category: {
       type: String,
       enum: ['Basic', 'Premium', 'Add-on'],
-      default: 'basic',
+      default: 'Basic',
     },
-    // The price you charge the customer
-    customerPrice: {
-      type: Number,
-      required: true,
-    },
-    // The cost you incur for this product
-    operatorCost: {
-      type: Number,
-      required: true,
-      default: 0,
-    },
+
+    // Price charged to customer
+    customerPrice: { type: Number, required: true },
+
+    // Cost to operator
+    operatorCost: { type: Number, required: true, default: 0 },
+
+    // Default billing cycle
     billingInterval: {
-      // e.g., 30 for monthly, 90 for quarterly
-      type: Number,
-      default: 30,
+      value: { type: Number, default: 30 }, // e.g. 30
+      unit: { type: String, enum: ['days', 'months'], default: 'days' },
     },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
+
+    isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

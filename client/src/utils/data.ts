@@ -2,7 +2,9 @@ export interface Product {
   _id: string;
   name: string;
   customerPrice: number;
-  billingInterval: number;
+  operatorCost: number;
+  category: string;
+  isActive: boolean;
 }
 
 export interface Customer {

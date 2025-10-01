@@ -6,71 +6,63 @@ const transactionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Customer',
       required: true,
-      index: true, // Index for faster lookups
+      index: true,
     },
     operatorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Operator',
       required: true,
     },
-    // Record who performed the action
+
+    // Who performed it
     collectedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      refPath: 'collectedByType', // Dynamic reference to either Operator or Agent
+      refPath: 'collectedByType',
     },
     collectedByType: {
       type: String,
       required: true,
       enum: ['Operator', 'Agent'],
     },
-    // The core transaction details
+
+    // Type of transaction
     type: {
       type: String,
       required: true,
-      enum: ['Billing', 'Collection', 'Adjustment', 'AddOn'], // Billing=Charge, Collection=Payment
+      enum: ['Billing', 'Collection', 'Adjustment', 'AddOn'],
     },
-    amount: {
-      type: Number,
-      required: true,
-    },
-    // Ledger state for auditing
-    balanceBefore: {
-      type: Number,
-      required: true,
-    },
-    balanceAfter: {
-      type: Number,
-      required: true,
-    },
-    invoiceId: {
-      type: String,
-      // This should be unique per operator, enforced in the controller logic
-    },
-    // For "Collection" transactions, can be manually entered by the operator
-    receiptNumber: {
-      type: String,
-    },
-    // To record the cost of the service for profit calculation
-    costOfGoodsSold: {
-      type: Number,
-      default: 0,
-    },
-    // Additional details
+    amount: { type: Number, required: true },
+
+    // Ledger tracking
+    balanceBefore: { type: Number, required: true },
+    balanceAfter: { type: Number, required: true },
+
+    // Reference to subscriptions
+    subscriptionId: { type: mongoose.Schema.Types.ObjectId }, // optional
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+
+    // Period covered
+    startDate: Date,
+    expiryDate: Date,
+
+    // Invoice/receipts
+    invoiceId: String,
+    receiptNumber: String,
+
+    // Profit calculation
+    costOfGoodsSold: { type: Number, default: 0 },
+
+    // Payment method
     method: {
       type: String,
       enum: ['Cash', 'Online', 'Cheque', 'Adjustment', 'UPI'],
       default: 'Cash',
     },
-    note: {
-      type: String,
-      trim: true,
-    },
+
+    note: { type: String, trim: true },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 const Transaction = mongoose.model('Transaction', transactionSchema);
-
 module.exports = Transaction;

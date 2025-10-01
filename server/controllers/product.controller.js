@@ -1,26 +1,45 @@
+const mongoose = require('mongoose');
 const Product = require('../models/product.model');
 const Customer = require('../models/customer.model');
 
 /**
  * Create a new product for the logged-in operator.
- * The operator's ID is automatically assigned from the authenticated user's token.
  */
 exports.createProduct = async (req, res) => {
   try {
-    const { name, customerPrice, operatorCost, billingInterval, isActive } =
-      req.body;
-    const operatorId = req.user.id; // From authMiddleware
+    const {
+      productCode,
+      name,
+      category,
+      customerPrice,
+      operatorCost,
+      billingInterval,
+      isActive,
+    } = req.body;
+    const operatorId = req.user.id;
 
-    // --- Validation ---
-    if (!name || customerPrice === undefined || operatorCost === undefined) {
+    // Validation
+    if (
+      !productCode ||
+      !name ||
+      customerPrice === undefined ||
+      operatorCost === undefined
+    ) {
       return res.status(400).json({
-        message: 'Please provide name, customerPrice, and operatorCost.',
+        message:
+          'Please provide productCode, name, customerPrice, and operatorCost.',
       });
     }
 
     const newProduct = new Product({
-      ...req.body,
-      operatorId, // Ensure product is tied to the correct operator
+      operatorId,
+      productCode,
+      name,
+      category: category || 'Basic',
+      customerPrice,
+      operatorCost,
+      billingInterval: billingInterval || { value: 30, unit: 'days' },
+      isActive: isActive !== undefined ? isActive : true,
     });
 
     const savedProduct = await newProduct.save();
@@ -33,7 +52,6 @@ exports.createProduct = async (req, res) => {
 
 /**
  * Get all products for the logged-in operator.
- * Supports filtering by active status and searching by name.
  */
 exports.getProducts = async (req, res) => {
   try {
@@ -46,19 +64,13 @@ exports.getProducts = async (req, res) => {
     } = req.query;
 
     const query = { operatorId };
-
-    if (isActive) {
-      query.isActive = isActive === 'true';
-    }
-    if (search) {
-      query.name = new RegExp(search, 'i'); // Case-insensitive search
-    }
+    if (isActive !== undefined) query.isActive = isActive === 'true';
+    if (search) query.name = new RegExp(search, 'i');
 
     const sortOrder = order === 'asc' ? 1 : -1;
     const sort = { [sortBy]: sortOrder };
 
     const products = await Product.find(query).sort(sort).lean();
-
     res.status(200).json(products);
   } catch (error) {
     console.error('Error fetching products:', error);
@@ -67,24 +79,20 @@ exports.getProducts = async (req, res) => {
 };
 
 /**
- * Get a single product by its ID.
- * Ensures the product belongs to the requesting operator.
+ * Get a single product by ID for the logged-in operator.
  */
 exports.getProductById = async (req, res) => {
   try {
     const operatorId = req.user.id;
     const product = await Product.findOne({
       _id: req.params.id,
-      operatorId: operatorId, // Security check
+      operatorId,
     }).lean();
 
     if (!product) {
-      return res
-        .status(404)
-        .json({
-          message:
-            'Product not found or you do not have permission to view it.',
-        });
+      return res.status(404).json({
+        message: 'Product not found or you do not have permission to view it.',
+      });
     }
 
     res.status(200).json(product);
@@ -96,34 +104,51 @@ exports.getProductById = async (req, res) => {
 
 /**
  * Update a product's details.
- * Ensures the product belongs to the requesting operator.
  */
 exports.updateProduct = async (req, res) => {
   try {
     const operatorId = req.user.id;
-    const { name, customerPrice, operatorCost, billingInterval, isActive } =
-      req.body;
+    const {
+      productCode,
+      name,
+      category,
+      customerPrice,
+      operatorCost,
+      billingInterval,
+      isActive,
+    } = req.body;
 
-    // --- Validation ---
-    if (!name || customerPrice === undefined || operatorCost === undefined) {
+    if (
+      !productCode ||
+      !name ||
+      customerPrice === undefined ||
+      operatorCost === undefined
+    ) {
       return res.status(400).json({
-        message: 'Please provide name, customerPrice, and operatorCost.',
+        message:
+          'Please provide productCode, name, customerPrice, and operatorCost.',
       });
     }
 
     const updatedProduct = await Product.findOneAndUpdate(
-      { _id: req.params.id, operatorId: operatorId }, // Find and verify ownership
-      { $set: req.body },
-      { new: true, runValidators: true } // Return the updated doc and run schema validators
+      { _id: req.params.id, operatorId },
+      {
+        productCode,
+        name,
+        category,
+        customerPrice,
+        operatorCost,
+        billingInterval,
+        isActive,
+      },
+      { new: true, runValidators: true }
     ).lean();
 
     if (!updatedProduct) {
-      return res
-        .status(404)
-        .json({
-          message:
-            'Product not found or you do not have permission to update it.',
-        });
+      return res.status(404).json({
+        message:
+          'Product not found or you do not have permission to update it.',
+      });
     }
 
     res.status(200).json(updatedProduct);
@@ -135,40 +160,31 @@ exports.updateProduct = async (req, res) => {
 
 /**
  * Delete a product.
- * Prevents deletion if the product is currently in use by any customers.
+ * Cannot delete if assigned to any customer.
  */
 exports.deleteProduct = async (req, res) => {
   try {
     const operatorId = req.user.id;
     const productId = req.params.id;
 
-    // --- Check if product is in use ---
-    const customerUsingProduct = await Customer.findOne({
-      productId: productId,
-      operatorId: operatorId,
-    });
-
-    if (customerUsingProduct) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Cannot delete this product because it is currently assigned to one or more customers.',
-        });
+    // Check if any customer is using this product
+    const inUse = await Customer.findOne({ productId, operatorId });
+    if (inUse) {
+      return res.status(400).json({
+        message:
+          'Cannot delete this product because it is assigned to one or more customers.',
+      });
     }
 
     const deletedProduct = await Product.findOneAndDelete({
       _id: productId,
-      operatorId: operatorId, // Security check
+      operatorId,
     });
-
     if (!deletedProduct) {
-      return res
-        .status(404)
-        .json({
-          message:
-            'Product not found or you do not have permission to delete it.',
-        });
+      return res.status(404).json({
+        message:
+          'Product not found or you do not have permission to delete it.',
+      });
     }
 
     res.status(200).json({ message: 'Product deleted successfully.' });

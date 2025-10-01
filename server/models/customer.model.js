@@ -1,5 +1,28 @@
 const mongoose = require('mongoose');
 
+const subscriptionSchema = new mongoose.Schema(
+  {
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      required: true,
+    },
+    startDate: { type: Date, required: true },
+    expiryDate: { type: Date, required: true },
+    billingInterval: {
+      value: { type: Number, required: true }, // e.g. 30
+      unit: { type: String, enum: ['days', 'months'], default: 'days' }, // e.g. 'days'
+    },
+    price: { type: Number, required: true }, // locked price at time of subscription
+    status: {
+      type: String,
+      enum: ['active', 'expired'],
+      default: 'active',
+    },
+  },
+  { _id: false }
+);
+
 const customerSchema = new mongoose.Schema(
   {
     // Multi-tenant references
@@ -13,38 +36,28 @@ const customerSchema = new mongoose.Schema(
       ref: 'Agent',
     },
 
-    // Provided fields
-    customerCode: { type: String, required: true }, // you may later enforce unique per operator
+    // Core identity
+    customerCode: { type: String, required: true },
     name: { type: String, required: true },
     locality: String,
     mobile: String,
     billingAddress: String,
-
-    balanceAmount: { type: Number, default: 0 },
     connectionStartDate: Date,
-    expiryDate: Date,
-
     sequenceNo: Number,
-
-    active: { type: Boolean, default: true },
-
+    // Box details
     stbName: String,
     stbNumber: String,
     cardNumber: String,
 
-    productId: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Product',
-        required: true,
-      },
-    ],
+    // Active subscriptions only
+    subscriptions: [subscriptionSchema],
+    // Financial tracking
+    balanceAmount: { type: Number, default: 0 },
     additionalCharge: { type: Number, default: 0 },
     discount: { type: Number, default: 0 },
-
-    lastPaymentAmount: { type: Number, default: 0 },
-    lastPaymentDate: Date,
+    active: { type: Boolean, default: true },
     remark: String,
+    deleted: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

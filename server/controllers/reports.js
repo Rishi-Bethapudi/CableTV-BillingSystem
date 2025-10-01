@@ -1,7 +1,6 @@
-const mongoose = require('mongoose');
 const Transaction = require('../models/transaction.model');
 const Customer = require('../models/customer.model');
-const Product = require('../models/product.model');
+const mongoose = require('mongoose');
 const Complaint = require('../models/complaint.model');
 const Agent = require('../models/agent.model');
 const {
@@ -12,8 +11,11 @@ const {
   addDays,
   format,
 } = require('date-fns');
+const STAT_TYPE = {
+  MONEY: 0,
+  COUNT: 1,
+};
 
-const STAT_TYPE = { MONEY: 0, COUNT: 1 };
 const SUMMARY_TYPE = {
   COLLECTION: 1,
   TODAY: 0,
@@ -23,8 +25,6 @@ const SUMMARY_TYPE = {
   CUSTOMERS: 3,
   COMPLAINTS: 13,
 };
-
-// ------------------------ Helper to format collection report ------------------------
 const formatCollectionReport = (collections) => {
   const report = {};
 
@@ -43,11 +43,13 @@ const formatCollectionReport = (collections) => {
       };
     }
 
+    // Update summary
     report[dateKey].summary.customers += 1;
     report[dateKey].summary.amount += tx.amount || 0;
     report[dateKey].summary.discount += tx.discount || 0;
     report[dateKey].summary.totalPayment += tx.amount || 0;
 
+    // Update areas and payment modes
     const area = tx.area || 'Unknown';
     const mode = tx.method || 'Cash';
 
@@ -58,6 +60,7 @@ const formatCollectionReport = (collections) => {
     const existingMode = report[dateKey].areas[area].modes.find(
       (m) => m.mode === mode
     );
+
     if (existingMode) {
       existingMode.customers += 1;
       existingMode.amount += tx.amount || 0;
@@ -73,32 +76,39 @@ const formatCollectionReport = (collections) => {
       });
     }
 
+    // Add customer details
     report[dateKey].customerDetails.push({
       id: tx.customerId,
       name: tx.customerName || '',
       area: tx.area || '',
-      balanceBefore: tx.balanceBefore || 0,
+      previousBalance: tx.previousBalance || 0,
       paidAmount: tx.amount || 0,
       discount: tx.discount || 0,
-      balanceAfter: tx.balanceAfter || 0,
+      currentBalance: tx.currentBalance || 0,
       collectedBy: tx.collectedBy || '',
       customerCode: tx.customerCode || '',
-      stbNumber: tx.stbNumber || '',
-      cardNumber: tx.cardNumber || '',
+      stbNo: tx.stbNo || '',
+      cardNo: tx.cardNo || '',
       method: tx.method || 'Cash',
     });
   });
 
   return report;
 };
-
-// ------------------------ API: Detailed Collection Report ------------------------
+/**
+ * @desc    Get a detailed report of all collections with filters.
+ * @route   GET /api/reports/collections
+ * @access  Private (Operator only)
+ */
 const getCollectionReport = async (req, res) => {
   try {
     const { startDate, endDate, agentId, area, payment, status } = req.query;
 
+    // Build MongoDB aggregation pipeline
     const pipeline = [
       { $match: { type: 'Collection' } },
+
+      // Join customer info
       {
         $lookup: {
           from: 'customers',
@@ -108,6 +118,8 @@ const getCollectionReport = async (req, res) => {
         },
       },
       { $unwind: '$customerInfo' },
+
+      // Join agent/operator info
       {
         $lookup: {
           from: 'agents',
@@ -124,6 +136,8 @@ const getCollectionReport = async (req, res) => {
           as: 'operatorInfo',
         },
       },
+
+      // Project required fields
       {
         $project: {
           _id: 0,
@@ -136,6 +150,7 @@ const getCollectionReport = async (req, res) => {
           area: '$customerInfo.locality',
           balanceBefore: '$balanceBefore',
           balanceAfter: '$balanceAfter',
+
           collectedBy: {
             $ifNull: [
               { $arrayElemAt: ['$agentInfo.name', 0] },
@@ -143,13 +158,14 @@ const getCollectionReport = async (req, res) => {
             ],
           },
           customerCode: '$customerInfo.customerCode',
-          stbNumber: '$customerInfo.stbNumber',
-          cardNumber: '$customerInfo.cardNumber',
+          stbNo: '$customerInfo.stbNo',
+          cardNo: '$customerInfo.cardNo',
           method: 1,
         },
       },
     ];
 
+    // Date filters
     if (startDate || endDate) {
       const matchDates = {};
       if (startDate) matchDates.$gte = new Date(startDate);
@@ -157,6 +173,7 @@ const getCollectionReport = async (req, res) => {
       pipeline.push({ $match: { createdAt: matchDates } });
     }
 
+    // Additional filters
     if (agentId)
       pipeline.push({
         $match: { collectedBy: new mongoose.Types.ObjectId(agentId) },
@@ -165,19 +182,22 @@ const getCollectionReport = async (req, res) => {
       pipeline.push({
         $match: { 'customerInfo.locality': new RegExp(area, 'i') },
       });
-    if (payment)
-      pipeline.push({ $match: { method: new RegExp(`^${payment}$`, 'i') } });
+    if (payment) {
+      pipeline.push({
+        $match: { method: new RegExp(`^${payment}$`, 'i') }, // e.g. Cash, Online, UPI
+      });
+    }
     if (status) {
       if (status === 'paid') pipeline.push({ $match: { amount: { $gt: 0 } } });
       if (status === 'pending')
-        pipeline.push({ $match: { balanceAfter: { $gt: 0 } } });
+        pipeline.push({ $match: { currentBalance: { $gt: 0 } } });
     }
 
+    // Sort by date descending
     pipeline.push({ $sort: { date: -1 } });
 
     const collections = await Transaction.aggregate(pipeline);
     const formattedData = formatCollectionReport(collections);
-
     let totalSummary = {
       customers: 0,
       amount: 0,
@@ -191,38 +211,51 @@ const getCollectionReport = async (req, res) => {
       totalSummary.totalPayment += day.summary.totalPayment;
     });
 
-    res.status(200).json({ report: formattedData, totals: totalSummary });
+    // Send both detailed report and totals
+    res.status(200).json({
+      report: formattedData,
+      totals: totalSummary,
+    });
   } catch (error) {
     console.error('Error fetching collection report:', error);
     res.status(500).json({ message: 'Server error.' });
   }
 };
 
-// ------------------------ API: Collection Summary ------------------------
 const getCollectionSummary = async (req, res) => {
   try {
     const operatorId = new mongoose.Types.ObjectId(req.user.id);
     const { startDate, endDate, area, collectedBy, paymentMode } = req.query;
 
-    const matchStage = { operatorId, type: 'Collection' };
+    // --- 1. Build the initial `$match` stage for filtering ---
+    // This is the most critical step for performance and security.
+    const matchStage = {
+      operatorId: operatorId,
+      type: 'Collection',
+    };
+
     if (startDate && endDate) {
       matchStage.createdAt = {
         $gte: startOfDay(new Date(startDate)),
         $lte: endOfDay(new Date(endDate)),
       };
     } else {
+      // Default to today if no date range is provided
       matchStage.createdAt = {
         $gte: startOfDay(new Date()),
         $lte: endOfDay(new Date()),
       };
     }
 
-    if (paymentMode) matchStage.method = paymentMode;
+    // Add optional filters
+    if (paymentMode) matchStage.paymentMode = paymentMode;
     if (collectedBy)
       matchStage.collectedBy = new mongoose.Types.ObjectId(collectedBy);
 
+    // --- 2. Main Aggregation for Daily Breakdown ---
     const dailyBreakdownPipeline = [
       { $match: matchStage },
+      // Join with customers to get their locality (area)
       {
         $lookup: {
           from: 'customers',
@@ -232,13 +265,15 @@ const getCollectionSummary = async (req, res) => {
         },
       },
       { $unwind: '$customerInfo' },
+      // If an area filter is applied, match it here after the lookup
       ...(area ? [{ $match: { 'customerInfo.locality': area } }] : []),
+      // Stage 1 Grouping: Group by Date, Area, and Mode
       {
         $group: {
           _id: {
             date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
             area: '$customerInfo.locality',
-            mode: '$method',
+            mode: '$paymentMode',
           },
           count: { $sum: 1 },
           amount: { $sum: '$amount' },
@@ -246,9 +281,13 @@ const getCollectionSummary = async (req, res) => {
           total_payments: { $sum: { $subtract: ['$amount', '$discount'] } },
         },
       },
+      // Stage 2 Grouping: Roll up by Date and Area
       {
         $group: {
-          _id: { date: '$_id.date', area: '$_id.area' },
+          _id: {
+            date: '$_id.date',
+            area: '$_id.area',
+          },
           mode: {
             $push: {
               mode: '$_id.mode',
@@ -263,6 +302,7 @@ const getCollectionSummary = async (req, res) => {
           mode_total_discount: { $sum: '$total_discount' },
         },
       },
+      // Stage 3 Grouping: Final roll up by Date
       {
         $group: {
           _id: '$_id.date',
@@ -272,7 +312,7 @@ const getCollectionSummary = async (req, res) => {
               mode: '$mode',
               mode_total: {
                 total_payments: '$mode_total_payments',
-                total_paid: '$mode_total_payments',
+                total_paid: '$mode_total_payments', // Assuming paid is same as payments
                 total_discount: '$mode_total_discount',
                 total_count: '$mode_total_count',
               },
@@ -283,9 +323,10 @@ const getCollectionSummary = async (req, res) => {
           total_discount: { $sum: '$mode_total_discount' },
         },
       },
-      { $sort: { _id: 1 } },
+      { $sort: { _id: 1 } }, // Sort by date ascending
       {
         $project: {
+          // Reshape to final format
           _id: 0,
           date: '$_id',
           data: 1,
@@ -297,11 +338,12 @@ const getCollectionSummary = async (req, res) => {
       },
     ];
 
+    // --- 3. Second, simpler Aggregation for Grand Totals ---
     const totalListPipeline = [
       { $match: matchStage },
       {
         $group: {
-          _id: '$method',
+          _id: '$paymentMode',
           count: { $sum: 1 },
           amount: { $sum: '$amount' },
           total_discount: { $sum: '$discount' },
@@ -320,11 +362,13 @@ const getCollectionSummary = async (req, res) => {
       },
     ];
 
+    // --- 4. Execute both pipelines concurrently ---
     const [dailyData, totalData] = await Promise.all([
       Transaction.aggregate(dailyBreakdownPipeline),
       Transaction.aggregate(totalListPipeline),
     ]);
 
+    // Calculate the final grand totals from the second pipeline's result
     const grandTotals = totalData.reduce(
       (acc, item) => {
         acc.total_payments += item.total_payments;
@@ -335,37 +379,38 @@ const getCollectionSummary = async (req, res) => {
       { total_payments: 0, total_discount: 0, total_count: 0 }
     );
 
-    res
-      .status(200)
-      .json({
-        data: dailyData,
-        total_list: {
-          data: totalData,
-          total_payments: grandTotals.total_payments,
-          total_paid: grandTotals.total_payments,
-          total_discount: grandTotals.total_discount,
-          total_count: grandTotals.total_count,
-        },
-      });
+    // --- 5. Combine and send the final response ---
+    res.status(200).json({
+      data: dailyData,
+      total_list: {
+        data: totalData,
+        total_payments: grandTotals.total_payments,
+        total_paid: grandTotals.total_payments,
+        total_discount: grandTotals.total_discount,
+        total_count: grandTotals.total_count,
+      },
+    });
   } catch (error) {
     console.error('Error generating collection summary:', error);
     res.status(500).json({ message: 'Server error while generating report.' });
   }
 };
 
-// ------------------------ API: Dashboard Summary ------------------------
 const getDashboardSummary = async (req, res) => {
   try {
     const operatorId = new mongoose.Types.ObjectId(req.user.id);
     const now = new Date();
 
+    // --- Date Ranges ---
     const todayStart = startOfDay(now);
     const todayEnd = endOfDay(now);
     const monthStart = startOfMonth(now);
     const monthEnd = endOfMonth(now);
     const tomorrowStart = startOfDay(addDays(now, 1));
 
+    // --- Queries ---
     const queries = [
+      // Primary metrics
       Transaction.aggregate([
         {
           $match: {
@@ -377,7 +422,8 @@ const getDashboardSummary = async (req, res) => {
         {
           $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } },
         },
-      ]),
+      ]), // 0. Monthly Total Collection
+
       Transaction.aggregate([
         {
           $match: {
@@ -389,7 +435,8 @@ const getDashboardSummary = async (req, res) => {
         {
           $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } },
         },
-      ]),
+      ]), // 1. Today's Collection
+
       Customer.aggregate([
         { $match: { operatorId, balanceAmount: { $gt: 0 } } },
         {
@@ -399,7 +446,8 @@ const getDashboardSummary = async (req, res) => {
             count: { $sum: 1 },
           },
         },
-      ]),
+      ]), // 2. Total Pending Amount
+
       Transaction.aggregate([
         {
           $match: {
@@ -412,34 +460,36 @@ const getDashboardSummary = async (req, res) => {
         {
           $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } },
         },
-      ]),
+      ]), // 3. Monthly Online Collection
+
+      // Secondary metrics
       Transaction.countDocuments({
         operatorId,
         type: 'Billing',
         createdAt: { $gte: todayStart, $lte: todayEnd },
-      }),
+      }), // 4. Today's Renewals
       Transaction.countDocuments({
         operatorId,
         type: 'Billing',
         createdAt: { $gte: monthStart, $lte: monthEnd },
-      }),
+      }), // 5. Month Renewals
       Customer.countDocuments({
         operatorId,
         active: true,
-        'subscriptions.expiryDate': { $gte: tomorrowStart },
-      }),
+        expiryDate: { $gte: tomorrowStart },
+      }), // 6. Upcoming Renewals
       Customer.countDocuments({
         operatorId,
         active: true,
-        'subscriptions.expiryDate': { $lt: todayStart },
-      }),
-      Customer.countDocuments({ operatorId }),
-      Customer.countDocuments({ operatorId, active: true }),
+        expiryDate: { $lt: todayStart },
+      }), // 7. Expired Renewals
+      Customer.countDocuments({ operatorId }), // 8. Total Customers
+      Customer.countDocuments({ operatorId, active: true }), // 9. Active Customers
       Customer.countDocuments({
         operatorId,
         createdAt: { $gte: monthStart, $lte: monthEnd },
-      }),
-      Complaint.countDocuments({ operatorId, status: 'Pending' }),
+      }), // 10. New Customers
+      Complaint.countDocuments({ operatorId, status: 'Pending' }), // 11. Pending Complaints
     ];
 
     const results = await Promise.all(
@@ -450,6 +500,8 @@ const getDashboardSummary = async (req, res) => {
         })
       )
     );
+
+    // --- Helper Functions ---
     const getAggResult = (idx, field = 'total') =>
       results[idx]?.[0]?.[field] ?? 0;
     const getCountResult = (idx) => results[idx] ?? 0;
@@ -458,6 +510,7 @@ const getDashboardSummary = async (req, res) => {
     const activeCustomers = getCountResult(9);
     const inactiveCustomers = totalCustomers - activeCustomers;
 
+    // --- Structured Response ---
     const responseData = {
       primaryMetrics: [
         {
@@ -466,7 +519,7 @@ const getDashboardSummary = async (req, res) => {
           stat: getAggResult(0),
           des: getAggResult(0, 'count'),
           stat_type: STAT_TYPE.MONEY,
-          action: '/collection',
+          action: '/collection', // link when card clicked
         },
         {
           id: 2,
@@ -575,7 +628,11 @@ const getDashboardSummary = async (req, res) => {
   }
 };
 
-// ------------------------ API: Income Report ------------------------
+/**
+ * @desc    Get a summary of income, costs, and profit.
+ * @route   GET /api/reports/income
+ * @access  Private (Operator only)
+ */
 const getIncomeReport = async (req, res) => {
   try {
     const operatorId = req.user.id;
@@ -585,17 +642,20 @@ const getIncomeReport = async (req, res) => {
       operatorId: new mongoose.Types.ObjectId(operatorId),
       type: 'Billing',
     };
+
+    // Date Period Filter
     if (period === 'monthly') {
       const today = new Date();
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       matchStage.createdAt = { $gte: startOfMonth };
     }
+    // Add more periods like 'yearly' if needed
 
     const report = await Transaction.aggregate([
       { $match: matchStage },
       {
         $group: {
-          _id: null,
+          _id: null, // Group all documents into one
           totalRevenue: { $sum: '$amount' },
           totalCost: { $sum: '$costOfGoodsSold' },
         },
@@ -610,6 +670,7 @@ const getIncomeReport = async (req, res) => {
       },
     ]);
 
+    // If no transactions, return zeroed object
     const result = report[0] || {
       totalRevenue: 0,
       totalCost: 0,
@@ -622,28 +683,56 @@ const getIncomeReport = async (req, res) => {
   }
 };
 
-// ------------------------ API: Dashboard Stats ------------------------
+/**
+ * @desc    Get key performance indicators (KPIs) for the operator's dashboard.
+ * @route   GET /api/reports/dashboard-stats
+ * @access  Private (Operator only)
+ */
 const getDashboardStats = async (req, res) => {
   try {
-    const operatorId = new mongoose.Types.ObjectId(req.user.id);
-    const now = new Date();
+    const operatorId = req.user.id;
+    const objectId = new mongoose.Types.ObjectId(operatorId);
 
-    const totalCustomers = await Customer.countDocuments({ operatorId });
-    const activeCustomers = await Customer.countDocuments({
-      operatorId,
-      active: true,
-    });
-    const pendingAmount = await Customer.aggregate([
-      { $match: { operatorId } },
-      { $group: { _id: null, totalPending: { $sum: '$balanceAmount' } } },
+    // --- Run multiple queries in parallel for efficiency ---
+    const [pendingAmountResult, areaWiseResult] = await Promise.all([
+      // 1. Calculate Total Pending Amount
+      Customer.aggregate([
+        { $match: { operatorId: objectId, balanceAmount: { $gt: 0 } } },
+        { $group: { _id: null, totalPending: { $sum: '$balanceAmount' } } },
+      ]),
+
+      // 2. Get Area-wise Subscription Count
+      Customer.aggregate([
+        { $match: { operatorId: objectId, active: true } },
+        {
+          $lookup: {
+            from: 'products',
+            localField: 'productId',
+            foreignField: '_id',
+            as: 'productInfo',
+          },
+        },
+        { $unwind: '$productInfo' },
+        {
+          $group: {
+            _id: { locality: '$locality', planName: '$productInfo.name' },
+            count: { $sum: 1 },
+          },
+        },
+        {
+          $group: {
+            _id: '$_id.locality',
+            plans: { $push: { name: '$_id.planName', count: '$count' } },
+          },
+        },
+        { $project: { _id: 0, area: '$_id', plans: 1 } },
+        { $sort: { area: 1 } },
+      ]),
     ]);
-    const pendingTotal = pendingAmount[0]?.totalPending || 0;
 
     const stats = {
-      totalCustomers,
-      activeCustomers,
-      inactiveCustomers: totalCustomers - activeCustomers,
-      pendingAmount: pendingTotal,
+      totalPendingAmount: pendingAmountResult[0]?.totalPending || 0,
+      areaWiseSubscriptions: areaWiseResult || [],
     };
 
     res.status(200).json(stats);
@@ -654,9 +743,9 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports = {
-  getCollectionReport,
   getCollectionSummary,
   getDashboardSummary,
+  getCollectionReport,
   getIncomeReport,
   getDashboardStats,
 };
