@@ -1,0 +1,426 @@
+[33mcommit dd473d02f84d346758a114c04b65e44c6ef8d466[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Merge: 9451bcb e62adcc
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Wed Oct 1 23:34:11 2025 +0530
+
+    Merge branch 'main' of https://github.com/Rishi-Bethapudi/CableTV-BillingSystem
+
+[33mcommit 9451bcba1a940695b632f7d671696482d7fee59f[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Wed Oct 1 23:34:03 2025 +0530
+
+    newModifications
+
+[33mcommit e62adcc362260372fcf281a659eaf83a157c5370[m
+Author: Risheendra <96418440+Rishi-Bethapudi@users.noreply.github.com>
+Date:   Wed Sep 24 17:32:27 2025 +0530
+
+    Update index.js
+
+[33mcommit 8d7e23cee4f81c298bb261e200d7b37cbefe463d[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Tue Sep 16 10:26:11 2025 +0530
+
+    SomeModifications
+
+[33mcommit 157db9b3e2f94f3735b9b565541d2cd1f8a9cd65[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Fri Sep 12 23:12:08 2025 +0530
+
+    DashboardDone
+
+[33mcommit 592653845da1a7e0b04ee5705f5df3e5ed66a8cb[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Fri Sep 12 21:18:25 2025 +0530
+
+    dds
+
+[33mcommit cd00bb744ed69d18aac6e6887ff3097c7c33d960[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Fri Sep 12 21:11:03 2025 +0530
+
+    ss
+
+[33mcommit fe556b970db8d9bbe4c92ffa1f791775b2f3d9d4[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Fri Sep 12 20:58:48 2025 +0530
+
+    ..
+
+[33mcommit 67a8ca61cb993ef1c4f224221437a0941007527e[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Fri Sep 12 13:09:23 2025 +0530
+
+    CollectionTableRedirect
+
+[33mcommit f2ecd06dd5c73b14f59b405374e9790a62c8203c[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Fri Sep 12 13:03:23 2025 +0530
+
+    fixedQ1
+
+[33mcommit bfd9561e09224f2e81d22c644392e3a930117420[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Fri Sep 12 02:21:03 2025 +0530
+
+    d
+
+[33mcommit 5f180ed764eac81d50ecf09b638e1394077ceb45[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Fri Sep 12 02:16:57 2025 +0530
+
+    ,,
+
+[33mcommit 43e8b67388415fe64f74e647ff3111e17d3fbebd[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Fri Sep 12 01:07:24 2025 +0530
+
+    .collectionsReport
+
+[33mcommit 1c015d613d2423124a148887ce51d95cd4141eac[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Thu Sep 11 22:02:54 2025 +0530
+
+    .push
+
+[33mcommit 31ea74fa84779d040f13e8083b8ada595facf35d[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Wed Sep 10 22:29:29 2025 +0530
+
+    .doneAlmostUi
+
+[33mcommit d8a6ce31a4cbba25f1ba24597c91992a5a584745[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Wed Sep 10 21:31:44 2025 +0530
+
+    update
+
+[33mcommit 64f4f313b93d96d4f1ef532cae4d4a9883f3f5d2[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Wed Sep 10 02:02:59 2025 +0530
+
+    add
+
+[33mcommit f5cf67db9e9b7c5e8bd5344ea36e19401aadb918[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Wed Sep 10 01:46:51 2025 +0530
+
+    additionalCharge
+
+[33mcommit 13306a10e948ede0ae838fc45e12bd746c37c1ad[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Wed Sep 10 01:02:10 2025 +0530
+
+    ,,m
+
+[33mcommit 2c3cf688e12467d58f32c4bea56d8df8cf7676e2[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sun Sep 7 01:33:27 2025 +0530
+
+    collectionAlmostDone
+
+[33mcommit 60bbf19266e771c771e544c82015404bd7145e4f[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Sep 6 22:42:04 2025 +0530
+
+    hs
+
+[33mcommit be8dc90b7959684f8820632da1a28203595c3bd4[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Sep 6 22:30:30 2025 +0530
+
+    fvs
+
+[33mcommit 8de2756ea1ef5af4201ae0f5cc1f620274b99f85[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Sep 6 21:56:26 2025 +0530
+
+    updateCustomer
+
+[33mcommit 0afd2412f5f961e1d2e3049addefd639cdd88507[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Sep 6 21:28:22 2025 +0530
+
+    f
+
+[33mcommit 74a4f5d6c41b33cb890303f8ce0baf2b05d97676[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Sep 6 21:03:04 2025 +0530
+
+    fd
+
+[33mcommit f9528c2d6117d439fcf4db965be43bcd3e037b1d[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Sep 6 18:53:41 2025 +0530
+
+    dss
+
+[33mcommit 5ecf4c3dbf98b3b0def662e28f2ddb4409305f9d[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Sep 6 18:28:01 2025 +0530
+
+    ss
+
+[33mcommit c33bd2ce4545046294d3e442f89a0e07ca755ac6[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Sep 6 14:31:11 2025 +0530
+
+    syntaxError
+
+[33mcommit 77876365083573fd1ce3ce9438edf9a34984dc19[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Sep 6 14:28:19 2025 +0530
+
+    reportsApi
+
+[33mcommit 2be7aa9efe2a0d7c9b7fd12c83168ad48d77d543[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Thu Sep 4 21:39:33 2025 +0530
+
+    productsApi updated
+
+[33mcommit f68f2103a6f200c6c6b7f2faa1cd6fd86584ad80[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Thu Sep 4 20:52:30 2025 +0530
+
+    APIs updated
+
+[33mcommit 981c7c1a7e9134c75aff9aeac6d8dbb060f699b7[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Thu Sep 4 18:35:22 2025 +0530
+
+    ..
+
+[33mcommit 1923c65e1a2f0d6cb295671935275f16f9fa0f84[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Thu Sep 4 18:29:54 2025 +0530
+
+    apis updatedd
+
+[33mcommit c905adfeae10f7ca68848860ae40bcc1596a045a[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Wed Sep 3 22:32:37 2025 +0530
+
+    backEnd Updates
+
+[33mcommit 829b0d94681a112162271e518c6224235fa3b79b[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Wed Sep 3 21:45:49 2025 +0530
+
+    dd
+
+[33mcommit 60c9b5dccc09de8d51b6f92c01bd11f05751f9e3[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Wed Sep 3 21:16:00 2025 +0530
+
+    Ui Modifications
+
+[33mcommit b4af16cf01123fe1edd5348b46bebb089ab605e8[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Wed Sep 3 13:47:34 2025 +0530
+
+    Ui Changes
+
+[33mcommit fb82ddad08c90f88d0b45df15c204f757fe5f192[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Fri Aug 29 01:08:38 2025 +0530
+
+    UI
+
+[33mcommit fc322ffb5a5e5bf37b999af97a22c8b5dc1523c6[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Thu Aug 28 20:36:19 2025 +0530
+
+    mobileUiModifications
+
+[33mcommit 93419547a2e2f235cb77a9c2b0c8087cfa33808b[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Thu Aug 28 14:24:18 2025 +0530
+
+    ui changes
+
+[33mcommit 5f3e8de819c467fc49540ac941c931a76dfcbdf8[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Jul 26 22:01:01 2025 +0530
+
+    Updated App.tsx for DeveloperFriendly
+
+[33mcommit f2571d75d4b23f6d8d4c20ccedb39807ff8bb2ee[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Jul 26 21:11:03 2025 +0530
+
+    customer Table Updated
+
+[33mcommit e0f6943464afa6a265da96c83be30364a14dcb2e[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Jul 26 20:33:14 2025 +0530
+
+    API calls working
+
+[33mcommit 1147d40eff332a5b6d4b6457233a6d493302b2fe[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Jul 26 20:10:57 2025 +0530
+
+    Cors updated and deployed frontend
+
+[33mcommit 47670c25e86bc4dd81ad7e14d50be949f04aea15[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Jul 26 18:49:11 2025 +0530
+
+    ...
+
+[33mcommit e82364d9e126d628e586b08d33a657a85edf0589[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Jul 26 00:11:12 2025 +0530
+
+    api calls
+
+[33mcommit ced124b8d3396085c6e22ba22249f89ce2a4c66c[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Fri Jul 25 23:28:40 2025 +0530
+
+    couple of Changes in frontend and backend
+
+[33mcommit 274e09c765ae878b574b2e2c70c394f5d901200c[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Fri Jul 25 18:41:50 2025 +0530
+
+    updated the routing
+
+[33mcommit eec1d979a04f42ed57bb2c03c8bd3f63733982f9[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Fri Jul 25 18:32:19 2025 +0530
+
+    login Updated
+
+[33mcommit 7715389740d8dad68fe9436d5229cac18e06b0e9[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Fri Jul 25 16:41:17 2025 +0530
+
+    Updated AuthContext
+
+[33mcommit 467a34bea4b6d881189edd4ff2a8ec1b232801ff[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Tue Jul 22 23:51:15 2025 +0530
+
+    Updated API seervices
+
+[33mcommit 6ed2dfa4fa748a203d3b8abb447b16962a015eef[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sun Jul 20 20:49:47 2025 +0530
+
+    frontend-Backend cnt
+
+[33mcommit 15a7220ca80b39b9115d3b5b92af8f2c2e44c8bd[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sun Jul 20 16:20:37 2025 +0530
+
+    layout Set for mobile
+
+[33mcommit dd76cd805775d4f7f1796f013409426146789a77[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sun Jul 20 15:39:46 2025 +0530
+
+    layoutsModified
+
+[33mcommit e9b6816c8caed3aa5d1f92a2ad6dcd5d890489cc[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Tue Jul 8 20:34:43 2025 +0530
+
+    .Head
+
+[33mcommit 68cd131c77867c697d5b6faa887a02d7a5e7f740[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Thu Jul 3 23:25:59 2025 +0530
+
+    started.Cron
+
+[33mcommit 524bdceb1b6350252618c6509d2ffc532d555c64[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Thu Jul 3 23:24:35 2025 +0530
+
+    cron-job
+
+[33mcommit 27deed3bda407ffe72267b4b7c6025c7908cb6ac[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Thu Jul 3 23:18:18 2025 +0530
+
+    complaintsDone
+
+[33mcommit 317f09c0a27a3e707117e65c5dd5b18a368291b6[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Thu Jul 3 23:17:30 2025 +0530
+
+    complaints.
+
+[33mcommit ddbaa020103ad9a3ef14d6c9f29909e363b0a989[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Thu Jul 3 23:15:34 2025 +0530
+
+    expenseController
+
+[33mcommit c519a93dcca7890d27df546f312c68c43ee06e6b[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Thu Jul 3 23:14:43 2025 +0530
+
+    ..
+
+[33mcommit f81c1c867539e1efe2c754c356cc5473ce5944d8[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Tue Jul 1 23:39:19 2025 +0530
+
+    customerFetch filters
+
+[33mcommit 52802012484edb0f0c7ade2dfafec50231a9d24a[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Tue Jul 1 22:39:20 2025 +0530
+
+    login updated
+
+[33mcommit b4bb860c130990f2083db2b7459355ea82e2aba0[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Tue Jul 1 21:21:15 2025 +0530
+
+    updated Models
+
+[33mcommit 969be0d3d4efcebd300a619736e757006bf76118[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Tue Jul 1 02:39:39 2025 +0530
+
+    windup for the day - Done testing
+
+[33mcommit 6628db09b0a950fe3767bae9866a5d88b231dcd9[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Tue Jul 1 01:22:32 2025 +0530
+
+    implemented 2 cookie system
+
+[33mcommit 4a885262b9c739a10135efccaabc705515231371[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Tue Jul 1 00:33:08 2025 +0530
+
+    admin Routes
+
+[33mcommit ef662f40fb87e86522f344ae7301fa3429c85980[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Tue Jul 1 00:28:54 2025 +0530
+
+    serveral Updated - Models, routes, Controllers
+
+[33mcommit 7e0acc8949be6c258759e5c98ece8d2fa0ddd6bf[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Mon Jun 30 23:22:05 2025 +0530
+
+    push1
+
+[33mcommit 6d4cea7446d0d70dfdf441b397ac4b9cabfff628[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Jun 28 23:29:19 2025 +0530
+
+    backed
+
+[33mcommit 1052bf60b2106d57b0367240d4056882484b95d2[m
+Author: Risheendra <rishi.bethapudi8@gmail.com>
+Date:   Sat Jun 28 21:47:54 2025 +0530
+
+    init
