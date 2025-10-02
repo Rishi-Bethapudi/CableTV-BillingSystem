@@ -103,7 +103,6 @@ export default function AddOnBillSection({
         productId: selectedPackage._id,
         amount: parseInt(price, 10),
         note,
-        isAddon: true,
       };
 
       const res = await apiClient.post('/transactions/billing', payload);

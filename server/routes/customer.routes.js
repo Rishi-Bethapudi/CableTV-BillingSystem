@@ -11,7 +11,6 @@ const {
 } = require('../controllers/customer.controller'); // Assuming controller functions are defined elsewhere
 const {
   adjustBalance,
-  addOnBilling,
   getCustomerTransactions,
   createAdditionalCharge,
 } = require('../controllers/transaction.controller');
@@ -85,8 +84,6 @@ router.post(
   adjustBalance
 );
 
-// @route   POST /api/customers/:id/add-on
-router.post('/:id/add-on', authMiddleware, operatorOrAgentOnly, addOnBilling);
 // @route   POST /api/customers/:id/additionalCharge
 router.post(
   '/:id/additionalCharge',
