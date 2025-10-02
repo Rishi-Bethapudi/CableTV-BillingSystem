@@ -37,7 +37,7 @@ const customerSchema = new mongoose.Schema(
     },
 
     // Core identity
-    customerCode: { type: String, required: true },
+    customerCode: { type: String },
     name: { type: String, required: true },
     locality: String,
     mobile: String,

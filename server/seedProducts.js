@@ -14,12 +14,12 @@ async function seedProducts() {
     // Add operatorId here if you already have one
     const operatorId = '68c0295cb96f5d9c9eadb918'; // replace with actual ObjectId
 
-    const productsWithOperator = customers.map((p) => ({
+    const productsWithOperator = products.map((p) => ({
       ...p,
-      operatorId,
+      operatorId: operatorId,
     }));
 
-    await Transaction.insertMany(transactions);
+    await Product.insertMany(productsWithOperator);
 
     console.log('✅ Products seeded successfully!');
     process.exit(0);

@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -27,6 +25,7 @@ interface Props {
   onDueNext5DaysChange: (value: boolean) => void;
   onSortChange: (value: string) => void;
   onOrderChange: (value: string) => void;
+  operatorAreas: string[]; // NEW: list of localities from operator
 }
 
 export default function CustomerFilters({
@@ -39,6 +38,7 @@ export default function CustomerFilters({
   onDueNext5DaysChange,
   onSortChange,
   onOrderChange,
+  operatorAreas,
 }: Props) {
   const [search, setSearch] = useState('');
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -108,6 +108,7 @@ export default function CustomerFilters({
             />
           </div>
 
+          {/* Mobile Filter Popover */}
           <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="icon">
@@ -135,21 +136,21 @@ export default function CustomerFilters({
                 <SelectContent>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                  <SelectItem value="disconnected">Disconnected</SelectItem>
+                  <SelectItem value="deleted">Deleted</SelectItem>
                 </SelectContent>
               </Select>
 
-              {/* Area */}
+              {/* Area (dynamic from operator) */}
               <Select onValueChange={onAreaChange}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Filter by area" />
+                  <SelectValue placeholder="Select Area" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="guntur">Guntur</SelectItem>
-                  <SelectItem value="vijayawada">Vijayawada</SelectItem>
-                  <SelectItem value="mangalagiri">Mangalagiri</SelectItem>
-                  <SelectItem value="tenali">Tenali</SelectItem>
+                  {operatorAreas.map((area) => (
+                    <SelectItem key={area} value={area}>
+                      {area}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
@@ -159,11 +160,11 @@ export default function CustomerFilters({
                   <label
                     key={key}
                     className={`flex items-center gap-2 text-sm px-3 py-1 rounded-md cursor-pointer transition-colors
-                    ${
-                      dueFilters[key]
-                        ? 'bg-primary text-white'
-                        : 'bg-gray-100 hover:bg-gray-200'
-                    }`}
+                      ${
+                        dueFilters[key]
+                          ? 'bg-primary text-white'
+                          : 'bg-gray-100 hover:bg-gray-200'
+                      }`}
                   >
                     <input
                       type="checkbox"
@@ -184,7 +185,7 @@ export default function CustomerFilters({
                 <SelectContent>
                   <SelectItem value="name">Name</SelectItem>
                   <SelectItem value="balanceAmount">Balance</SelectItem>
-                  <SelectItem value="expiryDate">Expiry</SelectItem>
+                  <SelectItem value="earliestExpiry">Expiry</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -228,21 +229,21 @@ export default function CustomerFilters({
             <SelectContent>
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="inactive">Inactive</SelectItem>
-              <SelectItem value="suspended">Suspended</SelectItem>
-              <SelectItem value="disconnected">Disconnected</SelectItem>
+              <SelectItem value="deleted">Deleted</SelectItem>
             </SelectContent>
           </Select>
 
-          {/* Area */}
+          {/* Area (dynamic from operator) */}
           <Select onValueChange={onAreaChange}>
             <SelectTrigger className="w-40">
-              <SelectValue placeholder="Filter by area" />
+              <SelectValue placeholder="Select Area" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="guntur">Guntur</SelectItem>
-              <SelectItem value="vijayawada">Vijayawada</SelectItem>
-              <SelectItem value="mangalagiri">Mangalagiri</SelectItem>
-              <SelectItem value="tenali">Tenali</SelectItem>
+              {operatorAreas.map((area) => (
+                <SelectItem key={area} value={area}>
+                  {area}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
@@ -252,11 +253,11 @@ export default function CustomerFilters({
               <label
                 key={key}
                 className={`flex items-center gap-2 text-sm px-3 py-1 rounded-md cursor-pointer transition-colors
-                ${
-                  dueFilters[key]
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-100 hover:bg-gray-200'
-                }`}
+                  ${
+                    dueFilters[key]
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-100 hover:bg-gray-200'
+                  }`}
               >
                 <input
                   type="checkbox"
@@ -277,7 +278,7 @@ export default function CustomerFilters({
             <SelectContent>
               <SelectItem value="name">Name</SelectItem>
               <SelectItem value="balanceAmount">Balance</SelectItem>
-              <SelectItem value="expiryDate">Expiry</SelectItem>
+              <SelectItem value="earliestExpiry">Expiry</SelectItem>
             </SelectContent>
           </Select>
 
@@ -300,6 +301,23 @@ export default function CustomerFilters({
             <RotateCcw className="h-4 w-4" /> Reset
           </Button>
         </div>
+      </div>
+
+      {/* Quick mobile buttons for Due Today/Tomorrow/Next5Days */}
+      <div className="lg:hidden flex gap-2 overflow-x-auto no-scrollbar">
+        {filterOptions.map(({ key, label }) => (
+          <button
+            key={key}
+            className={`px-4 py-1 text-sm font-medium rounded-full transition-colors ${
+              dueFilters[key]
+                ? 'bg-primary text-white'
+                : 'bg-gray-100 text-gray-700'
+            }`}
+            onClick={() => toggleFilter(key)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
     </div>
   );

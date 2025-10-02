@@ -21,6 +21,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import apiClient from '@/utils/apiClient';
 import type { ProductForm } from '@/utils/data';
+
 interface AddProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,10 +36,12 @@ export function AddProductDialog({
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<ProductForm>({
     name: '',
+    productCode: '',
     category: '',
     customerPrice: '',
     operatorCost: '',
-    billingInterval: '30', // default monthly
+    billingIntervalValue: '30', // ✅ default 30
+    billingIntervalUnit: 'days', // ✅ default "days"
     isActive: true,
   });
 
@@ -49,10 +52,12 @@ export function AddProductDialog({
   const resetForm = () => {
     setFormData({
       name: '',
+      productCode: '',
       category: '',
       customerPrice: '',
       operatorCost: '',
-      billingInterval: '30',
+      billingIntervalValue: '30',
+      billingIntervalUnit: 'days',
       isActive: true,
     });
   };
@@ -69,12 +74,16 @@ export function AddProductDialog({
     try {
       await apiClient.post('/products', {
         name: formData.name,
+        productCode: formData.productCode,
         category: formData.category,
         customerPrice: parseFloat(formData.customerPrice),
         operatorCost: formData.operatorCost
           ? parseFloat(formData.operatorCost)
           : 0,
-        billingInterval: parseInt(formData.billingInterval, 10),
+        billingInterval: {
+          value: parseInt(formData.billingIntervalValue, 10),
+          unit: formData.billingIntervalUnit,
+        },
         isActive: formData.isActive,
       });
 
@@ -102,7 +111,19 @@ export function AddProductDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-          {/* Product Name */}
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="pCode" className="text-right">
+              ProductCode
+            </Label>
+            <Input
+              id="pCode"
+              value={formData.productCode}
+              onChange={(e) => handleChange('productCode', e.target.value)}
+              className="col-span-3"
+              placeholder="P001 / Pro1234"
+              required
+            />
+          </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">
               Name
@@ -175,20 +196,35 @@ export function AddProductDialog({
             <Label htmlFor="billingInterval" className="text-right">
               Billing Interval
             </Label>
-            <Select
-              value={formData.billingInterval}
-              onValueChange={(value) => handleChange('billingInterval', value)}
-            >
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Select interval" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="30">Monthly (30 days)</SelectItem>
-                <SelectItem value="90">Quarterly (90 days)</SelectItem>
-                <SelectItem value="180">Half-Yearly (180 days)</SelectItem>
-                <SelectItem value="365">Yearly (365 days)</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="col-span-3 flex gap-2">
+              <Input
+                id="billingIntervalValue"
+                type="number"
+                min={1}
+                max={31}
+                value={formData.billingIntervalValue}
+                onChange={(e) =>
+                  handleChange('billingIntervalValue', e.target.value)
+                }
+                className="w-1/2"
+                placeholder="e.g. 1 or 30"
+                required
+              />
+              <Select
+                value={formData.billingIntervalUnit}
+                onValueChange={(value) =>
+                  handleChange('billingIntervalUnit', value)
+                }
+              >
+                <SelectTrigger className="w-1/2">
+                  <SelectValue placeholder="Unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="days">Days</SelectItem>
+                  <SelectItem value="months">Months</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Active Switch */}

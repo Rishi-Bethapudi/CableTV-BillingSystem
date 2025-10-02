@@ -1,227 +1,302 @@
 [
   {
-    "operatorId": null,
+    "productCode": "P0001",
+    "name": "ANT 20",
+    "category": "Basic",
+    "customerPrice": 350.0,
+    "operatorCost": 105.0,
+    "billingInterval": {
+      "value": 30,
+      "unit": "days"
+    },
+    "isActive": true
+  },
+  {
+    "productCode": "P0002",
+    "name": "ANT 30",
+    "category": "Premium",
+    "customerPrice": 450.0,
+    "operatorCost": 135.0,
+    "billingInterval": {
+      "value": 1,
+      "unit": "months"
+    },
+    "isActive": true
+  },
+  {
+    "productCode": "P0003",
     "name": "Internet & OTT",
     "category": "Premium",
     "customerPrice": 450.0,
-    "operatorCost": 315.0,
-    "billingInterval": 30,
+    "operatorCost": 135.0,
+    "billingInterval": {
+      "value": 30,
+      "unit": "days"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
+    "productCode": "P0004",
+    "name": "Levyn TV",
+    "category": "Basic",
+    "customerPrice": 100.0,
+    "operatorCost": 30.0,
+    "billingInterval": {
+      "value": 1,
+      "unit": "months"
+    },
+    "isActive": true
+  },
+  {
+    "productCode": "P0005",
+    "name": "Rounder TV",
+    "category": "Premium",
+    "customerPrice": 150.0,
+    "operatorCost": 45.0,
+    "billingInterval": {
+      "value": 30,
+      "unit": "days"
+    },
+    "isActive": true
+  },
+  {
+    "productCode": "P0006",
+    "name": "VR Play",
+    "category": "Add-on",
+    "customerPrice": 50.0,
+    "operatorCost": 15.0,
+    "billingInterval": {
+      "value": 1,
+      "unit": "months"
+    },
+    "isActive": true
+  },
+  {
+    "productCode": "P0007",
     "name": "A10",
     "category": "Premium",
     "customerPrice": 1000.0,
-    "operatorCost": 700.0,
-    "billingInterval": 30,
+    "operatorCost": 300.0,
+    "billingInterval": {
+      "value": 30,
+      "unit": "days"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
+    "productCode": "P0008",
     "name": "A2",
-    "category": "Premium",
+    "category": "Basic",
     "customerPrice": 350.0,
-    "operatorCost": 245.0,
-    "billingInterval": 30,
+    "operatorCost": 105.0,
+    "billingInterval": {
+      "value": 1,
+      "unit": "months"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
+    "productCode": "P0009",
     "name": "A20 - SS",
-    "category": "Premium",
+    "category": "Add-on",
     "customerPrice": 500.0,
-    "operatorCost": 350.0,
-    "billingInterval": 30,
+    "operatorCost": 150.0,
+    "billingInterval": {
+      "value": 30,
+      "unit": "days"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
+    "productCode": "P0010",
     "name": "A2IPHD",
-    "category": "Premium",
+    "category": "Basic",
     "customerPrice": 500.0,
-    "operatorCost": 350.0,
-    "billingInterval": 30,
+    "operatorCost": 150.0,
+    "billingInterval": {
+      "value": 1,
+      "unit": "months"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
+    "productCode": "P0011",
     "name": "A2IPSD",
     "category": "Premium",
     "customerPrice": 450.0,
-    "operatorCost": 315.0,
-    "billingInterval": 30,
+    "operatorCost": 135.0,
+    "billingInterval": {
+      "value": 30,
+      "unit": "days"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
+    "productCode": "P0012",
     "name": "A3",
-    "category": "Premium",
+    "category": "Basic",
     "customerPrice": 400.0,
-    "operatorCost": 280.0,
-    "billingInterval": 30,
+    "operatorCost": 120.0,
+    "billingInterval": {
+      "value": 1,
+      "unit": "months"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
+    "productCode": "P0013",
     "name": "A3RBTV",
-    "category": "Premium",
+    "category": "Basic",
     "customerPrice": 600.0,
-    "operatorCost": 420.0,
-    "billingInterval": 30,
+    "operatorCost": 180.0,
+    "billingInterval": {
+      "value": 30,
+      "unit": "days"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
+    "productCode": "P0014",
     "name": "A4IPSD",
-    "category": "Premium",
+    "category": "Add-on",
     "customerPrice": 600.0,
-    "operatorCost": 420.0,
-    "billingInterval": 30,
+    "operatorCost": 180.0,
+    "billingInterval": {
+      "value": 1,
+      "unit": "months"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
+    "productCode": "P0015",
     "name": "ANT20 - RBTV",
     "category": "Premium",
     "customerPrice": 600.0,
-    "operatorCost": 420.0,
-    "billingInterval": 30,
+    "operatorCost": 180.0,
+    "billingInterval": {
+      "value": 30,
+      "unit": "days"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
+    "productCode": "P0016",
     "name": "APSFL Home Essential",
-    "category": "Premium",
+    "category": "Add-on",
     "customerPrice": 450.0,
-    "operatorCost": 315.0,
-    "billingInterval": 30,
+    "operatorCost": 135.0,
+    "billingInterval": {
+      "value": 1,
+      "unit": "months"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
+    "productCode": "P0017",
     "name": "APSFL Home Premium",
     "category": "Premium",
     "customerPrice": 600.0,
-    "operatorCost": 420.0,
-    "billingInterval": 30,
+    "operatorCost": 180.0,
+    "billingInterval": {
+      "value": 30,
+      "unit": "days"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
+    "productCode": "P0018",
     "name": "APSFL Home_PIE",
-    "category": "Basic",
-    "customerPrice": 250.0,
-    "operatorCost": 175.0,
-    "billingInterval": 30,
-    "isActive": true
-  },
-  {
-    "operatorId": null,
-    "name": "Broadband 40Mbps",
-    "category": "Premium",
-    "customerPrice": 400.0,
-    "operatorCost": 280.0,
-    "billingInterval": 30,
-    "isActive": true
-  },
-  {
-    "operatorId": null,
-    "name": "FTA 2",
     "category": "Add-on",
+    "customerPrice": 250.0,
+    "operatorCost": 75.0,
+    "billingInterval": {
+      "value": 1,
+      "unit": "months"
+    },
+    "isActive": true
+  },
+  {
+    "productCode": "P0019",
+    "name": "Broadband 40Mbps",
+    "category": "Add-on",
+    "customerPrice": 400.0,
+    "operatorCost": 120.0,
+    "billingInterval": {
+      "value": 30,
+      "unit": "days"
+    },
+    "isActive": true
+  },
+  {
+    "productCode": "P0020",
+    "name": "FTA 2",
+    "category": "Premium",
     "customerPrice": 25.0,
-    "operatorCost": 17.5,
-    "billingInterval": 30,
+    "operatorCost": 7.5,
+    "billingInterval": {
+      "value": 1,
+      "unit": "months"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
+    "productCode": "P0021",
     "name": "GTPL",
-    "category": "Basic",
+    "category": "Premium",
     "customerPrice": 300.0,
-    "operatorCost": 210.0,
-    "billingInterval": 30,
+    "operatorCost": 90.0,
+    "billingInterval": {
+      "value": 30,
+      "unit": "days"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
+    "productCode": "P0022",
     "name": "Internet - OTT",
     "category": "Premium",
     "customerPrice": 500.0,
-    "operatorCost": 350.0,
-    "billingInterval": 30,
+    "operatorCost": 150.0,
+    "billingInterval": {
+      "value": 1,
+      "unit": "months"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
+    "productCode": "P0023",
     "name": "RBTV OTT",
-    "category": "Basic",
-    "customerPrice": 250.0,
-    "operatorCost": 175.0,
-    "billingInterval": 30,
-    "isActive": true
-  },
-  {
-    "operatorId": null,
-    "name": "Smart PlayTV",
-    "category": "Basic",
-    "customerPrice": 250.0,
-    "operatorCost": 175.0,
-    "billingInterval": 30,
-    "isActive": true
-  },
-  {
-    "operatorId": null,
-    "name": "SSLC",
-    "category": "Basic",
-    "customerPrice": 250.0,
-    "operatorCost": 175.0,
-    "billingInterval": 30,
-    "isActive": true
-  },
-  {
-    "operatorId": null,
-    "name": "APSFL Basic",
     "category": "Premium",
-    "customerPrice": 350.0,
-    "operatorCost": 245.0,
-    "billingInterval": 30,
+    "customerPrice": 250.0,
+    "operatorCost": 75.0,
+    "billingInterval": {
+      "value": 30,
+      "unit": "days"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
-    "name": "Colors Wala Gujarat Budget Plus",
+    "productCode": "P0024",
+    "name": "Smart PlayTV",
     "category": "Add-on",
-    "customerPrice": 22.0,
-    "operatorCost": 15.4,
-    "billingInterval": 30,
+    "customerPrice": 250.0,
+    "operatorCost": 75.0,
+    "billingInterval": {
+      "value": 1,
+      "unit": "months"
+    },
     "isActive": true
   },
   {
-    "operatorId": null,
-    "name": "Colors Wala Gujarat Value",
+    "productCode": "P0025",
+    "name": "SSLC",
     "category": "Add-on",
-    "customerPrice": 25.0,
-    "operatorCost": 17.5,
-    "billingInterval": 30,
-    "isActive": true
-  },
-  {
-    "operatorId": null,
-    "name": "Colors Wala Gujarat Value HD",
-    "category": "Add-on",
-    "customerPrice": 35.0,
-    "operatorCost": 24.5,
-    "billingInterval": 30,
-    "isActive": true
-  },
-  {
-    "operatorId": null,
-    "name": "Colors Wala Gujarat Value Plus",
-    "category": "Add-on",
-    "customerPrice": 25.0,
-    "operatorCost": 17.5,
-    "billingInterval": 30,
+    "customerPrice": 280.0,
+    "operatorCost": 84.0,
+    "billingInterval": {
+      "value": 30,
+      "unit": "days"
+    },
     "isActive": true
   }
 ]

@@ -1,5 +1,3 @@
-'use client';
-
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import {
@@ -39,6 +37,7 @@ export default function CustomersPage() {
     dueNext5Days: false,
     sortBy: 'createdAt',
     order: 'desc',
+    deleted: false, // 👈 new
   });
 
   // Header actions
@@ -116,6 +115,7 @@ export default function CustomersPage() {
       if (filters.dueToday) query.append('dueToday', 'true');
       if (filters.dueTomorrow) query.append('dueTomorrow', 'true');
       if (filters.dueNext5Days) query.append('dueNext5Days', 'true');
+      if (filters.deleted) query.append('includeDeleted', 'true');
 
       const res = await apiClient.get(`/customers?${query.toString()}`);
       const data = res.data;
@@ -237,7 +237,18 @@ export default function CustomersPage() {
 
       {/* Table + Pagination */}
       <div className="w-full overflow-x-auto">
-        <CustomerTable customers={customers} loading={loading} />
+        <CustomerTable
+          customers={customers}
+          loading={loading}
+          onSortChange={(val) =>
+            setFilters((prev) => ({ ...prev, sortBy: val }))
+          }
+          onOrderChange={(val) =>
+            setFilters((prev) => ({ ...prev, order: val }))
+          }
+          sortField={filters.sortBy}
+          sortOrder={filters.order}
+        />
       </div>
 
       <CustomerPagination

@@ -8,18 +8,37 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Customer } from '@/utils/data';
-import { Eye, MapPin } from 'lucide-react';
-
-import { Link } from 'react-router-dom';
+import { MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface Props {
   customers: Customer[];
   loading?: boolean;
+  onSortChange?: (field: string) => void;
+  onOrderChange?: (order: 'asc' | 'desc') => void;
+  sortField?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
-export default function CustomerTable({ customers, loading }: Props) {
+export default function CustomerTable({
+  customers,
+  loading,
+  onSortChange,
+  onOrderChange,
+  sortField,
+  sortOrder,
+}: Props) {
   const navigate = useNavigate();
+
+  const handleSort = (field: string) => {
+    if (!onSortChange || !onOrderChange) return;
+
+    // Toggle order if same field is clicked
+    const newOrder =
+      sortField === field && sortOrder === 'asc' ? 'desc' : 'asc';
+    onSortChange(field);
+    onOrderChange(newOrder);
+  };
 
   if (loading) {
     return (
@@ -28,6 +47,7 @@ export default function CustomerTable({ customers, loading }: Props) {
       </div>
     );
   }
+
   return (
     <>
       {/* Desktop Table */}
@@ -36,20 +56,57 @@ export default function CustomerTable({ customers, loading }: Props) {
           <TableHeader>
             <TableRow>
               <TableHead>Customer Code</TableHead>
-              <TableHead>Name</TableHead>
+              <TableHead
+                className="cursor-pointer"
+                onClick={() => handleSort('name')}
+              >
+                Name{' '}
+                {sortField === 'name' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+              </TableHead>
               <TableHead>Hardware</TableHead>
-              <TableHead>Balance</TableHead>
-              <TableHead>Area</TableHead>
+              <TableHead
+                className="cursor-pointer"
+                onClick={() => handleSort('balanceAmount')}
+              >
+                Balance{' '}
+                {sortField === 'balanceAmount'
+                  ? sortOrder === 'asc'
+                    ? '↑'
+                    : '↓'
+                  : ''}
+              </TableHead>
+              <TableHead
+                className="cursor-pointer"
+                onClick={() => handleSort('locality')}
+              >
+                Area{' '}
+                {sortField === 'locality'
+                  ? sortOrder === 'asc'
+                    ? '↑'
+                    : '↓'
+                  : ''}
+              </TableHead>
               <TableHead>Last Bill Amount</TableHead>
-              <TableHead>Expires</TableHead>
+              <TableHead
+                className="cursor-pointer"
+                onClick={() => handleSort('earliestExpiry')}
+              >
+                Expires{' '}
+                {sortField === 'earliestExpiry'
+                  ? sortOrder === 'asc'
+                    ? '↑'
+                    : '↓'
+                  : ''}
+              </TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
+
           <TableBody>
             {customers.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={8}
                   className="text-center py-6 text-muted-foreground"
                 >
                   No customers match your filters.
@@ -57,7 +114,8 @@ export default function CustomerTable({ customers, loading }: Props) {
               </TableRow>
             ) : (
               customers.map((customer) => {
-                const isExpired = new Date(customer.expiryDate) < new Date();
+                const isExpired =
+                  new Date(customer?.earliestExpiry) < new Date();
                 return (
                   <TableRow
                     key={customer._id}
@@ -71,7 +129,6 @@ export default function CustomerTable({ customers, loading }: Props) {
                     <TableCell className="py-2 px-2 text-sm">
                       {customer.customerCode}
                     </TableCell>
-
                     <TableCell>
                       <div className="flex items-center justify-between">
                         <div>
@@ -95,8 +152,6 @@ export default function CustomerTable({ customers, loading }: Props) {
                         )}
                       </div>
                     </TableCell>
-
-                    {/* Balance: green if positive, red if negative */}
                     <TableCell
                       className={`py-2 px-2 text-sm font-semibold ${
                         customer.balanceAmount < 0
@@ -106,26 +161,21 @@ export default function CustomerTable({ customers, loading }: Props) {
                     >
                       ₹{customer.balanceAmount.toLocaleString('en-IN')}
                     </TableCell>
-
                     <TableCell className="py-2 px-2 text-sm">
                       {customer.locality}
                     </TableCell>
                     <TableCell className="py-2 px-2 text-sm">
                       ₹{customer.lastPaymentAmount.toLocaleString('en-IN')}
                     </TableCell>
-
-                    {/* Expiry Date: red if expired */}
                     <TableCell
                       className={`py-2 px-2 text-sm font-medium ${
                         isExpired ? 'text-red-600' : 'text-gray-800'
                       }`}
                     >
-                      {new Date(customer.expiryDate).toLocaleDateString(
+                      {new Date(customer?.earliestExpiry).toLocaleDateString(
                         'en-IN'
                       )}
                     </TableCell>
-
-                    {/* Status Badge: red if expired/inactive, green if active */}
                     <TableCell>
                       <Badge
                         variant={
@@ -195,7 +245,9 @@ export default function CustomerTable({ customers, loading }: Props) {
                     }
                   >
                     Due:{' '}
-                    {new Date(customer.expiryDate).toLocaleDateString('en-IN')}
+                    {new Date(customer?.earliestExpiry).toLocaleDateString(
+                      'en-IN'
+                    )}
                   </span>
                 </div>
 

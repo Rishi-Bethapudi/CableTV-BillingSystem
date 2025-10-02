@@ -10,7 +10,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -19,19 +18,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
-interface Product {
-  id: string;
-  product_code: string;
-  name: string;
-  description: string | null;
-  monthly_price: number;
-  installation_fee: number | null;
-  category: string;
-  is_active: boolean;
-}
+import apiClient from '@/utils/apiClient';
+import type { ProductForm, Product } from '@/utils/data';
 
 interface EditProductDialogProps {
   product: Product;
@@ -47,57 +36,63 @@ export function EditProductDialog({
   onSuccess,
 }: EditProductDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    product_code: '',
+
+  const [formData, setFormData] = useState<ProductForm>({
+    productCode: '',
     name: '',
-    description: '',
-    monthly_price: '',
-    installation_fee: '',
-    category: '',
-    is_active: true,
+    category: 'Basic',
+    customerPrice: '',
+    operatorCost: '',
+    billingIntervalValue: '30',
+    billingIntervalUnit: 'days',
+    isActive: true,
   });
 
+  // Initialize form when product changes
   useEffect(() => {
     if (product) {
       setFormData({
-        product_code: product.product_code,
+        productCode: product.productCode,
         name: product.name,
-        description: product.description || '',
-        monthly_price: product.monthly_price.toString(),
-        installation_fee: (product.installation_fee || 0).toString(),
         category: product.category,
-        is_active: product.is_active,
+        customerPrice: product.customerPrice.toFixed(2),
+        operatorCost: product.operatorCost.toFixed(2),
+        billingIntervalValue: product.billingInterval.value.toString(),
+        billingIntervalUnit: product.billingInterval.unit,
+        isActive: product.isActive,
       });
     }
   }, [product]);
+
+  const handleChange = (field: keyof ProductForm, value: string | boolean) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const { error } = await supabase
-        .from('products')
-        .update({
-          product_code: formData.product_code,
-          name: formData.name,
-          description: formData.description || null,
-          monthly_price: parseFloat(formData.monthly_price),
-          installation_fee: formData.installation_fee
-            ? parseFloat(formData.installation_fee)
-            : 0,
-          category: formData.category,
-          is_active: formData.is_active,
-        })
-        .eq('id', product.id);
-
-      if (error) throw error;
+      await apiClient.put(`/products/${product._id}`, {
+        productCode: formData.productCode,
+        name: formData.name,
+        category: formData.category,
+        customerPrice: parseFloat(formData.customerPrice),
+        operatorCost: parseFloat(formData.operatorCost),
+        billingInterval: {
+          value: parseInt(formData.billingIntervalValue, 10),
+          unit: formData.billingIntervalUnit,
+        },
+        isActive: formData.isActive,
+      });
 
       toast.success('Product updated successfully');
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating product:', error);
-      toast.error('Failed to update product');
+      const message =
+        error.response?.data?.message || 'Failed to update product';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -114,21 +109,21 @@ export function EditProductDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
+          {/* Product Code */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="product_code" className="text-right">
+            <Label htmlFor="productCode" className="text-right">
               Product Code
             </Label>
             <Input
-              id="product_code"
-              value={formData.product_code}
-              onChange={(e) =>
-                setFormData({ ...formData, product_code: e.target.value })
-              }
+              id="productCode"
+              value={formData.productCode}
+              onChange={(e) => handleChange('productCode', e.target.value)}
               className="col-span-3"
               required
             />
           </div>
 
+          {/* Name */}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">
               Name
@@ -136,94 +131,110 @@ export function EditProductDialog({
             <Input
               id="name"
               value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
+              onChange={(e) => handleChange('name', e.target.value)}
               className="col-span-3"
               required
             />
           </div>
 
+          {/* Category */}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="category" className="text-right">
               Category
             </Label>
             <Select
               value={formData.category}
-              onValueChange={(value) =>
-                setFormData({ ...formData, category: value })
-              }
+              onValueChange={(value) => handleChange('category', value)}
             >
               <SelectTrigger className="col-span-3">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Basic">Basic</SelectItem>
-                <SelectItem value="Standard">Standard</SelectItem>
                 <SelectItem value="Premium">Premium</SelectItem>
                 <SelectItem value="Add-on">Add-on</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
+          {/* Customer Price */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="monthly_price" className="text-right">
-              Monthly Price
+            <Label htmlFor="customerPrice" className="text-right">
+              Customer Price
             </Label>
             <Input
-              id="monthly_price"
+              id="customerPrice"
               type="number"
               step="0.01"
-              value={formData.monthly_price}
-              onChange={(e) =>
-                setFormData({ ...formData, monthly_price: e.target.value })
-              }
+              min="0"
+              value={formData.customerPrice}
+              onChange={(e) => handleChange('customerPrice', e.target.value)}
               className="col-span-3"
               required
             />
           </div>
 
+          {/* Operator Cost */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="installation_fee" className="text-right">
-              Installation Fee
+            <Label htmlFor="operatorCost" className="text-right">
+              Operator Cost
             </Label>
             <Input
-              id="installation_fee"
+              id="operatorCost"
               type="number"
               step="0.01"
-              value={formData.installation_fee}
-              onChange={(e) =>
-                setFormData({ ...formData, installation_fee: e.target.value })
-              }
+              min="0"
+              value={formData.operatorCost}
+              onChange={(e) => handleChange('operatorCost', e.target.value)}
               className="col-span-3"
             />
           </div>
 
+          {/* Billing Interval */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="description" className="text-right">
-              Description
+            <Label htmlFor="billingInterval" className="text-right">
+              Billing Interval
             </Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              className="col-span-3"
-              rows={3}
-            />
+            <div className="col-span-3 flex gap-2">
+              <Input
+                id="billingIntervalValue"
+                type="number"
+                min={1}
+                max={31}
+                value={formData.billingIntervalValue}
+                onChange={(e) =>
+                  handleChange('billingIntervalValue', e.target.value)
+                }
+                className="w-1/2"
+                placeholder="e.g. 1 or 30"
+                required
+              />
+              <Select
+                value={formData.billingIntervalUnit}
+                onValueChange={(value) =>
+                  handleChange('billingIntervalUnit', value)
+                }
+              >
+                <SelectTrigger className="w-1/2">
+                  <SelectValue placeholder="Unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="days">Days</SelectItem>
+                  <SelectItem value="months">Months</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
+          {/* Active */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="is_active" className="text-right">
+            <Label htmlFor="isActive" className="text-right">
               Active
             </Label>
             <Switch
-              id="is_active"
-              checked={formData.is_active}
-              onCheckedChange={(checked) =>
-                setFormData({ ...formData, is_active: checked })
-              }
+              id="isActive"
+              checked={formData.isActive}
+              onCheckedChange={(checked) => handleChange('isActive', checked)}
             />
           </div>
 
