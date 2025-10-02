@@ -144,7 +144,7 @@ export default function CustomersPage() {
   };
 
   return (
-    <div className="space-y-4 w-full max-w-screen overflow-x-hidden">
+    <div className="space-y-4 w-full ">
       {/* Header */}
       <div className="hidden sm:flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mb-4">
         <div>
@@ -216,6 +216,7 @@ export default function CustomersPage() {
             onOrderChange={(val) =>
               setFilters((prev) => ({ ...prev, order: val }))
             }
+            operatorAreas= 
           />
         </div>
       </div>

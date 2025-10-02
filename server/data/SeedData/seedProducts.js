@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
-const Product = require('./models/product.model');
+const Product = require('../../models/product.model');
 const products = require('./products.json');
-const Customer = require('./models/customer.model');
+const Customer = require('../../models/customer.model');
 const customers = require('./customers.json');
-const Transaction = require('./models/transaction.model');
+const Transaction = require('../../models/transaction.model');
 const transactions = require('./transactions.json');
 async function seedProducts() {
   try {

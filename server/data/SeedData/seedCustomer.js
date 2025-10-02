@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
-const Customer = require('./models/customer.model'); // Adjust path as per your folder structure
-const connectDB = require('./config/db');
+const Customer = require('../../models/customer.model'); // Adjust path as per your folder structure
+const connectDB = require('../../config/db');
 const customers = require('./customers.json'); // Your JSON file with customer data
 const MONGO_URI =
   'mongodb+srv://CableTV-Billing:xHfUOkDYo7RgK1bm@cluster0.9znc3.mongodb.net/CableTV_Billing?retryWrites=true&w=majority&appName=Cluster0'; // Update with your DB URI

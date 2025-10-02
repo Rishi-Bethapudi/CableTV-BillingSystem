@@ -21,7 +21,7 @@ interface Props {
 }
 
 export default function CustomerTable({
-  customers,
+  customers = [],
   loading,
   onSortChange,
   onOrderChange,
@@ -103,7 +103,7 @@ export default function CustomerTable({
           </TableHeader>
 
           <TableBody>
-            {customers.length === 0 ? (
+            {customers?.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={8}
@@ -154,27 +154,32 @@ export default function CustomerTable({
                     </TableCell>
                     <TableCell
                       className={`py-2 px-2 text-sm font-semibold ${
-                        customer.balanceAmount < 0
+                        (customer.balanceAmount ?? 0) < 0
                           ? 'text-red-600'
                           : 'text-green-600'
                       }`}
                     >
-                      ₹{customer.balanceAmount.toLocaleString('en-IN')}
+                      ₹{(customer.balanceAmount ?? 0).toLocaleString('en-IN')}
                     </TableCell>
                     <TableCell className="py-2 px-2 text-sm">
                       {customer.locality}
                     </TableCell>
                     <TableCell className="py-2 px-2 text-sm">
-                      ₹{customer.lastPaymentAmount.toLocaleString('en-IN')}
+                      ₹
+                      {(customer.lastPaymentAmount ?? 0).toLocaleString(
+                        'en-IN'
+                      )}
                     </TableCell>
                     <TableCell
                       className={`py-2 px-2 text-sm font-medium ${
                         isExpired ? 'text-red-600' : 'text-gray-800'
                       }`}
                     >
-                      {new Date(customer?.earliestExpiry).toLocaleDateString(
-                        'en-IN'
-                      )}
+                      {customer.earliestExpiry
+                        ? new Date(customer.earliestExpiry).toLocaleDateString(
+                            'en-IN'
+                          )
+                        : 'N/A'}
                     </TableCell>
                     <TableCell>
                       <Badge

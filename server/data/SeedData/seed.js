@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const bcrypt = require('bcryptjs');
-const connectDB = require('./config/db');
-const Admin = require('./models/admin.model');
+const connectDB = require('../../config/db');
+const Admin = require('../../models/admin.model');
 
 // Load environment variables
 dotenv.config();

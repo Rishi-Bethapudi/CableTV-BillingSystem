@@ -30,7 +30,7 @@ const operatorSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-
+    localities: [String],
     address: String,
     refreshTokens: [String],
   },

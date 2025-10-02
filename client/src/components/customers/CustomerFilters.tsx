@@ -25,7 +25,7 @@ interface Props {
   onDueNext5DaysChange: (value: boolean) => void;
   onSortChange: (value: string) => void;
   onOrderChange: (value: string) => void;
-  operatorAreas: string[]; // NEW: list of localities from operator
+  operatorAreas?: string[]; // NEW: list of localities from operator
 }
 
 export default function CustomerFilters({
@@ -93,7 +93,7 @@ export default function CustomerFilters({
   }, [dueFilters]);
 
   return (
-    <div className="space-y-6 w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
+    <div className="space-y-6 w-full px-2 sm:px-4 lg:px-6">
       <div className="flex flex-col gap-4 w-full">
         {/* Mobile */}
         <div className="flex items-center gap-2 lg:hidden">
@@ -146,7 +146,7 @@ export default function CustomerFilters({
                   <SelectValue placeholder="Select Area" />
                 </SelectTrigger>
                 <SelectContent>
-                  {operatorAreas.map((area) => (
+                  {(operatorAreas || []).map((area) => (
                     <SelectItem key={area} value={area}>
                       {area}
                     </SelectItem>
@@ -208,98 +208,107 @@ export default function CustomerFilters({
         </div>
 
         {/* Desktop */}
-        <div className="hidden lg:flex items-center gap-4">
-          {/* Balance */}
-          <Select onValueChange={onBalanceChange}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Select Balance" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="zero">Zero/Paid</SelectItem>
-              <SelectItem value="due">Unpaid</SelectItem>
-              <SelectItem value="advance">Advance</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="w-full px-2 sm:px-4 lg:px-6">
+          <div className="flex flex-wrap gap-4 w-full items-center">
+            {/* Balance */}
+            <div className="flex-1 min-w-[150px]">
+              <Select onValueChange={onBalanceChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Balance" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="zero">Zero/Paid</SelectItem>
+                  <SelectItem value="due">Unpaid</SelectItem>
+                  <SelectItem value="advance">Advance</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* Status */}
-          <Select onValueChange={onStatusChange}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-              <SelectItem value="deleted">Deleted</SelectItem>
-            </SelectContent>
-          </Select>
+            {/* Status */}
+            <div className="flex-1 min-w-[150px]">
+              <Select onValueChange={onStatusChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="deleted">Deleted</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* Area (dynamic from operator) */}
-          <Select onValueChange={onAreaChange}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Select Area" />
-            </SelectTrigger>
-            <SelectContent>
-              {operatorAreas.map((area) => (
-                <SelectItem key={area} value={area}>
-                  {area}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {/* Area */}
+            <div className="flex-1 min-w-[150px]">
+              <Select onValueChange={onAreaChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Area" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(operatorAreas || []).map((area) => (
+                    <SelectItem key={area} value={area}>
+                      {area}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* Due filters */}
-          <div className="flex gap-2">
-            {filterOptions.map(({ key, label }) => (
-              <label
-                key={key}
-                className={`flex items-center gap-2 text-sm px-3 py-1 rounded-md cursor-pointer transition-colors
-                  ${
+            {/* Due Filters
+            <div className="flex flex-wrap gap-2 flex-1 min-w-[200px]">
+              {filterOptions.map(({ key, label }) => (
+                <button
+                  key={key}
+                  className={`px-4 py-1 text-sm font-medium rounded-full transition-colors ${
                     dueFilters[key]
                       ? 'bg-primary text-white'
-                      : 'bg-gray-100 hover:bg-gray-200'
+                      : 'bg-gray-100 text-gray-700'
                   }`}
+                  onClick={() => toggleFilter(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div> */}
+
+            {/* Sort */}
+            <div className="flex-1 min-w-[150px]">
+              <Select onValueChange={onSortChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="balanceAmount">Balance</SelectItem>
+                  <SelectItem value="earliestExpiry">Expiry</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Order
+            <div className="flex-1 min-w-[120px]">
+              <Select onValueChange={onOrderChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Order" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Asc</SelectItem>
+                  <SelectItem value="desc">Desc</SelectItem>
+                </SelectContent>
+              </Select>
+            </div> */}
+
+            {/* Reset Button */}
+            <div className="flex-none">
+              <Button
+                variant="ghost"
+                onClick={resetFilters}
+                className="text-sm gap-2"
               >
-                <input
-                  type="checkbox"
-                  checked={dueFilters[key]}
-                  onChange={() => toggleFilter(key)}
-                  className="accent-primary"
-                />
-                {label}
-              </label>
-            ))}
+                <RotateCcw className="h-4 w-4" /> Reset
+              </Button>
+            </div>
           </div>
-
-          {/* Sort */}
-          <Select onValueChange={onSortChange}>
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="name">Name</SelectItem>
-              <SelectItem value="balanceAmount">Balance</SelectItem>
-              <SelectItem value="earliestExpiry">Expiry</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Order */}
-          <Select onValueChange={onOrderChange}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="Order" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="asc">Asc</SelectItem>
-              <SelectItem value="desc">Desc</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button
-            variant="ghost"
-            onClick={resetFilters}
-            className="text-sm gap-2"
-          >
-            <RotateCcw className="h-4 w-4" /> Reset
-          </Button>
         </div>
       </div>
 
