@@ -216,7 +216,7 @@ export default function CustomersPage() {
             onOrderChange={(val) =>
               setFilters((prev) => ({ ...prev, order: val }))
             }
-            operatorAreas= 
+            // operatorAreas=
           />
         </div>
       </div>
