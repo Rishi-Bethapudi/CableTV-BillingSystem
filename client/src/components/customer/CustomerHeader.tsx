@@ -1,36 +1,19 @@
 import { useState } from 'react';
 import { ArrowLeft, Trash } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useMutation } from '@tanstack/react-query';
-import axios from 'axios';
 import { toast } from 'sonner';
+import { useMutation } from '@tanstack/react-query';
+import apiClient from '@/utils/apiClient';
 import ConfirmationModal from './ConfirmationModal';
+import type { Customer } from '@/utils/data';
 
-interface Customer {
-  id: string | number;
-  name: string;
-  active: boolean;
-  expiryDate?: string;
-}
-
-interface Props {
-  customer: Customer;
-}
-
-export default function CustomerHeader({ customer }: Props) {
+export default function CustomerHeader({ customer }: { customer: Customer }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showToggleModal, setShowToggleModal] = useState(false);
 
-  const getStatusColor = (active: boolean) =>
-    active
-      ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-      : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
-
-  // Delete mutation
   const deleteCustomer = useMutation({
-    mutationFn: async () => await axios.delete(`/api/customers/${customer.id}`),
+    mutationFn: () => apiClient.delete(`/customers/${customer._id}`),
     onSuccess: () => {
       toast.success('Customer deleted successfully');
       window.location.href = '/customers';
@@ -38,68 +21,50 @@ export default function CustomerHeader({ customer }: Props) {
     onError: () => toast.error('Failed to delete customer'),
   });
 
-  // Toggle active mutation
   const toggleActive = useMutation({
-    mutationFn: async () => {
-      const newStatus = !customer.active;
-      await axios.patch(`/api/customers/${customer.id}/toggle-active`, {
-        active: newStatus,
-      });
-      return newStatus;
-    },
-    onSuccess: (newStatus) => {
-      toast.success(`Customer marked as ${newStatus ? 'Active' : 'Inactive'}`);
+    mutationFn: () =>
+      apiClient.patch(`/customers/${customer._id}/toggle-active`, {
+        active: !customer.active,
+      }),
+    onSuccess: () => {
+      toast.success(
+        `Customer marked as ${customer.active ? 'Inactive' : 'Active'}`
+      );
       window.location.reload();
     },
     onError: () => toast.error('Failed to update customer status'),
   });
 
-  const formatExpiryDate = (date?: string) =>
-    date
-      ? new Date(date).toLocaleDateString('en-GB', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        })
-      : 'N/A';
-
-  const isExpired = () =>
-    customer.expiryDate ? new Date(customer.expiryDate) < new Date() : false;
+  const expiryText = customer.earliestExpiry
+    ? new Date(customer.earliestExpiry).toLocaleDateString('en-IN')
+    : 'N/A';
+  const isExpired =
+    customer.earliestExpiry && new Date(customer.earliestExpiry) < new Date();
 
   return (
     <>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        {/* Back */}
-        <div className="flex items-center gap-2">
-          <Link to="/customers">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" /> Back
-            </Button>
-          </Link>
-        </div>
+        <Link to="/customers">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          </Button>
+        </Link>
 
-        {/* Name */}
-        <div className="flex-1 text-center">
-          <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 dark:text-white">
-            {customer.name}
-          </h1>
-        </div>
+        <h1 className="flex-1 text-center text-4xl font-bold text-slate-900 dark:text-white">
+          {customer?.name}
+        </h1>
 
-        {/* Expiry → Active → Delete */}
-        <div className="flex items-center gap-4 justify-end">
-          {/* Expiry */}
-          {customer.active && customer.expiryDate && (
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Expiry: {formatExpiryDate(customer.expiryDate)}
-            </span>
-          )}
-          {!customer.active && customer.expiryDate && isExpired() && (
-            <span className="text-sm font-medium text-red-600 dark:text-red-400">
-              Expired on: {formatExpiryDate(customer.expiryDate)}
+        <div className="flex items-center gap-4">
+          {customer.earliestExpiry && (
+            <span
+              className={`text-sm font-medium ${
+                isExpired ? 'text-red-600' : 'text-gray-700'
+              }`}
+            >
+              {isExpired ? 'Expired: ' : 'Expiry: '} {expiryText}
             </span>
           )}
 
-          {/* Active Button */}
           <Button
             variant={customer.active ? 'outline' : 'secondary'}
             size="sm"
@@ -108,7 +73,6 @@ export default function CustomerHeader({ customer }: Props) {
             {customer.active ? 'Active' : 'Inactive'}
           </Button>
 
-          {/* Delete Button */}
           <Button
             variant="destructive"
             size="sm"
@@ -119,26 +83,19 @@ export default function CustomerHeader({ customer }: Props) {
         </div>
       </div>
 
-      {/* Modals */}
       <ConfirmationModal
         open={showDeleteModal}
         message="Are you sure you want to delete this customer?"
-        onConfirm={() => {
-          deleteCustomer.mutate();
-          setShowDeleteModal(false);
-        }}
+        onConfirm={() => deleteCustomer.mutate()}
         onCancel={() => setShowDeleteModal(false)}
       />
 
       <ConfirmationModal
         open={showToggleModal}
-        message={`Are you sure you want to ${
-          customer.active ? 'mark as inactive' : 'mark as active'
-        } this customer?`}
-        onConfirm={() => {
-          toggleActive.mutate();
-          setShowToggleModal(false);
-        }}
+        message={`Are you sure you want to set this customer as ${
+          customer.active ? 'Inactive' : 'Active'
+        }?`}
+        onConfirm={() => toggleActive.mutate()}
         onCancel={() => setShowToggleModal(false)}
       />
     </>

@@ -1,103 +1,106 @@
-// File: components/customer/CustomerMainDetails.tsx
-interface CustomerProps {
-  customer: {
-    name: string;
-    mobile?: string;
-    locality?: string;
-    balanceAmount?: number;
-    lastPaymentDate?: string;
-    stbName?: string;
-    stbNumber?: string;
-    cardNumber?: string;
-  };
-}
+import type { Customer } from '@/utils/data';
 
-export default function CustomerMainDetails({ customer }: CustomerProps) {
+export default function CustomerMainDetails({
+  customer,
+}: {
+  customer: Customer;
+}) {
+  const device =
+    customer.devices?.find((d) => d.active) || customer.devices?.[0];
+
+  // Fallback for last transaction fields if not populated
+  const lastPaymentAmount =
+    customer.lastTransaction?.amount ?? customer.lastPaymentAmount ?? 0;
+  const lastPaymentDate =
+    customer.lastTransaction?.createdAt ?? customer.lastPaymentDate;
+
+  // Calculate balance display
+  const balance = Number(customer.balanceAmount ?? 0);
+  const balanceDisplay =
+    balance > 0
+      ? `₹${balance.toLocaleString('en-IN')} Due`
+      : balance < 0
+      ? `₹${Math.abs(balance).toLocaleString('en-IN')} Advance`
+      : '₹0';
+
+  const balanceClass =
+    balance > 0
+      ? 'text-red-600'
+      : balance < 0
+      ? 'text-green-600'
+      : 'text-gray-900 dark:text-white';
+
+  const activeSubscriptions =
+    customer.subscriptions?.filter((s) => s.status === 'active').length ?? 0;
+
   return (
     <div className="space-y-3">
       {/* Customer Overview */}
       <div className="bg-white dark:bg-gray-800 shadow rounded-md p-4 sm:p-6">
         <h2 className="text-lg font-semibold mb-3">Customer Overview</h2>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="flex flex-col">
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              Balance
-            </span>
-            <span className="font-semibold text-gray-900 dark:text-white">
-              ₹{customer.balanceAmount?.toLocaleString() ?? 0}
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              Last Bill Date
-            </span>
-            <span className="font-semibold text-gray-900 dark:text-white">
-              {customer.lastBillDate
-                ? new Date(customer.lastBillDate).toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                  })
-                : 'N/A'}
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              Area
-            </span>
-            <span className="font-semibold text-gray-900 dark:text-white">
-              {customer.locality ?? 'N/A'}
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              Mobile
-            </span>
-            <span className="font-semibold text-gray-900 dark:text-white">
-              {customer.mobile ? customer.mobile.replace('+91 ', '') : 'N/A'}
-            </span>
-          </div>
+          <InfoBlock
+            label="Balance"
+            value={balanceDisplay}
+            className={balanceClass}
+          />
+
+          <InfoBlock
+            label="Last Payment"
+            value={
+              lastPaymentDate
+                ? new Date(lastPaymentDate).toLocaleDateString('en-IN')
+                : 'N/A'
+            }
+          />
+
+          <InfoBlock label="Area" value={customer.locality ?? 'N/A'} />
+
+          <InfoBlock
+            label="Active Subscriptions"
+            value={`${activeSubscriptions}`}
+          />
         </div>
       </div>
 
       {/* Hardware Details */}
       <div className="bg-white dark:bg-gray-800 shadow rounded-md p-4 sm:p-6">
         <h2 className="text-lg font-semibold mb-3">Hardware Details</h2>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="flex flex-col">
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              STB Name
-            </span>
-            <span className="font-semibold text-gray-900 dark:text-white">
-              {customer.stbName ?? 'N/A'}
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              STB No
-            </span>
-            <span className="font-semibold text-gray-900 dark:text-white">
-              {customer.stbNumber ?? 'N/A'}
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              Card No
-            </span>
-            <span className="font-semibold text-gray-400">
-              {customer.cardNumber ?? 'N/A'}
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              Membership No
-            </span>
-            <span className="font-semibold text-gray-900 dark:text-white">
-              {customer.cardNumber ?? 'N/A'}
-            </span>
-          </div>
+          <InfoBlock label="STB No" value={device?.stbNumber ?? 'N/A'} />
+          <InfoBlock label="Card No" value={device?.cardNumber ?? 'N/A'} />
+          <InfoBlock label="Active Device" value={device ? 'Yes' : 'No'} />
+          <InfoBlock
+            label="Total Devices"
+            value={`${customer.devices?.length ?? 0}`}
+          />
         </div>
       </div>
+    </div>
+  );
+}
+
+function InfoBlock({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string | number;
+  className?: string;
+}) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
+      <span
+        className={`font-semibold ${
+          className ?? 'text-gray-900 dark:text-white'
+        }`}
+      >
+        {value}
+      </span>
     </div>
   );
 }
