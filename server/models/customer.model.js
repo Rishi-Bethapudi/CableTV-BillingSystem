@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-
+const Subscription = require('./subscription.model');
 const deviceSchema = new mongoose.Schema(
   {
     stbNumber: String,

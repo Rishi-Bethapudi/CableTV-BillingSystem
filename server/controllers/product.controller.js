@@ -10,7 +10,7 @@ exports.createProduct = async (req, res) => {
     const {
       productCode,
       name,
-      category,
+      planType,
       customerPrice,
       operatorCost,
       billingInterval,
@@ -35,7 +35,7 @@ exports.createProduct = async (req, res) => {
       operatorId,
       productCode,
       name,
-      category: category || 'Basic',
+      planType: planType || 'Basic',
       customerPrice,
       operatorCost,
       billingInterval: billingInterval || { value: 30, unit: 'days' },
@@ -111,7 +111,7 @@ exports.updateProduct = async (req, res) => {
     const {
       productCode,
       name,
-      category,
+      planType,
       customerPrice,
       operatorCost,
       billingInterval,
@@ -135,7 +135,7 @@ exports.updateProduct = async (req, res) => {
       {
         productCode,
         name,
-        category,
+        planType,
         customerPrice,
         operatorCost,
         billingInterval,
