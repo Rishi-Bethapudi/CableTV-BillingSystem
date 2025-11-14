@@ -458,11 +458,9 @@ const deleteCustomer = async (req, res) => {
     }
 
     if (customer.operatorId.toString() !== req.user.operatorId) {
-      return res
-        .status(403)
-        .json({
-          message: 'Forbidden: You are not authorized to delete this customer.',
-        });
+      return res.status(403).json({
+        message: 'Forbidden: You are not authorized to delete this customer.',
+      });
     }
 
     if (req.user.role !== 'operator') {
@@ -511,61 +509,148 @@ const importCustomersFromExcel = async (req, res) => {
 
   const filePath = req.file.path;
 
+  // Utility to only assign value if non-empty
+  const setIfValid = (obj, key, value) => {
+    if (value !== undefined && value !== null && value !== '') {
+      obj[key] = value;
+    }
+  };
+
   try {
     const workbook = xlsx.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const customersJson = xlsx.utils.sheet_to_json(worksheet);
+    const rows = xlsx.utils.sheet_to_json(worksheet);
 
-    if (customersJson.length === 0) {
+    if (rows.length === 0) {
       return res.status(400).json({
-        message: 'The Excel file is empty or in an incorrect format.',
+        message: 'Excel file is empty or headers are incorrect.',
       });
     }
 
     const operatorId = req.user.id;
+    const customersToInsert = [];
 
-    const customersToImport = customersJson.map((c) => ({
-      operatorId,
-      agentId: c.agentId || null,
-      customerCode: c.customerCode || '', // or generate later
-      name: c.name,
-      mobile: c.mobile,
-      locality: c.locality || '',
-      stbName: c.stbName || '',
-      stbNumber: c.stbNumber || '',
-      cardNumber: c.cardNumber || '',
-      billingAddress: c.billingAddress || '',
-      connectionStartDate: c.connectionStartDate
-        ? new Date(c.connectionStartDate)
-        : null,
-      sequenceNo: c.sequenceNo || null,
-      subscriptions: [], // default empty (can be added later via product assign/renewal)
-      balanceAmount: c.balanceAmount || 0,
-      additionalCharge: c.additionalCharge || 0,
-      discount: c.discount || 0,
-      lastPaymentAmount: c.lastPaymentAmount || 0,
-      lastPaymentDate: c.lastPaymentDate ? new Date(c.lastPaymentDate) : null,
-      remark: c.remark || '',
-      active: c.active !== undefined ? c.active : true,
-    }));
+    for (const row of rows) {
+      if (!row.name || !row.mobile) {
+        continue; // ❌ skip invalid rows
+      }
 
-    const result = await Customer.insertMany(customersToImport, {
-      ordered: false,
-    });
+      // Generate unique sequence number
+      const lastCustomer = await Customer.findOne({ operatorId }).sort({
+        createdAt: -1,
+      });
+      const nextSeq = lastCustomer ? lastCustomer.sequenceNo + 1 : 1;
+
+      // Generate customerCode if missing
+      const customerCode =
+        row.customerCode || `CUS-${String(nextSeq).padStart(5, '0')}`;
+
+      // Build customer object
+      const customer = {
+        operatorId,
+        name: row.name.trim(),
+        contactNumber: row.mobile.toString().trim(),
+        locality: row.locality || '',
+        sequenceNo: nextSeq,
+        customerCode,
+        active: row.active !== undefined ? Boolean(row.active) : true,
+      };
+
+      // Optional fields — added only if valid
+      setIfValid(customer, 'agentId', row.agentId);
+      setIfValid(customer, 'billingAddress', row.billingAddress);
+      setIfValid(
+        customer,
+        'connectionStartDate',
+        row.connectionStartDate ? new Date(row.connectionStartDate) : undefined
+      );
+      setIfValid(customer, 'remark', row.remark);
+      setIfValid(customer, 'lastPaymentAmount', Number(row.lastPaymentAmount));
+      setIfValid(
+        customer,
+        'lastPaymentDate',
+        row.lastPaymentDate ? new Date(row.lastPaymentDate) : undefined
+      );
+      setIfValid(customer, 'balanceAmount', Number(row.balanceAmount));
+      setIfValid(customer, 'additionalCharge', Number(row.additionalCharge));
+      setIfValid(customer, 'discount', Number(row.discount));
+
+      // Devices array
+      const devices = [];
+      if (row.stbName || row.stbNumber || row.cardNumber) {
+        devices.push({
+          stbName: row.stbName || undefined,
+          stbNumber: row.stbNumber || undefined,
+          cardNumber: row.cardNumber || undefined,
+          active: true,
+        });
+      }
+      if (devices.length) customer.devices = devices;
+
+      // Subscriptions importing is optional (if product IDs are given)
+      customer.subscriptions = [];
+      if (row.productIds) {
+        const productIdList = row.productIds
+          .toString()
+          .split(',')
+          .map((x) => x.trim());
+        for (const pid of productIdList) {
+          if (mongoose.Types.ObjectId.isValid(pid)) {
+            const product = await Product.findById(pid);
+            if (product) {
+              const startDate = new Date();
+              let expiryDate = new Date(startDate);
+
+              if (product.billingInterval.unit === 'months') {
+                expiryDate.setMonth(
+                  startDate.getMonth() + product.billingInterval.value
+                );
+              } else {
+                expiryDate.setDate(
+                  startDate.getDate() + product.billingInterval.value
+                );
+              }
+
+              customer.subscriptions.push({
+                productId: pid,
+                startDate,
+                expiryDate,
+                price: product.customerPrice,
+                billingInterval: product.billingInterval,
+                status: 'active',
+              });
+            }
+          }
+        }
+      }
+
+      customersToInsert.push(customer);
+    }
+
+    if (!customersToInsert.length) {
+      return res.status(400).json({
+        message: 'No valid customer rows found to import.',
+      });
+    }
+
+    await Customer.insertMany(customersToInsert, { ordered: false });
 
     res.status(201).json({
-      message: `${result.length} customers imported successfully.`,
+      message: `${customersToInsert.length} customers imported successfully.`,
     });
   } catch (error) {
-    console.error('Error importing from Excel:', error);
+    console.error('Excel Import Error:', error);
+
+    // Duplicate (mobile or stb) error handling
     if (error.code === 11000) {
       return res.status(409).json({
         message:
-          'Import failed due to duplicate entries (e.g., mobile or STB number). Please check your file.',
+          'Some customers were not imported due to duplicate mobile/ STB/ card numbers.',
       });
     }
-    res.status(500).json({ message: 'Failed to import customers from Excel.' });
+
+    res.status(500).json({ message: 'Failed to import customers.' });
   } finally {
     fs.unlinkSync(filePath);
   }
