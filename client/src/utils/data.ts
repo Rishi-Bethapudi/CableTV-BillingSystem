@@ -3,9 +3,9 @@ export interface Product {
   operatorId: string;
   productCode: string;
   name: string;
-  category: 'Basic' | 'Premium' | 'Add-on';
-  customerPrice: number;       // price charged to customer
-  operatorCost: number;        // cost to operator
+  planType: 'Basic' | 'Add-on';
+  customerPrice: number;
+  operatorCost: number;
   billingInterval: {
     value: number;
     unit: 'days' | 'months';
@@ -13,7 +13,6 @@ export interface Product {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  __v?: number;
 }
 
 export interface ProductForm {
@@ -27,16 +26,31 @@ export interface ProductForm {
   isActive: boolean;
 }
 
-export interface CustomerSubscription {
-  productId: string | Product; // populated with full product if needed
-  startDate: string;           // ISO string
-  expiryDate: string;          // ISO string
+export interface Subscription {
+  _id: string;
+  customerId: string;
+  operatorId: string;
+  productId: string | Product;
+  startDate: string;
+  expiryDate: string;
   price: number;
   billingInterval: {
     value: number;
     unit: 'days' | 'months';
   };
-  status: 'active' | 'expired' | 'inactive';
+  status: 'ACTIVE' | 'EXPIRED' | 'PAUSED' | 'TERMINATED';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomerDevice {
+  stbNumber?: string;
+  cardNumber?: string;
+  deviceModel?: string;
+  membershipNumber?: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Customer {
@@ -44,33 +58,47 @@ export interface Customer {
   operatorId: string;
   agentId: string | null;
   customerCode: string;
-  name: string;
-  locality: string;
-  mobile: string;
-  billingAddress: string;
-  balanceAmount: number;
-  connectionStartDate: string;
   sequenceNo: number;
+  name: string;
+  contactNumber: string;     // TS version uses correct field name
+  alternateContact?: string;
+  messageNumber?: string;
+  locality: string;
+  billingAddress: string;
+  gstNumber?: string;
+  devices: CustomerDevice[];
+
+  balanceAmount: number;
+  defaultExtraCharge: number;   // previously additionalCharge
+  defaultDiscount: number;      // previously discount
+
+  activeSubscriptions: string[]; // list of subscription IDs
+  earliestExpiry: string | null;
+
+  connectionStartDate: string;
   active: boolean;
-  stbName: string;
-  stbNumber: string;
-  cardNumber: string;
-  subscriptions: CustomerSubscription[];
-  earliestExpiry?: string | null; 
-  additionalCharge: number;
-  discount: number;
-  lastPaymentAmount: number;
-  lastPaymentDate: string;
-  remark: string;
+  deleted: boolean;
+
+  lastPaymentAmount?: number;
+  lastPaymentDate?: string;
+  lastPaymentMethod?: string;
+
+  remark?: string;
   createdAt: string;
   updatedAt: string;
-  __v?: number;
 }
+
 
 export interface CollectedBy {
   _id: string;
   name: string;
 }
+
+export type TransactionType =
+  | 'INVOICE'
+  | 'PAYMENT'
+  | 'ADJUSTMENT'
+  | 'OPENING_BALANCE';
 
 export interface Transaction {
   _id: string;
@@ -78,18 +106,23 @@ export interface Transaction {
   operatorId: string;
   collectedBy: CollectedBy;
   collectedByType: 'Operator' | 'Agent';
-  type: 'Billing' | 'Payment' | 'Adjustment';
-  amount: number;
+  type: TransactionType;
+  amount: number;              // + add to balance, - reduce balance
   balanceBefore: number;
   balanceAfter: number;
-  invoiceId: string;
-  receiptNumber?: string;     // optional, may not exist
-  productId: string | Product;
+
+  invoiceId?: string;          // only for INVOICE
+  receiptNumber?: string;      // only for PAYMENT
+
+  productId?: string | Product; // only for invoices
   startDate?: string;
   expiryDate?: string;
-  costOfGoodsSold: number;
-  method?: string;            // only for payments
+
+  costOfGoodsSold?: number;   // only for invoice (profit calc)
+  method?: string;            // only for PAYMENT
   note?: string;
+  isOpeningBalance?: boolean;
+
   createdAt: string;
   updatedAt: string;
 }

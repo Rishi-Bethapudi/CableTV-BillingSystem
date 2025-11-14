@@ -8,10 +8,8 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  TrendingUp,
   UserPlus,
   MessageSquare,
-  RotateCcw,
   Bell,
   LinkIcon,
   RefreshCw,
@@ -21,6 +19,7 @@ import { DashboardCard } from '@/components/DashboardCard';
 import { DashboardSkeleton } from '@/components/DashboardSkeleton';
 import apiClient from '@/utils/apiClient';
 import { useNavigate } from 'react-router-dom';
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { setHeaderActions } = useLayout();
@@ -32,7 +31,7 @@ export default function Dashboard() {
       return res.data;
     },
     refetchOnWindowFocus: false,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 
   useEffect(() => {
@@ -62,13 +61,22 @@ export default function Dashboard() {
 
   if (isLoading) return <DashboardSkeleton />;
 
-  // Gradient classes for primary metrics (optional: match your design)
   const primaryColors = [
     'from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800',
     'from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800',
     'from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border-red-200 dark:border-red-800',
     'from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800',
   ];
+
+  const openRoute = (item: any) => {
+    if (!item.route || item.stat <= 0) return;
+    navigate({
+      pathname: item.route,
+      search: item.params
+        ? new URLSearchParams(item.params as any).toString()
+        : undefined,
+    });
+  };
 
   return (
     <div className="space-y-6 px-4 sm:px-6">
@@ -83,32 +91,41 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* Primary Metrics Grid */}
+      {/* Primary Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-6">
-        {data.primaryMetrics?.map((item, idx) => (
+        {data.primaryMetrics?.map((item: any, idx: number) => (
           <DashboardCard
             key={item.id}
             title={item.name}
             value={item.stat}
             currency={item.stat_type === 0}
             secondaryValue={item.des}
-            secondaryIcon={Users}
+            secondaryIcon={
+              item.name.includes('Pending')
+                ? AlertCircle
+                : item.name.includes('Customer')
+                ? UserPlus
+                : IndianRupee
+            }
             icon={
               item.name.includes('Collection')
                 ? IndianRupee
                 : item.name.includes('Pending')
                 ? AlertCircle
+                : item.name.includes('Online')
+                ? LinkIcon
                 : CheckCircle
             }
-            className={`bg-gradient-to-br ${primaryColors[idx]} `}
-            onClick={() => navigate(item.action)}
+            className={`bg-gradient-to-br ${primaryColors[idx]}`}
+            clickable={!!item.route && item.stat > 0}
+            onClick={() => openRoute(item)}
           />
         ))}
       </div>
 
-      {/* Secondary Metrics Grid */}
+      {/* Secondary Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-6">
-        {data.secondaryMetrics?.map((item) => (
+        {data.secondaryMetrics?.map((item: any) => (
           <DashboardCard
             key={item.id}
             title={item.name}
@@ -131,8 +148,8 @@ export default function Dashboard() {
                 ? 'positive'
                 : 'neutral'
             }
-            onClick={() => navigate(item.action)} // <-- action prop
-            clickable={true} // optional
+            clickable={!!item.route && item.stat > 0}
+            onClick={() => openRoute(item)}
           />
         ))}
       </div>

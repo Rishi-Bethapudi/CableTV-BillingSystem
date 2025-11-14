@@ -1,66 +1,85 @@
 const mongoose = require('mongoose');
 
-const subscriptionSchema = new mongoose.Schema(
+const deviceSchema = new mongoose.Schema(
   {
-    productId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
-      required: true,
-    },
-    startDate: { type: Date, required: true },
-    expiryDate: { type: Date, required: true },
-    billingInterval: {
-      value: { type: Number, required: true }, // e.g. 30
-      unit: { type: String, enum: ['days', 'months'], default: 'days' }, // e.g. 'days'
-    },
-    price: { type: Number, required: true }, // locked price at time of subscription
-    status: {
-      type: String,
-      enum: ['active', 'expired'],
-      default: 'active',
-    },
-  },
-  { _id: false }
-);
-
-const customerSchema = new mongoose.Schema(
-  {
-    // Multi-tenant references
-    operatorId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Operator',
-      required: true,
-    },
-    agentId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Agent',
-    },
-
-    // Core identity
-    customerCode: { type: String },
-    name: { type: String, required: true },
-    locality: String,
-    mobile: String,
-    billingAddress: String,
-    connectionStartDate: Date,
-    sequenceNo: Number,
-    // Box details
-    stbName: String,
     stbNumber: String,
     cardNumber: String,
-
-    // Active subscriptions only
-    subscriptions: [subscriptionSchema],
-    // Financial tracking
-    balanceAmount: { type: Number, default: 0 },
-    additionalCharge: { type: Number, default: 0 },
-    discount: { type: Number, default: 0 },
+    deviceModel: String,
+    membershipNumber: String,
     active: { type: Boolean, default: true },
-    remark: String,
-    deleted: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
-const Customer = mongoose.model('Customer', customerSchema);
-module.exports = Customer;
+const customerSchema = new mongoose.Schema(
+  {
+    operatorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Operator',
+      required: true,
+      index: true,
+    },
+    agentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Agent',
+      index: true,
+    },
+
+    name: { type: String, required: true, trim: true },
+    fatherName: String,
+    contactNumber: { type: String, required: true, index: true },
+    alternateContact: String,
+    messageNumber: String,
+
+    billingAddress: String,
+    deliveryAddress: String,
+    locality: String,
+    latitude: Number,
+    longitude: Number,
+
+    customerCode: { type: String, index: true },
+    connectionStartDate: { type: Date, default: Date.now },
+    sequenceNo: { type: Number, default: 0 },
+
+    /**
+     * Subscription summary for fast UI
+     * Full details stored in Subscription collection
+     */
+    activeSubscriptions: [
+      { type: mongoose.Schema.Types.ObjectId, ref: 'Subscription' },
+    ],
+    earliestExpiry: { type: Date, index: true },
+    planNamesSummary: [String], // optional UI boost ["Basic Pack", "Sports Addon"]
+
+    devices: [deviceSchema],
+
+    balanceAmount: { type: Number, default: 0 }, // auto-updated from transactions
+    unbilledAmount: { type: Number, default: 0 },
+    lastBillDate: Date,
+    lastBillAmount: Number,
+
+    lastPaymentAmount: Number,
+    lastPaymentDate: Date,
+    lastPaymentMethod: String,
+
+    // Customer-specific additional charge & discount defaults
+    defaultExtraCharge: { type: Number, default: 0 },
+    defaultDiscount: { type: Number, default: 0 },
+
+    billFrequency: { type: Number, default: 30 },
+    automaticBilling: { type: Boolean, default: false },
+
+    securityDeposit: { type: Number, default: 0 },
+    gstNumber: String,
+
+    active: { type: Boolean, default: true },
+    deleted: { type: Boolean, default: false },
+
+    remark: String,
+  },
+  { timestamps: true }
+);
+
+customerSchema.index({ operatorId: 1, contactNumber: 1 });
+
+module.exports = mongoose.model('Customer', customerSchema);

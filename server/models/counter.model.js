@@ -2,19 +2,18 @@ const mongoose = require('mongoose');
 
 const counterSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, unique: true }, // e.g. operatorId-202506
+    name: { type: String, required: true, unique: true }, // e.g. operatorId-202511
     operatorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Operator',
-      required: false, // not all counters need operator
     },
-    yearMonth: { type: String }, // e.g. '202506'
+    yearMonth: { type: String }, // '202511'
     value: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
 
-// Get next sequence for a generic name (used by expenseNumber, etc.)
+// generic sequence
 counterSchema.statics.getNextSequence = async function (name) {
   const counter = await this.findOneAndUpdate(
     { name },
@@ -24,14 +23,17 @@ counterSchema.statics.getNextSequence = async function (name) {
   return counter.value;
 };
 
-// Generate payment ID (operator + month-based)
-counterSchema.statics.getPaymentId = async function (operatorId) {
-  const now = new Date();
-  const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(
-    2,
-    '0'
-  )}`;
-  const key = `${operatorId}-${yearMonth}`;
+// INVOICE NUMBER: YYYYMMDD + 4-digit serial (monthly reset per operator)
+counterSchema.statics.getInvoiceNumber = async function (
+  operatorId,
+  date = new Date()
+) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  const yearMonth = `${year}${month}`; // "202511"
+  const key = `inv-${operatorId}-${yearMonth}`; // separate namespace
 
   const counter = await this.findOneAndUpdate(
     { name: key },
@@ -43,10 +45,10 @@ counterSchema.statics.getPaymentId = async function (operatorId) {
   );
 
   const serial = String(counter.value).padStart(4, '0');
-  return `${yearMonth}${serial}`; // e.g. 2025090001
+  return `${yearMonth}${day}${serial}`; // e.g. 202511120001
 };
 
-// Generate receipt number (continuous for operator)
+// RECEIPT NUMBER: continuous per operator
 counterSchema.statics.getReceiptNumber = async function (operatorId) {
   const key = `receipt-${operatorId}`;
   const counter = await this.findOneAndUpdate(

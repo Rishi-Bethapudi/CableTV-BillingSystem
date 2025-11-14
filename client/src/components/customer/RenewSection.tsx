@@ -9,6 +9,7 @@ interface RenewSubscriptionProps {
   isVisible: boolean;
   onRefresh: () => void;
 }
+
 const RenewSubscription = ({
   customer,
   isVisible,
@@ -18,17 +19,20 @@ const RenewSubscription = ({
   const [toDate, setToDate] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('30');
   const [selectedPackage, setSelectedPackage] = useState('');
-  const [packages, setPackages] = useState([]);
-  const [filteredPackages, setFilteredPackages] = useState([]);
+  const [packages, setPackages] = useState<any[]>([]);
+  const [filteredPackages, setFilteredPackages] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
   const [renewLoading, setRenewLoading] = useState(false);
 
-  // Check if subscription is expired
-  const isExpired = new Date(customer.expiryDate) < new Date();
+  const activeSubscription = customer?.subscriptions?.[0];
+  const activeProduct = activeSubscription?.product;
 
-  // Calculate end date when start date or period changes
+  const isExpired = customer?.earliestExpiry
+    ? new Date(customer.earliestExpiry) < new Date()
+    : true;
+
   useEffect(() => {
     if (fromDate && selectedPeriod) {
       const startDate = new Date(fromDate);
@@ -38,15 +42,15 @@ const RenewSubscription = ({
     }
   }, [fromDate, selectedPeriod]);
 
-  // Filter packages based on search term
   useEffect(() => {
     if (searchTerm) {
-      const filtered = packages.filter(
-        (pkg) =>
-          pkg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          pkg.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      setFilteredPackages(
+        packages.filter(
+          (pkg) =>
+            pkg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            pkg.description?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
       );
-      setFilteredPackages(filtered);
     } else {
       setFilteredPackages(packages);
     }
@@ -60,24 +64,15 @@ const RenewSubscription = ({
       setPackages(data);
       setFilteredPackages(data);
 
-      // Find the package name using customer's currentPackageId
-      if (customer?.productId[0] && data.length > 0) {
-        const matchedPackage = data.find(
-          (pkg: any) => pkg._id === customer.productId[0]._id
-        );
-
-        if (matchedPackage) {
-          setSelectedPackage(matchedPackage.name);
-          setSearchTerm(matchedPackage.name);
-        } else {
-          // fallback to first package if not found
+      if (activeProduct) {
+        const match = data.find((pkg: any) => pkg._id === activeProduct._id);
+        if (match) {
+          setSelectedPackage(match.name);
+          setSearchTerm(match.name);
+        } else if (data.length > 0) {
           setSelectedPackage(data[0].name);
           setSearchTerm(data[0].name);
         }
-      } else if (data.length > 0) {
-        // default fallback: use first package
-        setSelectedPackage(data[0].name);
-        setSearchTerm(data[0].name);
       }
     } catch (error) {
       console.error('Error fetching packages:', error);
@@ -90,23 +85,19 @@ const RenewSubscription = ({
     fetchPackages();
   }, []);
 
-  const handlePackageSelect = (pkg) => {
+  const handlePackageSelect = (pkg: any) => {
     setSelectedPackage(pkg.name);
     setSearchTerm(pkg.name);
     setShowDropdown(false);
   };
 
   const handleRenewToday = () => {
-    const today = new Date().toISOString().split('T')[0];
-    setFromDate(today);
+    setFromDate(new Date().toISOString().split('T')[0]);
   };
 
   const handleRenew = async () => {
     const selectedPkg = packages.find((pkg) => pkg.name === selectedPackage);
-    if (!selectedPkg) {
-      alert('Please select a package');
-      return;
-    }
+    if (!selectedPkg) return alert('Please select a package');
 
     const payload = {
       customerId: customer._id,
@@ -116,26 +107,23 @@ const RenewSubscription = ({
     };
 
     setRenewLoading(true);
-    try {
-      console.log('Renew payload:', payload);
-      // Mock API call - replace with actual API endpoint
-      await apiClient.post('/transactions/billing', payload);
-      // console.log('Renewing subscription with payload:', payload);
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      await apiClient.post('/transactions/billing', payload);
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
       toast.success('Subscription renewed successfully!');
-      if (onRefresh) onRefresh();
+      onRefresh?.();
     } catch (error) {
       console.error('Error renewing subscription:', error);
-      alert('Failed to renew subscription. Please try again.');
+      toast.error('Renewal failed. Try again.');
     } finally {
       setRenewLoading(false);
     }
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
@@ -146,7 +134,6 @@ const RenewSubscription = ({
   return (
     <div className="max-w-6xl mx-auto p-4">
       <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-        {/* Header with dynamic background */}
         <div
           className={`p-4 ${
             isExpired
@@ -171,12 +158,11 @@ const RenewSubscription = ({
 
         <div className="p-6 space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Left Section */}
+            {/* LEFT INFO PANEL */}
             <div className="space-y-4">
-              {/* Customer Name */}
               <div className="bg-gray-50 p-4 rounded-lg flex items-center gap-3">
                 <User className="w-5 h-5 text-gray-500" />
-                <div className="flex-1">
+                <div>
                   <span className="text-sm text-gray-600">Customer Name:</span>
                   <div className="font-semibold text-gray-900">
                     {customer.name}
@@ -184,20 +170,16 @@ const RenewSubscription = ({
                 </div>
               </div>
 
-              {/* Current Balance */}
-              <div className="bg-gray-50 p-4 rounded-lg flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CreditCard className="w-5 h-5 text-gray-500" />
-                  <span className="text-sm text-gray-600">
-                    Current Balance:
-                  </span>
-                </div>
+              <div className="bg-gray-50 p-4 rounded-lg flex justify-between">
+                <span className="text-sm text-gray-600 flex items-center gap-3">
+                  <CreditCard className="w-5 h-5 text-gray-500" /> Current
+                  Balance
+                </span>
                 <span className="font-semibold text-white bg-gray-700 px-3 py-1 rounded-md">
                   ₹{customer.balanceAmount}
                 </span>
               </div>
 
-              {/* Last Bill Date */}
               <div className="bg-gray-50 p-4 rounded-lg">
                 <div className="flex items-center gap-3 mb-2">
                   <Calendar className="w-5 h-5 text-gray-500" />
@@ -208,41 +190,35 @@ const RenewSubscription = ({
                 </div>
               </div>
 
-              {/* Date Range */}
+              {/* DATE PICKERS */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Start Date
-                  </label>
+                  <label className="text-sm mb-1 block">Start Date</label>
                   <input
                     type="date"
                     value={fromDate}
                     onChange={(e) => setFromDate(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="input-field"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    End Date
-                  </label>
+                  <label className="text-sm mb-1 block">End Date</label>
                   <input
                     type="date"
                     value={toDate}
                     readOnly
-                    className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                    className="input-field bg-gray-100 cursor-not-allowed"
                   />
                 </div>
               </div>
 
-              {/* Period Dropdown */}
+              {/* PERIOD SELECT */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Period
-                </label>
+                <label className="text-sm mb-1 block">Period</label>
                 <select
                   value={selectedPeriod}
                   onChange={(e) => setSelectedPeriod(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="input-field"
                 >
                   <option value="30">30 Days</option>
                   <option value="60">60 Days</option>
@@ -251,70 +227,18 @@ const RenewSubscription = ({
                   <option value="365">365 Days</option>
                 </select>
               </div>
-
-              {/* Searchable Package Dropdown */}
-              <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Package
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Search className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setShowDropdown(true);
-                    }}
-                    onFocus={() => setShowDropdown(true)}
-                    placeholder="Search packages..."
-                    className="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                {showDropdown && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {loading ? (
-                      <div className="p-3 text-center text-gray-500">
-                        Loading packages...
-                      </div>
-                    ) : filteredPackages.length > 0 ? (
-                      filteredPackages.map((pkg) => (
-                        <div
-                          key={pkg._id}
-                          onClick={() => handlePackageSelect(pkg)}
-                          className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
-                        >
-                          <div className="font-medium text-gray-900">
-                            {pkg.name}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            ₹{pkg.customerPrice}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="p-3 text-center text-gray-500">
-                        No packages found
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
             </div>
 
-            {/* Right Section: Current Subscription */}
+            {/* RIGHT STATUS PANEL */}
             <div
-              className={`p-6 rounded-lg h-fit ${
+              className={`p-6 rounded-lg h-fit border ${
                 isExpired
-                  ? 'bg-red-50 border border-red-200'
-                  : 'bg-green-50 border border-green-200'
+                  ? 'bg-red-50 border-red-200'
+                  : 'bg-green-50 border-green-200'
               }`}
             >
               <h4
-                className={`text-lg font-semibold mb-4 ${
+                className={`font-semibold mb-4 ${
                   isExpired ? 'text-red-800' : 'text-green-800'
                 }`}
               >
@@ -322,87 +246,95 @@ const RenewSubscription = ({
               </h4>
 
               <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Status:</span>
-                  <span
-                    className={`font-bold text-sm px-2 py-1 rounded ${
+                <StatusRow label="Status">
+                  <strong
+                    className={`px-2 py-1 rounded ${
                       isExpired
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-green-100 text-green-800'
+                        ? 'bg-red-100 text-red-600'
+                        : 'bg-green-100 text-green-700'
                     }`}
                   >
                     {isExpired ? 'EXPIRED' : 'ACTIVE'}
-                  </span>
-                </div>
+                  </strong>
+                </StatusRow>
 
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Active until:</span>
-                  <span
-                    className={`font-bold ${
-                      isExpired ? 'text-red-600' : 'text-green-600'
-                    }`}
-                  >
-                    {formatDate(customer.expiryDate)}
-                  </span>
-                </div>
+                <StatusRow label="Active until">
+                  {formatDate(customer.earliestExpiry)}
+                </StatusRow>
 
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Last renewal:</span>
-                  <span className="font-bold text-gray-800">
-                    {formatDate(customer.lastPaymentDate)}
-                  </span>
-                </div>
+                <StatusRow label="Last renewal">
+                  {formatDate(customer.lastPaymentDate)}
+                </StatusRow>
 
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">
-                    Current Package:
-                  </span>
-                  <span className="font-bold text-gray-800">
-                    {customer.productId.length > 0
-                      ? customer.productId[0].name
-                      : 'N/A'}
-                  </span>
-                </div>
-                {customer.productId.length > 1 && (
-                  <div>
-                    <span className="text-sm text-gray-600">Add-ons:</span>
-                    <ul className="mt-1 list-disc list-inside text-sm text-gray-800">
-                      {customer.productId.slice(1).map((addon) => (
-                        <li key={addon._id}>{addon.name}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {fromDate && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">New period:</span>
-                    <span className="font-bold text-blue-600">
-                      {selectedPeriod} days
-                    </span>
-                  </div>
+                <StatusRow label="Package">
+                  {activeProduct?.name || 'Not Subscribed'}
+                </StatusRow>
+
+                {activeProduct && fromDate && (
+                  <StatusRow label="New period">
+                    {selectedPeriod} days
+                  </StatusRow>
                 )}
               </div>
             </div>
+            {/* PACKAGE SEARCH */}
+            <div className="relative">
+              <label className="text-sm mb-1 block">Package</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setShowDropdown(true);
+                  }}
+                  onFocus={() => setShowDropdown(true)}
+                  placeholder="Search package…"
+                  className="input-field pl-10"
+                />
+              </div>
+
+              {showDropdown && (
+                <div className="absolute z-10 w-full bg-white shadow-lg rounded-lg border mt-1 max-h-60 overflow-y-auto">
+                  {loading ? (
+                    <div className="p-3 text-center text-gray-500">
+                      Loading…
+                    </div>
+                  ) : filteredPackages.length > 0 ? (
+                    filteredPackages.map((pkg) => (
+                      <div
+                        key={pkg._id}
+                        onClick={() => handlePackageSelect(pkg)}
+                        className="p-3 hover:bg-gray-100 cursor-pointer"
+                      >
+                        <div className="font-medium">{pkg.name}</div>
+                        <div className="text-sm text-gray-600">
+                          ₹{pkg.customerPrice}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-3 text-center text-gray-500">
+                      No results
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col md:flex-row gap-4 pt-6 border-t border-gray-200">
-            <button
-              onClick={handleRenewToday}
-              className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-            >
+          {/* ACTION BUTTONS */}
+          <div className="flex flex-col md:flex-row gap-4 border-t pt-6">
+            <button onClick={handleRenewToday} className="btn-secondary">
               Renew From Today
             </button>
             <button
               onClick={handleRenew}
-              disabled={renewLoading || !selectedPackage || !fromDate}
-              className={`flex-1 px-6 py-3 rounded-lg font-medium transition-colors ${
-                renewLoading || !selectedPackage || !fromDate
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-green-600 hover:bg-green-700 text-white'
-              }`}
+              disabled={!selectedPackage || !fromDate || renewLoading}
+              className="btn-primary"
             >
-              {renewLoading ? 'Renewing...' : 'Renew Subscription'}
+              {renewLoading ? 'Renewing…' : 'Renew Subscription'}
             </button>
           </div>
         </div>
@@ -410,5 +342,12 @@ const RenewSubscription = ({
     </div>
   );
 };
+
+const StatusRow = ({ children, label }: any) => (
+  <div className="flex justify-between text-sm">
+    <span className="text-gray-600">{label}:</span>
+    <span className="font-bold">{children}</span>
+  </div>
+);
 
 export default RenewSubscription;

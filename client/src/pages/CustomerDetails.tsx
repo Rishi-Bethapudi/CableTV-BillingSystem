@@ -60,6 +60,7 @@ export default function CustomerDetails() {
   if (!customer) {
     return <div className="p-6 text-red-500">Customer not found.</div>;
   }
+  console.log('Rendering CustomerDetails for:', customer);
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto space-y-3">

@@ -12,9 +12,10 @@ const transactionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Operator',
       required: true,
+      index: true,
     },
 
-    // Who performed it
+    // Who performed it (Operator / Agent)
     collectedBy: {
       type: mongoose.Schema.Types.ObjectId,
       refPath: 'collectedByType',
@@ -25,34 +26,58 @@ const transactionSchema = new mongoose.Schema(
       enum: ['Operator', 'Agent'],
     },
 
-    // Type of transaction
+    // Type of transaction (accrual style)
     type: {
       type: String,
       required: true,
-      enum: ['Billing', 'Collection', 'Adjustment', 'AddOn'],
+      enum: ['INVOICE', 'PAYMENT', 'ADJUSTMENT', 'REVERSAL'],
+      index: true,
     },
+
+    /**
+     * Signed amount:
+     *  - INVOICE  => +ve (customer owes more)
+     *  - PAYMENT  => -ve (customer owes less)
+     *  - ADJUSTMENT/REVERSAL: depends on case
+     */
     amount: { type: Number, required: true },
 
     // Ledger tracking
     balanceBefore: { type: Number, required: true },
     balanceAfter: { type: Number, required: true },
 
-    // Reference to subscriptions
-    subscriptionId: { type: mongoose.Schema.Types.ObjectId }, // optional
-    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    // Link to subscription & product (optional)
+    subscriptionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Subscription', // once you create it
+    },
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+    },
 
-    // Period covered
+    // Period covered by this invoice (for renewals)
     startDate: Date,
     expiryDate: Date,
 
-    // Invoice/receipts
-    invoiceId: String,
-    receiptNumber: String,
+    // Invoice & receipt identifiers
+    invoiceId: { type: String, index: true }, // e.g. 202511120001
+    receiptNumber: { type: String, index: true },
 
-    // Profit calculation
-    costOfGoodsSold: { type: Number, default: 0 },
+    // Billing breakdown (for INVOICE)
+    baseAmount: { type: Number, default: 0 }, // sum of plan prices
+    extraCharge: { type: Number, default: 0 }, // second TV, wiring, etc.
+    discount: { type: Number, default: 0 }, // customer-level discount
+    netAmount: { type: Number, default: 0 }, // base + extra - discount
 
-    // Payment method
+    // Profit calculation – accrual
+    costOfGoodsSold: { type: Number, default: 0 }, // sum of operatorCost
+    profit: { type: Number, default: 0 }, // netAmount - COGS
+
+    // Flags
+    isOpeningBalance: { type: Boolean, default: false },
+
+    // Payment method (for PAYMENT)
     method: {
       type: String,
       enum: ['Cash', 'Online', 'Cheque', 'Adjustment', 'UPI'],
@@ -63,6 +88,11 @@ const transactionSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Helpful indexes for reports
+transactionSchema.index({ operatorId: 1, customerId: 1, createdAt: -1 });
+transactionSchema.index({ operatorId: 1, type: 1, createdAt: -1 });
+transactionSchema.index({ operatorId: 1, invoiceId: 1 });
 
 const Transaction = mongoose.model('Transaction', transactionSchema);
 module.exports = Transaction;

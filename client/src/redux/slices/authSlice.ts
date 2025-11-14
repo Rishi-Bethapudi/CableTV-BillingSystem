@@ -7,15 +7,21 @@ export const loginAsync = createAsyncThunk(
   'auth/login',
   async (payload: { identifier: string; password: string }, { rejectWithValue }) => {
     try {
-      const response = await axios.post('https://cabletv-billingsystem.onrender.com/api/auth/login', payload);
-      // const response = await apiClient.post('/auth/login', payload);
+      console.log('Logging in with payload:', payload);
+      // const response = await axios.post('https://cabletv-billingsystem.onrender.com/api/auth/login', payload);
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_BASE_URL}/auth/login`,
+        payload
+      );
+
       const { accessToken, refreshToken, user } = response.data;
 
       await Preferences.set({ key: 'accessToken', value: accessToken });
       await Preferences.set({ key: 'refreshToken', value: refreshToken });
 
       return { accessToken, user };
-    } catch (err: any) {
+    } catch (err) {
+      console.error("Login error:", err);
       return rejectWithValue(err.response?.data?.message || 'Login failed');
     }
   }

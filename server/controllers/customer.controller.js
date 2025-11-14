@@ -1,8 +1,15 @@
-const Customer = require('../models/customer.model'); // Assuming your model is here
-const Operator = require('../models/operator.model'); // For tenancy checks
+const Customer = require('../models/customer.model');
+const Operator = require('../models/operator.model');
+const Subscription = require('../models/subscription.model');
+const Transaction = require('../models/transaction.model');
+
 const mongoose = require('mongoose');
 const xlsx = require('xlsx'); // For Excel import/export
 const fs = require('fs'); // To clean up uploaded files
+
+const generateCustomerCode = (operatorId, sequenceNo) => {
+  return `C${String(sequenceNo).padStart(5, '0')}`;
+};
 
 /**
  * @desc    Create a new customer
@@ -10,6 +17,9 @@ const fs = require('fs'); // To clean up uploaded files
  * @access  Private (Operator only)
  */
 const createCustomer = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const {
       customerCode,
@@ -22,97 +32,125 @@ const createCustomer = async (req, res) => {
       agentId,
       billingAddress,
       balanceAmount = 0,
-      additionalCharge = 0,
-      discount = 0,
-      lastPaymentAmount = 0,
-      lastPaymentDate = null,
-      productIds = [],
+      additionalCharge = 0, // legacy name, maps to defaultExtraCharge
+      discount = 0, // legacy name, maps to defaultDiscount
       remark = '',
+      connectionStartDate,
     } = req.body;
 
     if (!name || !mobile) {
-      return res.status(400).json({ message: 'Please provide name, mobile.' });
+      return res
+        .status(400)
+        .json({ message: 'Please provide name and mobile.' });
+    }
+
+    // Only operator should be allowed here
+    if (req.user.role !== 'operator') {
+      return res
+        .status(403)
+        .json({ message: 'Only operator can create customers.' });
     }
 
     const operatorId = req.user.id;
 
-    // Generate sequence number
-    const lastCustomer = await Customer.findOne({ operatorId }).sort({
-      createdAt: -1,
-    });
+    // Generate sequence number per operator
+    const lastCustomer = await Customer.findOne({ operatorId })
+      .sort({ sequenceNo: -1 })
+      .select('sequenceNo')
+      .session(session);
+
     const newSequenceNo = lastCustomer ? lastCustomer.sequenceNo + 1 : 1;
 
-    // Duplicate check
-    let duplicateQuery = [{ mobile }];
-    if (stbNumber) duplicateQuery.push({ stbNumber });
+    // Duplicate check: mobile / STB / card
+    const duplicateOr = [
+      { contactNumber: mobile },
+      { contactNumber: String(mobile) },
+    ];
+    if (stbNumber) duplicateOr.push({ 'devices.stbNumber': stbNumber });
+    if (cardNumber) duplicateOr.push({ 'devices.cardNumber': cardNumber });
+
     const existingCustomer = await Customer.findOne({
       operatorId,
-      $or: duplicateQuery,
-    });
+      $or: duplicateOr,
+      deleted: false,
+    }).session(session);
+
     if (existingCustomer) {
-      let field =
-        existingCustomer.mobile === mobile ? 'mobile number' : 'STB number';
+      let field = 'contact';
+      if (existingCustomer.contactNumber === mobile) field = 'mobile number';
+      // we can’t easily know STB vs card without extra checks, but mobile is common case
       return res
         .status(409)
         .json({ message: `Customer with this ${field} already exists.` });
     }
 
-    // Subscriptions build
-    const subscriptions = [];
-    for (let pid of productIds) {
-      const product = await Product.findById(pid);
-      if (!product) continue;
-
-      const startDate = new Date();
-      let expiryDate;
-
-      if (product.billingInterval.unit === 'months') {
-        expiryDate = new Date(startDate);
-        expiryDate.setMonth(
-          startDate.getMonth() + product.billingInterval.value
-        );
-      } else {
-        expiryDate = new Date(
-          startDate.getTime() +
-            product.billingInterval.value * 24 * 60 * 60 * 1000
-        );
-      }
-
-      subscriptions.push({
-        productId: product._id,
-        startDate,
-        expiryDate,
-        billingInterval: product.billingInterval,
-        price: product.customerPrice,
-        status: 'active',
+    // Build devices array (single primary device for now)
+    const devices = [];
+    if (stbNumber || cardNumber) {
+      devices.push({
+        stbNumber: stbNumber || undefined,
+        cardNumber: cardNumber || undefined,
+        deviceModel: stbName || undefined,
+        active: true,
       });
     }
 
-    const newCustomer = new Customer({
+    const initialBalance = Number(balanceAmount) || 0;
+
+    const customer = new Customer({
       operatorId,
       agentId: agentId || null,
-      customerCode,
+      customerCode:
+        customerCode || generateCustomerCode(operatorId, newSequenceNo),
       sequenceNo: newSequenceNo,
       name,
-      mobile,
+      contactNumber: mobile,
       locality,
-      stbName,
-      stbNumber,
-      cardNumber,
       billingAddress,
-      balanceAmount,
-      additionalCharge,
-      discount,
-      lastPaymentAmount,
-      lastPaymentDate,
-      subscriptions,
-      active: true,
+      devices,
+      balanceAmount: initialBalance, // will be backed by transaction below if non-zero
+      defaultExtraCharge: Number(additionalCharge) || 0,
+      defaultDiscount: Number(discount) || 0,
       remark,
+      connectionStartDate: connectionStartDate
+        ? new Date(connectionStartDate)
+        : new Date(),
+      active: true,
+      deleted: false,
+      activeSubscriptions: [],
+      earliestExpiry: null,
     });
 
-    const savedCustomer = await newCustomer.save();
-    res.status(201).json(savedCustomer);
+    await customer.save({ session });
+
+    // If initial balance is non-zero, create an "opening balance" transaction
+    if (initialBalance !== 0) {
+      await Transaction.create(
+        [
+          {
+            customerId: customer._id,
+            operatorId,
+            collectedBy: req.user.id,
+            collectedByType: 'Operator',
+            type: 'ADJUSTMENT',
+            amount: initialBalance, // positive => customer owes this much
+            balanceBefore: 0,
+            balanceAfter: initialBalance,
+            isOpeningBalance: true,
+            note: 'Opening balance on customer creation',
+          },
+        ],
+        { session }
+      );
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(201).json(customer);
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error('Error creating customer:', error);
     res.status(500).json({ message: 'Server error while creating customer.' });
   }
@@ -134,20 +172,21 @@ const getCustomers = async (req, res) => {
 
     // Deleted filter handling
     if (req.query.includeDeleted === 'true') {
-      query.deleted = true; // ✅ only deleted customers
+      query.deleted = true; // only deleted
     } else {
-      query.deleted = false; // ✅ exclude deleted customers
+      query.deleted = false; // normal view excludes deleted
     }
 
     // Active / inactive filter
     if (req.query.customerStatus === 'active') query.active = true;
     else if (req.query.customerStatus === 'inactive') query.active = false;
 
+    // Locality filter
     if (req.query.locality) {
       query.locality = new RegExp(req.query.locality, 'i');
     }
 
-    // Expiry filters (applied only when not querying deleted customers)
+    // Renewal / expiry filters using earliestExpiry
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -155,9 +194,7 @@ const getCustomers = async (req, res) => {
       if (req.query.dueToday === 'true') {
         const tomorrow = new Date(today);
         tomorrow.setDate(today.getDate() + 1);
-        query.subscriptions = {
-          $elemMatch: { expiryDate: { $gte: today, $lt: tomorrow } },
-        };
+        query.earliestExpiry = { $gte: today, $lt: tomorrow };
       }
 
       if (req.query.dueTomorrow === 'true') {
@@ -165,17 +202,13 @@ const getCustomers = async (req, res) => {
         tomorrow.setDate(today.getDate() + 1);
         const dayAfter = new Date(today);
         dayAfter.setDate(today.getDate() + 2);
-        query.subscriptions = {
-          $elemMatch: { expiryDate: { $gte: tomorrow, $lt: dayAfter } },
-        };
+        query.earliestExpiry = { $gte: tomorrow, $lt: dayAfter };
       }
 
       if (req.query.dueNext5Days === 'true') {
         const in5Days = new Date(today);
         in5Days.setDate(today.getDate() + 5);
-        query.subscriptions = {
-          $elemMatch: { expiryDate: { $gte: today, $lt: in5Days } },
-        };
+        query.earliestExpiry = { $gte: today, $lt: in5Days };
       }
     }
 
@@ -184,10 +217,16 @@ const getCustomers = async (req, res) => {
     if (req.query.balance === 'due') query.balanceAmount = { $gt: 0 };
     if (req.query.balance === 'advance') query.balanceAmount = { $lt: 0 };
 
-    // Search
+    // Search - by name, contact, code, STB, card
     if (req.query.search) {
       const regex = new RegExp(req.query.search, 'i');
-      query.$or = [{ name: regex }, { mobile: regex }, { stbNumber: regex }];
+      query.$or = [
+        { name: regex },
+        { contactNumber: regex },
+        { customerCode: regex },
+        { 'devices.stbNumber': regex },
+        { 'devices.cardNumber': regex },
+      ];
     }
 
     // Sorting
@@ -195,32 +234,14 @@ const getCustomers = async (req, res) => {
     const sortOrder = req.query.order === 'asc' ? 1 : -1;
     const sort = { [sortField]: sortOrder };
 
-    // Query execution
     const customers = await Customer.find(query)
       .populate('agentId', 'name')
-      .populate('subscriptions.productId', 'name customerPrice')
       .sort(sort)
       .skip(skip)
       .limit(limit)
       .lean();
 
     const total = await Customer.countDocuments(query);
-
-    // Compute earliest expiry only for non-deleted
-    if (req.query.includeDeleted !== 'true') {
-      customers.forEach((c) => {
-        if (c.subscriptions && c.subscriptions.length > 0) {
-          c.earliestExpiry = c.subscriptions.reduce((earliest, sub) => {
-            if (!earliest) return sub.expiryDate;
-            return new Date(sub.expiryDate) < new Date(earliest)
-              ? sub.expiryDate
-              : earliest;
-          }, null);
-        } else {
-          c.earliestExpiry = null;
-        }
-      });
-    }
 
     res.status(200).json({
       data: customers,
@@ -238,7 +259,7 @@ const getCustomers = async (req, res) => {
 };
 
 /**
- * @desc    Get a single customer by ID
+ * @desc    Get a single customer by ID (with optional subscription list)
  * @route   GET /api/customers/:id
  * @access  Private (Operator or Agent)
  */
@@ -249,26 +270,42 @@ const getCustomerById = async (req, res) => {
       return res.status(400).json({ message: 'Invalid customer ID format.' });
     }
 
-    const query = {
+    const baseQuery = {
       _id: customerId,
       operatorId: req.user.operatorId,
-      deleted: false, // 👈 exclude deleted customers
+      deleted: false,
     };
 
-    // Allow admins to view deleted customer if explicitly requested
     if (req.query.includeDeleted === 'true') {
-      delete query.deleted;
+      delete baseQuery.deleted;
     }
 
-    const customer = await Customer.findOne(query)
+    const customer = await Customer.findOne(baseQuery)
       .populate('agentId', 'name email')
-      .populate('subscriptions.productId', 'name customerPrice billingInterval')
       .lean();
 
-    if (!customer)
+    if (!customer) {
       return res.status(404).json({ message: 'Customer not found.' });
+    }
 
-    res.status(200).json(customer);
+    // Optionally include subscription history
+    const includeSubscriptions = req.query.includeSubscriptions === 'true';
+
+    let subscriptions = [];
+    if (includeSubscriptions) {
+      subscriptions = await Subscription.find({
+        customerId,
+        operatorId: req.user.operatorId,
+      })
+        .populate('productId', 'name planType customerPrice')
+        .sort({ startDate: -1 })
+        .lean();
+    }
+
+    res.status(200).json({
+      customer,
+      subscriptions,
+    });
   } catch (error) {
     console.error('Error fetching customer by ID:', error);
     res.status(500).json({ message: 'Server error while fetching customer.' });
@@ -276,7 +313,7 @@ const getCustomerById = async (req, res) => {
 };
 
 /**
- * @desc    Update a customer
+ * @desc    Update a customer (profile-level fields only)
  * @route   PUT /api/customers/:id
  * @access  Private (Operator only)
  */
@@ -290,35 +327,105 @@ const updateCustomer = async (req, res) => {
     const customer = await Customer.findById(customerId);
     if (!customer)
       return res.status(404).json({ message: 'Customer not found.' });
-    if (customer.operatorId.toString() !== req.user.id) {
+
+    if (customer.operatorId.toString() !== req.user.operatorId) {
       return res.status(403).json({ message: 'Unauthorized access.' });
     }
 
-    // Don't allow operatorId/subscriptions overwrite here
-    delete req.body.operatorId;
-    delete req.body.subscriptions;
+    if (req.user.role !== 'operator') {
+      return res
+        .status(403)
+        .json({ message: 'Only operator can update customer.' });
+    }
+
+    // Protect non-editable fields
+    const blockedFields = [
+      'operatorId',
+      'balanceAmount',
+      'activeSubscriptions',
+      'earliestExpiry',
+      'deleted',
+    ];
+    blockedFields.forEach((f) => delete req.body[f]);
+
+    // Map legacy field names
+    if (req.body.mobile !== undefined) {
+      req.body.contactNumber = req.body.mobile;
+      delete req.body.mobile;
+    }
+    if (req.body.additionalCharge !== undefined) {
+      req.body.defaultExtraCharge = req.body.additionalCharge;
+      delete req.body.additionalCharge;
+    }
+    if (req.body.discount !== undefined) {
+      req.body.defaultDiscount = req.body.discount;
+      delete req.body.discount;
+    }
+
+    // Simple device handling: if stb/card number sent, update first device
+    const deviceUpdates = {};
+    if (req.body.stbNumber !== undefined)
+      deviceUpdates.stbNumber = req.body.stbNumber;
+    if (req.body.cardNumber !== undefined)
+      deviceUpdates.cardNumber = req.body.cardNumber;
+    if (req.body.stbName !== undefined)
+      deviceUpdates.deviceModel = req.body.stbName;
+
+    // Check STB/card duplicates if changed
+    if (deviceUpdates.stbNumber || deviceUpdates.cardNumber) {
+      const duplicateDevice = await Customer.findOne({
+        _id: { $ne: customerId },
+        operatorId: req.user.operatorId,
+        deleted: false,
+        $or: [
+          deviceUpdates.stbNumber
+            ? { 'devices.stbNumber': deviceUpdates.stbNumber }
+            : null,
+          deviceUpdates.cardNumber
+            ? { 'devices.cardNumber': deviceUpdates.cardNumber }
+            : null,
+        ].filter(Boolean),
+      });
+
+      if (duplicateDevice) {
+        return res.status(409).json({
+          message: 'Another customer already uses this STB/card number.',
+        });
+      }
+    }
 
     const updatableFields = [
       'name',
-      'mobile',
+      'contactNumber',
       'locality',
-      'stbName',
-      'stbNumber',
-      'cardNumber',
       'billingAddress',
-      'balanceAmount',
-      'additionalCharge',
-      'discount',
+      'defaultExtraCharge',
+      'defaultDiscount',
       'lastPaymentAmount',
       'lastPaymentDate',
       'remark',
       'active',
+      'messageNumber',
+      'alternateContact',
+      'gstNumber',
+      'agentId',
     ];
 
     const updates = {};
+
     updatableFields.forEach((field) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     });
+
+    // Apply device changes to first device
+    if (Object.keys(deviceUpdates).length > 0) {
+      if (!customer.devices || customer.devices.length === 0) {
+        customer.devices = [{ ...deviceUpdates, active: true }];
+      } else {
+        customer.devices[0] = { ...customer.devices[0]._doc, ...deviceUpdates };
+      }
+      updates.devices = customer.devices;
+    }
 
     const updatedCustomer = await Customer.findByIdAndUpdate(
       customerId,
@@ -345,22 +452,45 @@ const deleteCustomer = async (req, res) => {
       return res.status(400).json({ message: 'Invalid customer ID format.' });
     }
 
-    const customerToDelete = await Customer.findById(customerId);
-
-    if (!customerToDelete) {
+    const customer = await Customer.findById(customerId);
+    if (!customer) {
       return res.status(404).json({ message: 'Customer not found.' });
     }
 
-    if (customerToDelete.operatorId.toString() !== req.user.id) {
-      return res.status(403).json({
-        message: 'Forbidden: You are not authorized to delete this customer.',
+    if (customer.operatorId.toString() !== req.user.operatorId) {
+      return res
+        .status(403)
+        .json({
+          message: 'Forbidden: You are not authorized to delete this customer.',
+        });
+    }
+
+    if (req.user.role !== 'operator') {
+      return res
+        .status(403)
+        .json({ message: 'Only operator can delete a customer.' });
+    }
+
+    // Professional safety: don’t delete customers with outstanding balance
+    if (customer.balanceAmount !== 0) {
+      return res.status(400).json({
+        message:
+          'Customer has non-zero balance. Please settle or adjust via transactions before deleting.',
       });
     }
 
-    // ✅ Soft delete instead of removing
-    customerToDelete.deleted = true;
-    customerToDelete.active = false;
-    await customerToDelete.save();
+    // Terminate active subscriptions
+    await Subscription.updateMany(
+      { customerId, operatorId: req.user.operatorId, status: 'ACTIVE' },
+      { $set: { status: 'TERMINATED' } }
+    );
+
+    customer.deleted = true;
+    customer.active = false;
+    customer.activeSubscriptions = [];
+    customer.earliestExpiry = null;
+
+    await customer.save();
 
     res.status(200).json({ message: 'Customer soft deleted successfully.' });
   } catch (error) {

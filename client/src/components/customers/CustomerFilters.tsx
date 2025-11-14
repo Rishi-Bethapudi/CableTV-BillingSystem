@@ -1,333 +1,119 @@
-import { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
   Select,
-  SelectContent,
-  SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectContent,
+  SelectItem,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from '@/components/ui/popover';
-import { Search, Filter, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 
 interface Props {
-  onSearchChange: (value: string) => void;
-  onStatusChange: (value: string) => void;
-  onBalanceChange: (value: string) => void;
-  onAreaChange: (value: string) => void;
-  onDueTodayChange: (value: boolean) => void;
-  onDueTomorrowChange: (value: boolean) => void;
-  onDueNext5DaysChange: (value: boolean) => void;
-  onSortChange: (value: string) => void;
-  onOrderChange: (value: string) => void;
-  operatorAreas?: string[]; // NEW: list of localities from operator
+  filters: any;
+  setFilters: (updater: any) => void;
+  operatorAreas?: string[];
 }
 
 export default function CustomerFilters({
-  onSearchChange,
-  onStatusChange,
-  onBalanceChange,
-  onAreaChange,
-  onDueTodayChange,
-  onDueTomorrowChange,
-  onDueNext5DaysChange,
-  onSortChange,
-  onOrderChange,
+  filters,
+  setFilters,
   operatorAreas,
 }: Props) {
-  const [search, setSearch] = useState('');
-  const [popoverOpen, setPopoverOpen] = useState(false);
-
-  const [dueFilters, setDueFilters] = useState({
-    dueToday: false,
-    dueTomorrow: false,
-    dueNext5Days: false,
-  });
-
-  const filterOptions = [
-    { key: 'dueToday', label: 'Due Today' },
-    { key: 'dueTomorrow', label: 'Due Tomorrow' },
-    { key: 'dueNext5Days', label: 'Due in 5 Days' },
-  ] as const;
-
-  const toggleFilter = (key: keyof typeof dueFilters) => {
-    setDueFilters((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const resetFilters = () => {
-    onStatusChange('');
-    onBalanceChange('');
-    onAreaChange('');
-    onDueTodayChange(false);
-    onDueTomorrowChange(false);
-    onDueNext5DaysChange(false);
-    onSortChange('');
-    onOrderChange('');
-    setDueFilters({
+  const reset = () => {
+    setFilters({
+      searchTerm: '',
+      statusFilter: '',
+      balanceFilter: '',
+      areaFilter: '',
       dueToday: false,
       dueTomorrow: false,
       dueNext5Days: false,
+      sortBy: 'createdAt',
+      order: 'desc',
+      deleted: false,
     });
-    setSearch('');
-    onSearchChange('');
   };
 
-  // debounce search
-  useEffect(() => {
-    const debounce = setTimeout(() => {
-      onSearchChange(search);
-    }, 400);
-    return () => clearTimeout(debounce);
-  }, [search]);
-
-  // sync due filters with parent
-  useEffect(() => {
-    onDueTodayChange(dueFilters.dueToday);
-    onDueTomorrowChange(dueFilters.dueTomorrow);
-    onDueNext5DaysChange(dueFilters.dueNext5Days);
-  }, [dueFilters]);
-
   return (
-    <div className="space-y-6 w-full px-2 sm:px-4 lg:px-6">
-      <div className="flex flex-col gap-4 w-full">
-        {/* Mobile */}
-        <div className="flex items-center gap-2 lg:hidden">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search customers..."
-              className="pl-10"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+    <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <Select
+        value={filters.statusFilter}
+        onValueChange={(v) =>
+          setFilters((p: any) => ({ ...p, statusFilter: v }))
+        }
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="active">Active</SelectItem>
+          <SelectItem value="inactive">Inactive</SelectItem>
+        </SelectContent>
+      </Select>
 
-          {/* Mobile Filter Popover */}
-          <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Filter className="h-5 w-5" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 space-y-4" align="end">
-              {/* Balance */}
-              <Select onValueChange={onBalanceChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select Balance" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="zero">Zero/Paid</SelectItem>
-                  <SelectItem value="due">Unpaid</SelectItem>
-                  <SelectItem value="advance">Advance</SelectItem>
-                </SelectContent>
-              </Select>
+      <Select
+        value={filters.balanceFilter}
+        onValueChange={(v) =>
+          setFilters((p: any) => ({ ...p, balanceFilter: v }))
+        }
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Balance" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="zero">Zero / Paid</SelectItem>
+          <SelectItem value="due">Due</SelectItem>
+          <SelectItem value="advance">Advance</SelectItem>
+        </SelectContent>
+      </Select>
 
-              {/* Status */}
-              <Select onValueChange={onStatusChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="deleted">Deleted</SelectItem>
-                </SelectContent>
-              </Select>
+      <Select
+        value={filters.areaFilter}
+        onValueChange={(v) => setFilters((p: any) => ({ ...p, areaFilter: v }))}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Area" />
+        </SelectTrigger>
+        <SelectContent>
+          {(operatorAreas || []).map((area) => (
+            <SelectItem key={area} value={area}>
+              {area}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
-              {/* Area (dynamic from operator) */}
-              <Select onValueChange={onAreaChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select Area" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(operatorAreas || []).map((area) => (
-                    <SelectItem key={area} value={area}>
-                      {area}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      <Select
+        value={filters.sortBy}
+        onValueChange={(v) => setFilters((p: any) => ({ ...p, sortBy: v }))}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Sort by" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="name">Name</SelectItem>
+          <SelectItem value="balanceAmount">Balance</SelectItem>
+          <SelectItem value="earliestExpiry">Expiry</SelectItem>
+        </SelectContent>
+      </Select>
 
-              {/* Due filters */}
-              <div className="space-y-2">
-                {filterOptions.map(({ key, label }) => (
-                  <label
-                    key={key}
-                    className={`flex items-center gap-2 text-sm px-3 py-1 rounded-md cursor-pointer transition-colors
-                      ${
-                        dueFilters[key]
-                          ? 'bg-primary text-white'
-                          : 'bg-gray-100 hover:bg-gray-200'
-                      }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={dueFilters[key]}
-                      onChange={() => toggleFilter(key)}
-                      className="accent-primary"
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
+      <Select
+        value={filters.order}
+        onValueChange={(v) => setFilters((p: any) => ({ ...p, order: v }))}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Order" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="asc">Ascending</SelectItem>
+          <SelectItem value="desc">Descending</SelectItem>
+        </SelectContent>
+      </Select>
 
-              {/* Sort */}
-              <Select onValueChange={onSortChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">Name</SelectItem>
-                  <SelectItem value="balanceAmount">Balance</SelectItem>
-                  <SelectItem value="earliestExpiry">Expiry</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Order */}
-              <Select onValueChange={onOrderChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Order" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="asc">Ascending</SelectItem>
-                  <SelectItem value="desc">Descending</SelectItem>
-                </SelectContent>
-              </Select>
-            </PopoverContent>
-          </Popover>
-
-          <Button variant="outline" size="icon" onClick={resetFilters}>
-            <RotateCcw className="h-5 w-5" />
-          </Button>
-        </div>
-
-        {/* Desktop */}
-        <div className="w-full px-2 sm:px-4 lg:px-6">
-          <div className="flex flex-wrap gap-4 w-full items-center">
-            {/* Balance */}
-            <div className="flex-1 min-w-[150px]">
-              <Select onValueChange={onBalanceChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select Balance" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="zero">Zero/Paid</SelectItem>
-                  <SelectItem value="due">Unpaid</SelectItem>
-                  <SelectItem value="advance">Advance</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Status */}
-            <div className="flex-1 min-w-[150px]">
-              <Select onValueChange={onStatusChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="deleted">Deleted</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Area */}
-            <div className="flex-1 min-w-[150px]">
-              <Select onValueChange={onAreaChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select Area" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(operatorAreas || []).map((area) => (
-                    <SelectItem key={area} value={area}>
-                      {area}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Due Filters
-            <div className="flex flex-wrap gap-2 flex-1 min-w-[200px]">
-              {filterOptions.map(({ key, label }) => (
-                <button
-                  key={key}
-                  className={`px-4 py-1 text-sm font-medium rounded-full transition-colors ${
-                    dueFilters[key]
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-100 text-gray-700'
-                  }`}
-                  onClick={() => toggleFilter(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div> */}
-
-            {/* Sort */}
-            <div className="flex-1 min-w-[150px]">
-              <Select onValueChange={onSortChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">Name</SelectItem>
-                  <SelectItem value="balanceAmount">Balance</SelectItem>
-                  <SelectItem value="earliestExpiry">Expiry</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Order
-            <div className="flex-1 min-w-[120px]">
-              <Select onValueChange={onOrderChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Order" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="asc">Asc</SelectItem>
-                  <SelectItem value="desc">Desc</SelectItem>
-                </SelectContent>
-              </Select>
-            </div> */}
-
-            {/* Reset Button */}
-            <div className="flex-none">
-              <Button
-                variant="ghost"
-                onClick={resetFilters}
-                className="text-sm gap-2"
-              >
-                <RotateCcw className="h-4 w-4" /> Reset
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick mobile buttons for Due Today/Tomorrow/Next5Days */}
-      <div className="lg:hidden flex gap-2 overflow-x-auto no-scrollbar">
-        {filterOptions.map(({ key, label }) => (
-          <button
-            key={key}
-            className={`px-4 py-1 text-sm font-medium rounded-full transition-colors ${
-              dueFilters[key]
-                ? 'bg-primary text-white'
-                : 'bg-gray-100 text-gray-700'
-            }`}
-            onClick={() => toggleFilter(key)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <Button variant="ghost" onClick={reset} className="gap-1">
+        <RotateCcw className="h-4 w-4" /> Reset
+      </Button>
     </div>
   );
 }
