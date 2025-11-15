@@ -40,7 +40,6 @@ export default function CustomerHeader({ customer }: { customer: Customer }) {
     : 'N/A';
   const isExpired =
     customer.earliestExpiry && new Date(customer.earliestExpiry) < new Date();
-
   return (
     <>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -50,9 +49,11 @@ export default function CustomerHeader({ customer }: { customer: Customer }) {
           </Button>
         </Link>
 
-        <h1 className="flex-1 text-center text-4xl font-bold text-slate-900 dark:text-white">
-          {customer?.name}
-        </h1>
+        <div className="flex-1 flex justify-center">
+          <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white truncate max-w-full">
+            {customer?.name}
+          </h1>
+        </div>
 
         <div className="flex items-center gap-4">
           {customer.earliestExpiry && (

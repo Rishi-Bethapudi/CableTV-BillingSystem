@@ -5,6 +5,7 @@ export default function CustomerMainDetails({
 }: {
   customer: Customer;
 }) {
+  console.log('Rendering  for:', customer);
   const device =
     customer.devices?.find((d) => d.active) || customer.devices?.[0];
 
