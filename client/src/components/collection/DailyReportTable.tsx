@@ -5,7 +5,8 @@ interface DailyReportTableProps {
 import { useNavigate } from 'react-router-dom';
 export const DailyReportTable = ({ date, data }: DailyReportTableProps) => {
   const navigate = useNavigate();
-  console.log('Rendering DailyReportTable for date:', date, data);
+  // console.log('Rendering DailyReportTable for date:', date, data);
+  const strongDay = (data?.summary?.amount || 0) >= 5000;
   return (
     <div className="bg-white rounded-lg shadow-sm mb-4 overflow-x-auto">
       <table className="w-full min-w-max border-collapse">
@@ -14,7 +15,9 @@ export const DailyReportTable = ({ date, data }: DailyReportTableProps) => {
           <tr>
             <th
               colSpan={12}
-              className="bg-slate-800 text-white p-2 text-center font-semibold text-sm"
+              className={`bg-slate-800 text-white p-2 text-center font-semibold text-sm ${
+                strongDay ? 'ring-2 ring-yellow-300 ring-offset-1' : ''
+              }`}
             >
               {date}
             </th>
@@ -60,7 +63,7 @@ export const DailyReportTable = ({ date, data }: DailyReportTableProps) => {
               className="p-2 bg-gray-50 border border-gray-200 align-top"
             >
               <div className="space-y-2">
-                {Object.entries(data.areas).map(
+                {Object.entries(data?.areas || {}).map(
                   ([area, areaData]: [string, any]) => (
                     <div key={area} className="bg-gray-100 rounded p-1">
                       <div className="font-semibold text-gray-800 mb-1 bg-gray-200 p-1 rounded text-xs text-center">
@@ -88,58 +91,27 @@ export const DailyReportTable = ({ date, data }: DailyReportTableProps) => {
                           </tr>
                         </thead>
                         <tbody>
-                          {areaData.modes.map((mode: any, index: number) => (
-                            <tr key={index}>
-                              <td className="border border-gray-300 p-1 text-xs">
-                                {mode.mode}
-                              </td>
-                              <td className="border border-gray-300 p-1 text-xs text-center">
-                                {mode.customers}
-                              </td>
-                              <td className="border border-gray-300 p-1 text-xs">
-                                ₹{mode.amount}
-                              </td>
-                              <td className="border border-gray-300 p-1 text-xs">
-                                ₹{mode.discount}
-                              </td>
-                              <td className="border border-gray-300 p-1 text-xs">
-                                ₹{mode.payment}
-                              </td>
-                            </tr>
-                          ))}
-                          <tr className="bg-yellow-100 font-semibold">
-                            <td className="border border-gray-300 p-1 text-xs">
-                              Total
-                            </td>
-                            <td className="border border-gray-300 p-1 text-xs text-center">
-                              {areaData.modes.reduce(
-                                (sum: number, mode: any) =>
-                                  sum + mode.customers,
-                                0
-                              )}
-                            </td>
-                            <td className="border border-gray-300 p-1 text-xs">
-                              ₹
-                              {areaData.modes.reduce(
-                                (sum: number, mode: any) => sum + mode.amount,
-                                0
-                              )}
-                            </td>
-                            <td className="border border-gray-300 p-1 text-xs">
-                              ₹
-                              {areaData.modes.reduce(
-                                (sum: number, mode: any) => sum + mode.discount,
-                                0
-                              )}
-                            </td>
-                            <td className="border border-gray-300 p-1 text-xs">
-                              ₹
-                              {areaData.modes.reduce(
-                                (sum: number, mode: any) => sum + mode.payment,
-                                0
-                              )}
-                            </td>
-                          </tr>
+                          {(areaData?.modes || []).map(
+                            (mode: any, index: number) => (
+                              <tr key={index}>
+                                <td className="border border-gray-300 p-1 text-xs">
+                                  {mode.mode}
+                                </td>
+                                <td className="border border-gray-300 p-1 text-xs text-center">
+                                  {mode.customers}
+                                </td>
+                                <td className="border border-gray-300 p-1 text-xs">
+                                  ₹{mode.amount}
+                                </td>
+                                <td className="border border-gray-300 p-1 text-xs">
+                                  ₹{mode.discount}
+                                </td>
+                                <td className="border border-gray-300 p-1 text-xs">
+                                  ₹{mode.payment}
+                                </td>
+                              </tr>
+                            )
+                          )}
                         </tbody>
                       </table>
                     </div>

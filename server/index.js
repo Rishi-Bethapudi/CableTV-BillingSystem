@@ -32,16 +32,28 @@ const allowedOrigins = [
   'http://localhost:8080',
   'http://localhost:4173',
   'capacitor://localhost',
-  'https://p37z1hxb-5000.inc1.devtunnels.ms/',
   'https://cable-tv-billing-system.vercel.app', // Replace with actual deployed frontend
 ];
 
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true); // allow Postman / Thunder Client
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      console.log('❌ CORS blocked:', origin);
+      return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
+
+// FIX: Respond to preflight (OPTIONS) request
+app.options('*', cors());
 
 // Middleware to parse JSON request bodies
 app.use(express.json());

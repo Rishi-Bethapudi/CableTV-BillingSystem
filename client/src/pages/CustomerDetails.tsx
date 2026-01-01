@@ -55,20 +55,32 @@ export default function CustomerDetails() {
 
         <CustomerMainDetails customer={customer} />
 
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-12 lg:col-span-3">
+        <div className="space-y-6">
+          {/* Sidebar becomes horizontal on small screens, vertical on lg */}
+          <div className="block lg:hidden">
             <CustomerSidebar
               activeSection={activeSection}
               setActiveSection={setActiveSection}
+              layout="horizontal"
             />
           </div>
 
-          <div className="col-span-12 lg:col-span-9">
-            <CustomerRightPanel
-              customer={customer}
-              activeSection={activeSection}
-              onRefresh={fetchCustomer}
-            />
+          <div className="grid grid-cols-12 gap-6">
+            <div className="hidden lg:block lg:col-span-3">
+              <CustomerSidebar
+                activeSection={activeSection}
+                setActiveSection={setActiveSection}
+                layout="vertical"
+              />
+            </div>
+
+            <div className="col-span-12 lg:col-span-9">
+              <CustomerRightPanel
+                customer={customer}
+                activeSection={activeSection}
+                onRefresh={fetchCustomer}
+              />
+            </div>
           </div>
         </div>
       </div>

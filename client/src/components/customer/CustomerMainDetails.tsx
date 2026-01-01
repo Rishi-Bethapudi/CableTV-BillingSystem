@@ -5,7 +5,6 @@ export default function CustomerMainDetails({
 }: {
   customer: Customer;
 }) {
-  console.log('Rendering  for:', customer);
   const device =
     customer.devices?.find((d) => d.active) || customer.devices?.[0];
 
@@ -32,7 +31,7 @@ export default function CustomerMainDetails({
       : 'text-gray-900 dark:text-white';
 
   const activeSubscriptions =
-    customer.subscriptions?.filter((s) => s.status === 'active').length ?? 0;
+    customer?.subscriptions?.filter((s) => s.status === 'active').length ?? 0;
 
   return (
     <div className="space-y-3">

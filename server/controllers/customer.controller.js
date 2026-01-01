@@ -270,17 +270,12 @@ const getCustomerById = async (req, res) => {
       return res.status(400).json({ message: 'Invalid customer ID format.' });
     }
 
-    const baseQuery = {
+    // Base customer
+    const customer = await Customer.findOne({
       _id: customerId,
       operatorId: req.user.operatorId,
       deleted: false,
-    };
-
-    if (req.query.includeDeleted === 'true') {
-      delete baseQuery.deleted;
-    }
-
-    const customer = await Customer.findOne(baseQuery)
+    })
       .populate('agentId', 'name email')
       .lean();
 
@@ -288,27 +283,90 @@ const getCustomerById = async (req, res) => {
       return res.status(404).json({ message: 'Customer not found.' });
     }
 
-    // Optionally include subscription history
-    const includeSubscriptions = req.query.includeSubscriptions === 'true';
+    /* ------------------------------------------------------------
+       FETCH ALL SUBSCRIPTIONS (ACTIVE + EXPIRED)
+    ------------------------------------------------------------ */
+    const subs = await Subscription.find({
+      customerId,
+      operatorId: req.user.operatorId,
+      status: { $in: ['ACTIVE', 'EXPIRED'] },
+    })
+      .populate('productId', 'name customerPrice operatorCost planType')
+      .sort({ expiryDate: -1 }) // newest first
+      .lean();
 
-    let subscriptions = [];
-    if (includeSubscriptions) {
-      subscriptions = await Subscription.find({
-        customerId,
-        operatorId: req.user.operatorId,
-      })
-        .populate('productId', 'name planType customerPrice')
-        .sort({ startDate: -1 })
-        .lean();
+    const activeSubs = subs.filter((s) => s.status === 'ACTIVE');
+    const expiredSubs = subs.filter((s) => s.status === 'EXPIRED');
+
+    /* ------------------------------------------------------------
+       🔥 AUTO-CLEAN CUSTOMER.activeSubscriptions FIELD
+       Remove old subscription IDs, keep only currently active ones
+    ------------------------------------------------------------ */
+    const activeSubIds = activeSubs.map((s) => s._id.toString());
+
+    if (
+      JSON.stringify(activeSubIds) !==
+      JSON.stringify(
+        (customer.activeSubscriptions || []).map((id) => id.toString())
+      )
+    ) {
+      await Customer.updateOne(
+        { _id: customerId },
+        { $set: { activeSubscriptions: activeSubIds } }
+      );
+      customer.activeSubscriptions = activeSubIds; // reflect back in response
     }
 
-    res.status(200).json({
-      customer,
-      subscriptions,
+    /* ------------------------------------------------------------
+       🔥 Update planNamesSummary = unique active plan names
+    ------------------------------------------------------------ */
+    const planNamesSummary = activeSubs.map((s) => s.productId?.name);
+    if (
+      JSON.stringify(planNamesSummary) !==
+      JSON.stringify(customer.planNamesSummary || [])
+    ) {
+      await Customer.updateOne(
+        { _id: customerId },
+        { $set: { planNamesSummary } }
+      );
+      customer.planNamesSummary = planNamesSummary;
+    }
+
+    /* ------------------------------------------------------------
+       🔥 Calculate earliest active expiry (Base packs only)
+    ------------------------------------------------------------ */
+    const baseExpiries = activeSubs
+      .filter((s) => s.planType === 'BASE')
+      .map((s) => s.expiryDate)
+      .sort();
+
+    const earliestExpiry = baseExpiries.length ? baseExpiries[0] : null;
+
+    if (earliestExpiry?.toString() !== customer.earliestExpiry?.toString()) {
+      await Customer.updateOne(
+        { _id: customerId },
+        { $set: { earliestExpiry } }
+      );
+      customer.earliestExpiry = earliestExpiry;
+    }
+
+    /* ------------------------------------------------------------
+       FINAL RESPONSE FORMAT (FLATTENED & FRONTEND OPTIMIZED)
+    ------------------------------------------------------------ */
+    return res.json({
+      ...customer,
+      currentSubscriptions: activeSubs,
+      expiredSubscriptions: expiredSubs,
+      subscriptionsCount: {
+        active: activeSubs.length,
+        expired: expiredSubs.length,
+      },
     });
   } catch (error) {
     console.error('Error fetching customer by ID:', error);
-    res.status(500).json({ message: 'Server error while fetching customer.' });
+    return res.status(500).json({
+      message: 'Server error while fetching customer.',
+    });
   }
 };
 
@@ -332,23 +390,17 @@ const updateCustomer = async (req, res) => {
       return res.status(403).json({ message: 'Unauthorized access.' });
     }
 
-    if (req.user.role !== 'operator') {
-      return res
-        .status(403)
-        .json({ message: 'Only operator can update customer.' });
-    }
-
-    // Protect non-editable fields
-    const blockedFields = [
+    // Fields that cannot be modified
+    const blocked = [
       'operatorId',
       'balanceAmount',
       'activeSubscriptions',
       'earliestExpiry',
       'deleted',
     ];
-    blockedFields.forEach((f) => delete req.body[f]);
+    blocked.forEach((f) => delete req.body[f]);
 
-    // Map legacy field names
+    /** 🔄 LEGACY → NEW field mappings */
     if (req.body.mobile !== undefined) {
       req.body.contactNumber = req.body.mobile;
       delete req.body.mobile;
@@ -362,70 +414,63 @@ const updateCustomer = async (req, res) => {
       delete req.body.discount;
     }
 
-    // Simple device handling: if stb/card number sent, update first device
-    const deviceUpdates = {};
-    if (req.body.stbNumber !== undefined)
-      deviceUpdates.stbNumber = req.body.stbNumber;
-    if (req.body.cardNumber !== undefined)
-      deviceUpdates.cardNumber = req.body.cardNumber;
-    if (req.body.stbName !== undefined)
-      deviceUpdates.deviceModel = req.body.stbName;
+    /** 🔹 DEVICE HANDLING */
+    if (req.body.devices) {
+      const newDevice = req.body.devices[0];
 
-    // Check STB/card duplicates if changed
-    if (deviceUpdates.stbNumber || deviceUpdates.cardNumber) {
-      const duplicateDevice = await Customer.findOne({
-        _id: { $ne: customerId },
-        operatorId: req.user.operatorId,
-        deleted: false,
-        $or: [
-          deviceUpdates.stbNumber
-            ? { 'devices.stbNumber': deviceUpdates.stbNumber }
-            : null,
-          deviceUpdates.cardNumber
-            ? { 'devices.cardNumber': deviceUpdates.cardNumber }
-            : null,
-        ].filter(Boolean),
-      });
-
-      if (duplicateDevice) {
-        return res.status(409).json({
-          message: 'Another customer already uses this STB/card number.',
+      // Duplicate check only if updated
+      if (newDevice?.stbNumber || newDevice?.cardNumber) {
+        const duplicate = await Customer.findOne({
+          _id: { $ne: customerId },
+          operatorId: req.user.operatorId,
+          deleted: false,
+          $or: [
+            newDevice?.stbNumber
+              ? { 'devices.stbNumber': newDevice.stbNumber }
+              : null,
+            newDevice?.cardNumber
+              ? { 'devices.cardNumber': newDevice.cardNumber }
+              : null,
+          ].filter(Boolean),
         });
+
+        if (duplicate) {
+          return res.status(409).json({
+            message: 'Another customer already uses this STB or Card Number.',
+          });
+        }
       }
+
+      // Apply to first device
+      if (!customer.devices?.length) {
+        customer.devices = [newDevice];
+      } else {
+        customer.devices[0] = { ...customer.devices[0]._doc, ...newDevice };
+      }
+
+      req.body.devices = customer.devices;
     }
 
-    const updatableFields = [
+    /** 🔹 Allowed fields to update */
+    const allowed = [
       'name',
       'contactNumber',
       'locality',
       'billingAddress',
       'defaultExtraCharge',
       'defaultDiscount',
-      'lastPaymentAmount',
-      'lastPaymentDate',
+      'gstNumber',
+      'alternateContact',
+      'messageNumber',
       'remark',
       'active',
-      'messageNumber',
-      'alternateContact',
-      'gstNumber',
-      'agentId',
+      'devices',
     ];
 
     const updates = {};
-
-    updatableFields.forEach((field) => {
-      if (req.body[field] !== undefined) updates[field] = req.body[field];
+    allowed.forEach((f) => {
+      if (req.body[f] !== undefined) updates[f] = req.body[f];
     });
-
-    // Apply device changes to first device
-    if (Object.keys(deviceUpdates).length > 0) {
-      if (!customer.devices || customer.devices.length === 0) {
-        customer.devices = [{ ...deviceUpdates, active: true }];
-      } else {
-        customer.devices[0] = { ...customer.devices[0]._doc, ...deviceUpdates };
-      }
-      updates.devices = customer.devices;
-    }
 
     const updatedCustomer = await Customer.findByIdAndUpdate(
       customerId,

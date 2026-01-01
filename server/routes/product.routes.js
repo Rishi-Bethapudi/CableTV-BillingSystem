@@ -6,6 +6,8 @@ const {
   getProductById,
   updateProduct,
   deleteProduct,
+  uploadProductsFromExcel,
+  downloadProductsToExcel,
 } = require('../controllers/product.controller');
 
 const {
@@ -13,14 +15,8 @@ const {
   operatorOnly,
 } = require('../middleware/auth.middleware');
 
-/**
- * ==============================================================================================
- * PRODUCT ROUTES
- * ==============================================================================================
- * @note All routes in this file are protected and can only be accessed by an authenticated operator.
- * The `operatorOnly` middleware ensures that the user has the 'operator' role.
- * Data access is automatically scoped to the logged-in operator via `req.user.id`.
- */
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' });
 
 // Mount the middleware for all routes in this file
 router.use(authMiddleware, operatorOnly);
@@ -60,5 +56,6 @@ router.put('/:id', updateProduct);
  * @access  Private (Operator)
  */
 router.delete('/:id', deleteProduct);
-
+router.get('/export/excel', downloadProductsToExcel);
+router.post('/import/excel', uploadProductsFromExcel);
 module.exports = router;

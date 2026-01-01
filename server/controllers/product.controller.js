@@ -1,10 +1,9 @@
 const mongoose = require('mongoose');
 const Product = require('../models/product.model');
-const Customer = require('../models/customer.model');
+const Subscription = require('../models/subscription.model');
+const XLSX = require('xlsx');
+const fs = require('fs');
 
-/**
- * Create a new product for the logged-in operator.
- */
 exports.createProduct = async (req, res) => {
   try {
     const {
@@ -16,9 +15,7 @@ exports.createProduct = async (req, res) => {
       billingInterval,
       isActive,
     } = req.body;
-    const operatorId = req.user.id;
 
-    // Validation
     if (
       !productCode ||
       !name ||
@@ -27,49 +24,48 @@ exports.createProduct = async (req, res) => {
     ) {
       return res.status(400).json({
         message:
-          'Please provide productCode, name, customerPrice, and operatorCost.',
+          'productCode, name, customerPrice & operatorCost are required.',
       });
     }
 
-    const newProduct = new Product({
-      operatorId,
+    if (!['BASE', 'ADDON'].includes(planType)) {
+      return res.status(400).json({
+        message: 'planType must be BASE or ADDON.',
+      });
+    }
+
+    const newProduct = await Product.create({
+      operatorId: req.user.operatorId,
       productCode,
       name,
-      planType: planType || 'Basic',
+      planType,
       customerPrice,
       operatorCost,
       billingInterval: billingInterval || { value: 30, unit: 'days' },
       isActive: isActive !== undefined ? isActive : true,
     });
 
-    const savedProduct = await newProduct.save();
-    res.status(201).json(savedProduct);
+    res.status(201).json(newProduct);
   } catch (error) {
     console.error('Error creating product:', error);
     res.status(500).json({ message: 'Server error while creating product.' });
   }
 };
 
-/**
- * Get all products for the logged-in operator.
- */
 exports.getProducts = async (req, res) => {
   try {
-    const operatorId = req.user.id;
     const {
       isActive,
       search,
       sortBy = 'createdAt',
       order = 'desc',
     } = req.query;
+    const query = { operatorId: req.user.operatorId };
 
-    const query = { operatorId };
     if (isActive !== undefined) query.isActive = isActive === 'true';
     if (search) query.name = new RegExp(search, 'i');
 
-    const sortOrder = order === 'asc' ? 1 : -1;
-    const sort = { [sortBy]: sortOrder };
-
+    const sort = { [sortBy]: order === 'asc' ? 1 : -1 };
     const products = await Product.find(query).sort(sort).lean();
     res.status(200).json(products);
   } catch (error) {
@@ -78,36 +74,26 @@ exports.getProducts = async (req, res) => {
   }
 };
 
-/**
- * Get a single product by ID for the logged-in operator.
- */
 exports.getProductById = async (req, res) => {
   try {
-    const operatorId = req.user.id;
     const product = await Product.findOne({
       _id: req.params.id,
-      operatorId,
+      operatorId: req.user.operatorId,
     }).lean();
 
     if (!product) {
-      return res.status(404).json({
-        message: 'Product not found or you do not have permission to view it.',
-      });
+      return res.status(404).json({ message: 'Product not found.' });
     }
 
     res.status(200).json(product);
   } catch (error) {
-    console.error('Error fetching product by ID:', error);
+    console.error('Error fetching product:', error);
     res.status(500).json({ message: 'Server error.' });
   }
 };
 
-/**
- * Update a product's details.
- */
 exports.updateProduct = async (req, res) => {
   try {
-    const operatorId = req.user.id;
     const {
       productCode,
       name,
@@ -126,12 +112,18 @@ exports.updateProduct = async (req, res) => {
     ) {
       return res.status(400).json({
         message:
-          'Please provide productCode, name, customerPrice, and operatorCost.',
+          'productCode, name, customerPrice & operatorCost are required.',
       });
     }
 
-    const updatedProduct = await Product.findOneAndUpdate(
-      { _id: req.params.id, operatorId },
+    if (planType && !['BASE', 'ADDON'].includes(planType)) {
+      return res.status(400).json({
+        message: 'planType must be BASE or ADDON.',
+      });
+    }
+
+    const updated = await Product.findOneAndUpdate(
+      { _id: req.params.id, operatorId: req.user.operatorId },
       {
         productCode,
         name,
@@ -144,53 +136,147 @@ exports.updateProduct = async (req, res) => {
       { new: true, runValidators: true }
     ).lean();
 
-    if (!updatedProduct) {
-      return res.status(404).json({
-        message:
-          'Product not found or you do not have permission to update it.',
-      });
+    if (!updated) {
+      return res.status(404).json({ message: 'Product not found.' });
     }
 
-    res.status(200).json(updatedProduct);
+    res.status(200).json(updated);
   } catch (error) {
     console.error('Error updating product:', error);
-    res.status(500).json({ message: 'Server error while updating product.' });
+    res.status(500).json({ message: 'Server error.' });
   }
 };
 
-/**
- * Delete a product.
- * Cannot delete if assigned to any customer.
- */
 exports.deleteProduct = async (req, res) => {
   try {
-    const operatorId = req.user.id;
+    const operatorId = req.user.operatorId;
     const productId = req.params.id;
 
-    // Check if any customer is using this product
-    const inUse = await Customer.findOne({ productId, operatorId });
+    // ❗ correct validation
+    const inUse = await Subscription.findOne({
+      productId,
+      operatorId,
+      status: { $in: ['ACTIVE', 'EXPIRED'] },
+    });
+
     if (inUse) {
       return res.status(400).json({
         message:
-          'Cannot delete this product because it is assigned to one or more customers.',
+          'Cannot delete product because subscriptions exist for this product.',
       });
     }
 
-    const deletedProduct = await Product.findOneAndDelete({
+    const deleted = await Product.findOneAndDelete({
       _id: productId,
       operatorId,
     });
-    if (!deletedProduct) {
-      return res.status(404).json({
-        message:
-          'Product not found or you do not have permission to delete it.',
-      });
+
+    if (!deleted) {
+      return res.status(404).json({ message: 'Product not found.' });
     }
 
     res.status(200).json({ message: 'Product deleted successfully.' });
   } catch (error) {
     console.error('Error deleting product:', error);
-    res.status(500).json({ message: 'Server error while deleting product.' });
+    res.status(500).json({ message: 'Server error.' });
   }
 };
-//Updated productController
+
+exports.downloadProductsToExcel = async (req, res) => {
+  try {
+    const products = await Product.find({ operatorId: req.user.id }).lean();
+    if (products.length === 0)
+      return res
+        .status(400)
+        .json({ message: 'No products available to download.' });
+
+    const rows = products.map((p) => ({
+      productCode: p.productCode,
+      name: p.name,
+      planType: p.planType,
+      customerPrice: p.customerPrice,
+      operatorCost: p.operatorCost,
+      billingIntervalValue: p.billingInterval?.value ?? 30,
+      billingIntervalUnit: p.billingInterval?.unit ?? 'days',
+      isActive: p.isActive,
+    }));
+
+    const worksheet = xlsx.utils.json_to_sheet(rows);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, 'Products');
+
+    const fileName = `products_${Date.now()}.xlsx`;
+    const filePath = `uploads/${fileName}`;
+    xlsx.writeFile(workbook, filePath);
+
+    res.download(filePath, fileName, (err) => {
+      fs.unlinkSync(filePath); // cleanup after download
+    });
+  } catch (error) {
+    console.error('Excel download error:', error);
+    return res.status(500).json({ message: 'Error generating Excel file.' });
+  }
+};
+
+exports.uploadProductsFromExcel = async (req, res) => {
+  try {
+    if (!req.file)
+      return res.status(400).json({ message: 'No file uploaded.' });
+
+    const workbook = xlsx.readFile(req.file.path);
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = xlsx.utils.sheet_to_json(sheet);
+
+    let success = 0,
+      failed = 0;
+
+    for (const row of rows) {
+      try {
+        if (
+          !row.productCode ||
+          !row.name ||
+          !row.customerPrice ||
+          !row.operatorCost
+        ) {
+          failed++;
+          continue;
+        }
+
+        await Product.findOneAndUpdate(
+          {
+            operatorId: req.user.id,
+            productCode: row.productCode.trim(),
+          },
+          {
+            operatorId: req.user.id,
+            productCode: row.productCode,
+            name: row.name,
+            planType:
+              row.planType?.toUpperCase() === 'ADDON' ? 'ADDON' : 'BASE',
+            customerPrice: Number(row.customerPrice),
+            operatorCost: Number(row.operatorCost),
+            billingInterval: {
+              value: Number(row.billingIntervalValue || 30),
+              unit: row.billingIntervalUnit === 'months' ? 'months' : 'days',
+            },
+            isActive: row.isActive === false ? false : true,
+          },
+          { upsert: true, new: true, runValidators: true }
+        );
+
+        success++;
+      } catch {
+        failed++;
+      }
+    }
+
+    fs.unlinkSync(req.file.path); // cleanup
+    return res.status(200).json({
+      message: 'Excel uploaded successfully',
+      summary: { success, failed },
+    });
+  } catch (error) {
+    console.error('Excel upload error:', error);
+    return res.status(500).json({ message: 'Error reading Excel file.' });
+  }
+};

@@ -1,3 +1,28 @@
+export interface CollectPaymentPayload {
+  customerId: string;
+  amount: number;
+  method: string;
+  note?: string;
+  recordedAt?: string;
+}
+export interface SubscriptionDetails {
+  _id: string;
+  expiryDate: string;
+  startDate: string;
+  status: 'ACTIVE' | 'EXPIRED' | 'PAUSED' | 'TERMINATED';
+  productId: {
+    _id: string;
+    name: string;
+    planType: 'BASE' | 'ADDON';
+    customerPrice: number;
+    operatorCost: number;
+    billingInterval: {
+      value: number;
+      unit: 'days' | 'months';
+    };
+  };
+}
+
 export interface Product {
   _id: string;
   operatorId: string;
@@ -18,7 +43,7 @@ export interface Product {
 export interface ProductForm {
   productCode: string;
   name: string;
-  category: 'Basic' | 'Premium' | 'Add-on';
+  planType: 'BASE' | 'ADDON' | '';
   customerPrice: string;
   operatorCost: string;
   billingIntervalValue: string;
@@ -74,7 +99,8 @@ export interface Customer {
 
   activeSubscriptions: string[]; // list of subscription IDs
   earliestExpiry: string | null;
-
+currentSubscriptions?: SubscriptionDetails[];
+expiredSubscriptions?: SubscriptionDetails[];
   connectionStartDate: string;
   active: boolean;
   deleted: boolean;

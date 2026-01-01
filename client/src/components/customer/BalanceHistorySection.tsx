@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '../ui/button';
 import { toast } from 'react-toastify';
-import TransactionBillModal from './TransactionBillModal';
+import InvoicePDFModal from './InvoicePDFModal';
 import type { Customer, Transaction } from '@/utils/data';
 import apiClient from '@/utils/apiClient';
 
@@ -28,135 +28,110 @@ interface PaginationInfo {
   limit: number;
 }
 
-interface TransactionsResponse {
-  transactions: Transaction[];
-  pagination: PaginationInfo;
-}
-
-function BalanceHistorySection({
+export default function BalanceHistorySection({
   isVisible,
   customer,
+  onRefresh,
 }: BalanceHistorySectionProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTransaction, setSelectedTransaction] =
     useState<Transaction | null>(null);
   const [showBillModal, setShowBillModal] = useState(false);
-  const [balanceHistory, setBalanceHistory] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
     total: 0,
     page: 1,
     pages: 1,
-    limit: 10,
+    limit: 15,
   });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isVisible && customer._id) {
-      fetchTransactions();
-    }
+    if (isVisible && customer._id) fetchTransactions();
   }, [customer._id, currentPage, isVisible]);
 
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get<TransactionsResponse>(
+      const res = await apiClient.get(
         `/customers/${customer._id}/transactions`,
-        {
-          params: {
-            page: currentPage,
-            limit: 15,
-          },
-        }
+        { params: { page: currentPage, limit: 15 } }
       );
 
-      setBalanceHistory(response.data.transactions);
-      setPagination(response.data.pagination);
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-      // Handle error (show toast message, etc.)
-      toast.error('Failed to load transactions. Please try again.');
+      setTransactions(res.data.transactions);
+      setPagination(res.data.pagination);
+    } catch {
+      toast.error('Failed to load transactions');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleExport = () => {
-    console.log('Exporting balance history...');
-    // Implement export functionality
-  };
-
-  const handleTransactionClick = (transaction: Transaction) => {
+  const openPDFModal = (transaction: Transaction, e: any) => {
+    e.stopPropagation();
     setSelectedTransaction(transaction);
     setShowBillModal(true);
   };
 
-  const handleDeleteTransaction = async (transactionId: string) => {
-    if (!window.confirm('Are you sure you want to delete this transaction?')) {
-      return;
-    }
+  const handleDeleteTransaction = async (transactionId: string, e: any) => {
+    e.stopPropagation();
+    if (!window.confirm('Delete this transaction?')) return;
 
     try {
       await apiClient.delete(`/transactions/${transactionId}`);
-      // Refresh the transactions list
+      toast.success('Transaction deleted');
       fetchTransactions();
-      // Show success message
-      console.log('Transaction deleted successfully');
-    } catch (error) {
-      console.error('Error deleting transaction:', error);
-      // Show error message
+      onRefresh();
+    } catch {
+      toast.error('Failed to delete transaction');
     }
   };
 
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= pagination.pages) {
-      setCurrentPage(newPage);
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-    });
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= pagination.pages) setCurrentPage(page);
   };
 
   if (!isVisible) return null;
 
+  const formatDate = (d: string) =>
+    new Date(d).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+
   return (
     <>
-      <Card className="w-100">
+      <Card className="w-full">
         <CardHeader className="bg-gray-50 dark:bg-gray-900/20">
           <CardTitle className="text-lg flex items-center justify-between">
             Balance History
-            <Button size="sm" onClick={handleExport} disabled={loading}>
+            <Button size="sm" disabled={loading}>
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
           </CardTitle>
         </CardHeader>
+
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-8 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-              <p className="mt-2 text-sm text-gray-600">
-                Loading transactions...
-              </p>
-            </div>
+            <div className="p-8 text-center text-sm">Loading...</div>
           ) : (
             <>
               <div className="max-h-96 overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-xs">Date</TableHead>
-                      <TableHead className="text-xs">Type</TableHead>
-                      <TableHead className="text-xs">Amount</TableHead>
-                      <TableHead className="text-xs">Balance</TableHead>
-                      <TableHead className="text-xs">Action</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Balance</TableHead>
+                      <TableHead>Action</TableHead>
                     </TableRow>
                   </TableHeader>
+
                   <TableBody>
-                    {balanceHistory.length === 0 ? (
+                    {transactions.length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={5}
@@ -166,39 +141,29 @@ function BalanceHistorySection({
                         </TableCell>
                       </TableRow>
                     ) : (
-                      balanceHistory.map((entry) => (
+                      transactions.map((t) => (
                         <TableRow
-                          key={entry._id}
+                          key={t._id}
                           className="cursor-pointer hover:bg-gray-50"
-                          onClick={() => handleTransactionClick(entry)}
+                          onClick={(e) => openPDFModal(t, e)}
                         >
-                          <TableCell className="text-xs">
-                            {formatDate(entry.createdAt)}
-                          </TableCell>
-                          <TableCell className="text-xs">
-                            {entry.type}
-                          </TableCell>
+                          <TableCell>{formatDate(t.createdAt)}</TableCell>
+                          <TableCell>{t.type}</TableCell>
                           <TableCell
-                            className={`text-xs ${
-                              entry.amount < 0
-                                ? 'text-green-600'
-                                : 'text-red-600'
-                            }`}
+                            className={
+                              t.amount < 0 ? 'text-green-600' : 'text-red-600'
+                            }
                           >
-                            ₹{Math.abs(entry.amount)}
+                            ₹{Math.abs(t.amount)}
                           </TableCell>
-                          <TableCell className="text-xs">
-                            ₹{entry.balanceAfter}
-                          </TableCell>
-                          <TableCell className="text-xs text-center">
+                          <TableCell>₹{t.balanceAfter}</TableCell>
+
+                          <TableCell className="text-center">
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteTransaction(entry._id);
-                              }}
-                              className="h-6 w-6 p-0"
+                              className="p-0 h-6 w-6"
+                              onClick={(e) => handleDeleteTransaction(t._id, e)}
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>
@@ -210,29 +175,28 @@ function BalanceHistorySection({
                 </Table>
               </div>
 
-              <div className="p-4 border-t">
-                <div className="flex justify-between items-center text-sm">
-                  <span>
-                    Page {currentPage} of {pagination.pages}
-                  </span>
-                  <div className="space-x-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={currentPage === 1}
-                    >
-                      Previous
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === pagination.pages}
-                    >
-                      Next
-                    </Button>
-                  </div>
+              {/* Pagination */}
+              <div className="p-4 border-t flex justify-between text-sm">
+                <span>
+                  Page {pagination.page} of {pagination.pages}
+                </span>
+                <div className="space-x-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={pagination.page === 1}
+                    onClick={() => handlePageChange(pagination.page - 1)}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={pagination.page === pagination.pages}
+                    onClick={() => handlePageChange(pagination.page + 1)}
+                  >
+                    Next
+                  </Button>
                 </div>
               </div>
             </>
@@ -240,16 +204,14 @@ function BalanceHistorySection({
         </CardContent>
       </Card>
 
-      {/* Transaction Bill Modal */}
+      {/* PDF Modal */}
       {showBillModal && selectedTransaction && (
-        <TransactionBillModal
-          transaction={selectedTransaction}
-          customer={customer}
+        <InvoicePDFModal
+          open={showBillModal}
           onClose={() => setShowBillModal(false)}
+          transactionId={selectedTransaction._id}
         />
       )}
     </>
   );
 }
-
-export default BalanceHistorySection;

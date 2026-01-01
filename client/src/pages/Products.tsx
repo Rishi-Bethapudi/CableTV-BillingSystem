@@ -32,7 +32,6 @@ import { AddProductDialog } from '@/components/AddProductDialog';
 import { EditProductDialog } from '@/components/EditProductDialog';
 import ExcelUploadDialog from '@/components/ExcelUploadDialog';
 import ConfirmationModal from '@/components/customer/ConfirmationModal';
-
 import type { Product } from '@/utils/data';
 
 export default function Products() {
@@ -60,6 +59,7 @@ export default function Products() {
     return () => setHeaderActions(null);
   }, []);
 
+  // 🔥 Fetch products
   const {
     data: products,
     isLoading,
@@ -74,10 +74,10 @@ export default function Products() {
         operatorId: p.operatorId,
         productCode: p.productCode,
         name: p.name,
-        category: p.category || 'Basic',
-        customerPrice: p.customerPrice || 0,
-        operatorCost: p.operatorCost || 0,
-        billingInterval: p.billingInterval || { value: 30, unit: 'days' },
+        planType: p.planType,
+        customerPrice: p.customerPrice,
+        operatorCost: p.operatorCost,
+        billingInterval: p.billingInterval,
         isActive: p.isActive,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
@@ -85,6 +85,7 @@ export default function Products() {
     },
   });
 
+  // ❌ Delete
   const handleDeleteClick = (id: string, name: string) => {
     setDeleteProductId(id);
     setDeleteProductName(name);
@@ -92,13 +93,11 @@ export default function Products() {
   };
 
   const confirmDeleteProduct = async () => {
-    if (!deleteProductId) return;
     try {
       await apiClient.delete(`/products/${deleteProductId}`);
       toast.success(`"${deleteProductName}" deleted successfully`);
       refetch();
-    } catch (err) {
-      console.error('Error deleting product:', err);
+    } catch {
       toast.error('Failed to delete product');
     } finally {
       setShowDeleteModal(false);
@@ -107,32 +106,59 @@ export default function Products() {
     }
   };
 
+  // 🔄 Toggle Active
   const handleToggleActive = async (id: string, currentStatus: boolean) => {
     try {
       await apiClient.put(`/products/${id}`, { isActive: !currentStatus });
-      toast.success(
-        `Product ${!currentStatus ? 'activated' : 'deactivated'} successfully`
-      );
+      toast.success(`Product ${!currentStatus ? 'activated' : 'deactivated'}`);
       refetch();
-    } catch (err) {
-      console.error('Error updating product status:', err);
+    } catch {
       toast.error('Failed to update product status');
     }
   };
 
-  const handleDownloadExcel = () => {
-    if (!products || products.length === 0) {
-      toast.error('No product data to download');
-      return;
+  // ⬇ Export Excel
+  const handleDownloadExcel = async () => {
+    try {
+      const res = await apiClient.get('/products/export/excel', {
+        responseType: 'blob',
+      });
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute(
+        'download',
+        `Products_${new Date().toISOString().slice(0, 10)}.xlsx`
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Download started');
+    } catch (err) {
+      console.error(err);
+      toast.error('Excel download failed');
     }
-    // Implement your download logic here, mapping fields to Excel-friendly format
-    toast.success('Product data downloaded successfully');
   };
 
+  // ⬆ Import Excel
   const handleUploadExcel = async (file: File) => {
-    // Implement your Excel parsing/upload here
-    toast.success('Products uploaded successfully');
-    refetch();
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      await apiClient.post('/products/import/excel', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      toast.success('Excel uploaded successfully');
+      refetch();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.message || 'Upload failed');
+    } finally {
+      setShowUploadDialog(false);
+    }
   };
 
   if (isLoading)
@@ -141,6 +167,7 @@ export default function Products() {
         Loading products...
       </div>
     );
+
   if (error)
     return (
       <div className="flex items-center justify-center h-64 text-lg text-red-600">
@@ -178,52 +205,19 @@ export default function Products() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Products
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{products?.length || 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Active Products
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {products?.filter((p) => p.isActive).length || 0}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Basic Packages
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {products?.filter((p) => p.category === 'Basic').length || 0}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Premium Packages
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {products?.filter((p) => p.category === 'Premium').length || 0}
-            </div>
-          </CardContent>
-        </Card>
+        <StatsCard title="Total Products" value={products?.length || 0} />
+        <StatsCard
+          title="Active Products"
+          value={products?.filter((p) => p.isActive).length || 0}
+        />
+        <StatsCard
+          title="Base Packages"
+          value={products?.filter((p) => p.planType === 'BASE').length || 0}
+        />
+        <StatsCard
+          title="Add-on Packages"
+          value={products?.filter((p) => p.planType === 'ADDON').length || 0}
+        />
       </div>
 
       {/* Products Table */}
@@ -231,7 +225,7 @@ export default function Products() {
         <CardHeader>
           <CardTitle>All Products</CardTitle>
           <CardDescription>
-            View and manage all your cable TV packages and services
+            View and manage all your cable TV packages
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -241,7 +235,7 @@ export default function Products() {
                 <TableRow>
                   <TableHead>Product Code</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
+                  <TableHead>Plan Type</TableHead>
                   <TableHead>Customer Price</TableHead>
                   <TableHead>Operator Cost</TableHead>
                   <TableHead>Billing Interval</TableHead>
@@ -249,6 +243,7 @@ export default function Products() {
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
+
               <TableBody>
                 {products?.map((product) => (
                   <TableRow key={product._id}>
@@ -257,7 +252,11 @@ export default function Products() {
                     </TableCell>
                     <TableCell>{product.name}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{product.category}</Badge>
+                      <Badge variant="outline">
+                        {product.planType === 'BASE'
+                          ? 'Base Pack'
+                          : 'Addon Pack'}
+                      </Badge>
                     </TableCell>
                     <TableCell>₹{product.customerPrice.toFixed(2)}</TableCell>
                     <TableCell>₹{product.operatorCost.toFixed(2)}</TableCell>
@@ -308,11 +307,9 @@ export default function Products() {
       <AddProductDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
-        onSuccess={() => {
-          refetch();
-          setShowAddDialog(false);
-        }}
+        onSuccess={refetch}
       />
+
       {editingProduct && (
         <EditProductDialog
           product={editingProduct}
@@ -324,19 +321,35 @@ export default function Products() {
           }}
         />
       )}
+
       <ConfirmationModal
         open={showDeleteModal}
         message="Are you sure you want to delete this product?"
         onConfirm={confirmDeleteProduct}
         onCancel={() => setShowDeleteModal(false)}
       />
+
       <ExcelUploadDialog
         open={showUploadDialog}
         onOpenChange={setShowUploadDialog}
         title="Upload Product Data"
-        description="Upload an Excel file with product data. Required columns: productCode, name, category, customerPrice, operatorCost, billingIntervalValue, billingIntervalUnit, isActive."
+        description="Upload an Excel file with product data."
         onUpload={handleUploadExcel}
       />
     </div>
+  );
+}
+
+/* ✨ Stats Card Component */
+function StatsCard({ title, value }: { title: string; value: number }) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{value}</div>
+      </CardContent>
+    </Card>
   );
 }

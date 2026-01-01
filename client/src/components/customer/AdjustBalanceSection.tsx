@@ -22,41 +22,38 @@ function AdjustBalanceSection({
   const [newBalance, setNewBalance] = useState('');
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
+
   const handleAdjust = async () => {
-    if (!newBalance) return;
+    if (!newBalance) return toast.error('Enter new balance');
 
+    const current = customer.balanceAmount;
+    const target = parseFloat(newBalance);
+
+    // Determine difference
+    const diff = Math.abs(target - current);
+    if (diff <= 0) return toast.error('New balance must be different');
+
+    // Determine credit or debit
+    // CREDIT → decrease balance
+    // DEBIT  → increase balance
+    const type = target < current ? 'credit' : 'debit';
+
+    setLoading(true);
     try {
-      setLoading(true);
-
-      const currentBalance = customer.balanceAmount;
-      const targetBalance = parseFloat(newBalance);
-
-      // Compute amount difference
-      const amount = Math.abs(targetBalance - currentBalance);
-      const type = targetBalance > currentBalance ? 'credit' : 'debit';
-
       await apiClient.post(`/customers/${customer._id}/adjust-balance`, {
-        amount,
+        customerId: customer._id,
+        amount: diff,
         type,
         note: reason,
       });
 
-      // toast({
-      //   title: 'Success',
-      //   description: 'Balance adjusted successfully.',
-      //   variant: 'default',
-      // });
-      toast.success('Balance adjusted successfully.');
-      // 🔄 Refresh parent data
-      if (onRefresh) await onRefresh();
-
+      toast.success('Balance adjusted successfully');
+      onRefresh?.();
       setNewBalance('');
       setReason('');
     } catch (error: any) {
       console.error('Error adjusting balance:', error);
-      toast.error(
-        error?.response?.data?.message || 'Failed to adjust balance.'
-      );
+      toast.error(error?.response?.data?.message || 'Failed to adjust balance');
     } finally {
       setLoading(false);
     }
@@ -69,6 +66,7 @@ function AdjustBalanceSection({
       <CardHeader className="bg-orange-50 dark:bg-orange-900/20">
         <CardTitle className="text-lg">Adjust Balance</CardTitle>
       </CardHeader>
+
       <CardContent className="p-4 space-y-4">
         <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
           <div className="text-sm text-gray-600">Current Balance</div>
@@ -87,7 +85,7 @@ function AdjustBalanceSection({
         </div>
 
         <div className="space-y-2">
-          <Label>Reason</Label>
+          <Label>Reason (optional)</Label>
           <Textarea
             placeholder="Reason for balance adjustment..."
             value={reason}

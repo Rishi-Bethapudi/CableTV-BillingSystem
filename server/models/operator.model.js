@@ -32,6 +32,14 @@ const operatorSchema = new mongoose.Schema(
     },
     localities: [String],
     address: String,
+    additionalItems: [
+      {
+        name: String,
+        sellingPrice: Number,
+        costPrice: Number,
+        defaultNote: String,
+      },
+    ],
     refreshTokens: [String],
   },
   { timestamps: true }

@@ -1,9 +1,12 @@
 const Transaction = require('../models/transaction.model');
-const Customer = require('../models/customer.model');
 const Product = require('../models/product.model');
+const Customer = require('../models/customer.model');
+const Subscription = require('../models/subscription.model');
+const Operator = require('../models/operator.model');
 const Counter = require('../models/counter.model');
 const mongoose = require('mongoose');
 const { addDays, addMonths } = require('date-fns');
+const { generateInvoicePDF } = require('../services/invoicePDF');
 
 /**
  * @desc  Generate invoice + renew subscription for a customer
@@ -11,12 +14,13 @@ const { addDays, addMonths } = require('date-fns');
  * @access Private (Operator or Agent)
  */
 const createBilling = async (req, res) => {
-  const { customerId, productId, startDate, note } = req.body;
+  const { customerId, productId, startDate, endDate, durationDays, note } =
+    req.body;
 
   if (!customerId || !productId) {
-    return res
-      .status(400)
-      .json({ message: 'Customer ID and Product ID are required.' });
+    return res.status(400).json({
+      message: 'Customer ID and Product ID are required.',
+    });
   }
 
   const session = await mongoose.startSession();
@@ -31,10 +35,14 @@ const createBilling = async (req, res) => {
     if (
       customer.operatorId.toString() !== req.user.operatorId ||
       product.operatorId.toString() !== req.user.operatorId
-    )
+    ) {
       throw new Error('Forbidden.');
+    }
 
-    // Find last subscription for this product
+    // Determine billing start date
+    const billingDate = startDate ? new Date(startDate) : new Date();
+
+    // Find last ACTIVE subscription for this product
     const lastSub = await Subscription.findOne({
       customerId,
       productId,
@@ -43,39 +51,55 @@ const createBilling = async (req, res) => {
       .sort({ expiryDate: -1 })
       .session(session);
 
-    const billingDate = startDate ? new Date(startDate) : new Date();
     let newStartDate, newExpiryDate, renewalNumber;
 
     if (!lastSub) {
-      // First time purchase
+      // First time subscription
       newStartDate = billingDate;
       renewalNumber = 1;
     } else {
-      const baseDate =
+      const baseStart =
         lastSub.expiryDate > billingDate ? lastSub.expiryDate : billingDate;
-      newStartDate = baseDate;
+      newStartDate = baseStart;
       renewalNumber = lastSub.renewalNumber + 1;
     }
 
-    if (product.billingInterval.unit === 'months') {
+    // Calculate expiry date
+    if (durationDays && durationDays > 0) {
+      newExpiryDate = addDays(newStartDate, durationDays);
+    } else if (endDate) {
+      newExpiryDate = new Date(endDate);
+    } else if (product.billingInterval.unit === 'months') {
       newExpiryDate = addMonths(newStartDate, product.billingInterval.value);
     } else {
       newExpiryDate = addDays(newStartDate, product.billingInterval.value);
     }
 
-    // Pricing
-    const baseAmount = product.customerPrice;
+    // Pricing (scaled if multiple renewal duration)
+    const daysInProduct =
+      product.billingInterval.unit === 'months'
+        ? product.billingInterval.value * 30
+        : product.billingInterval.value;
+
+    const totalDays =
+      durationDays && durationDays > 0
+        ? durationDays
+        : Math.ceil((newExpiryDate - newStartDate) / (1000 * 60 * 60 * 24));
+
+    const factor = totalDays / daysInProduct; // e.g. 90 days / 30 days → 3x
+    const baseAmount = product.customerPrice * factor;
+
     const extraCharge = customer.defaultExtraCharge || 0;
     const discount = customer.defaultDiscount || 0;
-    const netAmount = baseAmount + extraCharge - discount;
 
+    const netAmount = baseAmount + extraCharge - discount;
     const balanceBefore = customer.balanceAmount;
     const balanceAfter = balanceBefore + netAmount;
 
     // Generate invoice number
     const invoiceId = await Counter.getInvoiceNumber(req.user.operatorId);
 
-    // Create transaction entry (ledger)
+    // Create transaction record
     const transaction = await Transaction.create(
       [
         {
@@ -84,7 +108,7 @@ const createBilling = async (req, res) => {
           collectedBy: req.user.id,
           collectedByType: req.user.role === 'operator' ? 'Operator' : 'Agent',
           type: 'INVOICE',
-          amount: netAmount, // +ve
+          amount: netAmount,
           balanceBefore,
           balanceAfter,
           invoiceId,
@@ -95,15 +119,15 @@ const createBilling = async (req, res) => {
           extraCharge,
           discount,
           netAmount,
-          costOfGoodsSold: product.operatorCost,
-          profit: netAmount - product.operatorCost,
+          costOfGoodsSold: product.operatorCost * factor,
+          profit: netAmount - product.operatorCost * factor,
           note,
         },
       ],
       { session }
     );
 
-    // Create new subscription record
+    // Create subscription entry
     const subscription = await Subscription.create(
       [
         {
@@ -128,14 +152,17 @@ const createBilling = async (req, res) => {
     customer.balanceAmount = balanceAfter;
     customer.lastBillDate = new Date();
     customer.lastBillAmount = netAmount;
-
-    // update subscription summary inside customer
     customer.active = true;
-    if (!customer.activeSubscriptions.includes(subscription[0]._id)) {
-      customer.activeSubscriptions.push(subscription[0]._id);
-    }
 
-    // update earliest expiry
+    // Push new subscription ID (remove old duplicates)
+    customer.activeSubscriptions = [
+      ...new Set([
+        ...customer.activeSubscriptions.map(String),
+        subscription[0]._id.toString(),
+      ]),
+    ];
+
+    // Compute new earliest expiry
     const allActiveSubs = await Subscription.find({
       customerId,
       status: 'ACTIVE',
@@ -250,29 +277,51 @@ const createCollection = async (req, res) => {
  * @route  POST /api/transactions/charge
  * @access Private (Operator or Agent)
  */
-const createAdditionalCharge = async (req, res) => {
-  const { customerId, amount, note } = req.body;
+const createAddonBilling = async (req, res) => {
+  const { customerId, itemIndex, amount, note } = req.body;
 
-  if (!customerId || !amount || amount <= 0) {
-    return res.status(400).json({
-      message: 'Customer ID and a positive amount are required.',
-    });
-  }
+  if (!customerId)
+    return res.status(400).json({ message: 'Customer ID is required.' });
+
+  if (itemIndex === undefined && (!amount || amount <= 0))
+    return res.status(400).json({ message: 'Valid amount required.' });
 
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const customer = await Customer.findById(customerId).session(session);
-    if (!customer) throw new Error('Customer not found.');
+    if (!customer) throw new Error('Customer not found');
     if (customer.operatorId.toString() !== req.user.operatorId)
-      throw new Error('Forbidden.');
+      throw new Error('Forbidden');
 
-    const additionalAmount = Number(amount);
+    const operator = await Operator.findById(req.user.operatorId).session(
+      session
+    );
+
+    let sellingPrice, costPrice, autoNote;
+
+    // Case 1: Billing via stored item
+    if (itemIndex !== undefined && operator.additionalItems[itemIndex]) {
+      const item = operator.additionalItems[itemIndex];
+      sellingPrice = item.sellingPrice;
+      costPrice = item.costPrice;
+      autoNote = item.name;
+    }
+
+    // Case 2: Manual billing amount
+    if (!sellingPrice) {
+      sellingPrice = Number(amount);
+      costPrice = 0; // no COGS for manual misc charges
+    }
+
+    const netAmount = sellingPrice;
     const balanceBefore = customer.balanceAmount;
-    const balanceAfter = balanceBefore + additionalAmount; // ADD charge → balance increases
+    const balanceAfter = balanceBefore + netAmount;
 
-    // Create transaction
+    // invoice number
+    const invoiceId = await Counter.getInvoiceNumber(req.user.operatorId);
+
     const transaction = await Transaction.create(
       [
         {
@@ -280,27 +329,32 @@ const createAdditionalCharge = async (req, res) => {
           operatorId: req.user.operatorId,
           collectedBy: req.user.id,
           collectedByType: req.user.role === 'operator' ? 'Operator' : 'Agent',
-          type: 'ADJUSTMENT', // Correct accounting treatment
-          amount: additionalAmount, // +ve
+          type: 'ADDON',
+          invoiceId,
+          amount: netAmount,
           balanceBefore,
           balanceAfter,
-          profit: 0, // Manual charges do NOT change profit
-          note: note || 'Additional charge',
+          costOfGoodsSold: costPrice,
+          profit: netAmount - costPrice,
+          note: note || autoNote || 'Add-on charge',
         },
       ],
       { session }
     );
 
-    // Update customer summary
+    // Update customer ledger summary
     customer.balanceAmount = balanceAfter;
-    customer.active = true;
+    customer.lastBillDate = new Date();
+    customer.lastBillAmount = netAmount;
+    customer.active = true; // Any billing reactivates
 
     await customer.save({ session });
     await session.commitTransaction();
     session.endSession();
 
     return res.status(201).json({
-      message: 'Additional charge applied successfully.',
+      message: 'Add-on billing completed successfully',
+      invoiceId,
       transaction: transaction[0],
       customer,
     });
@@ -308,7 +362,7 @@ const createAdditionalCharge = async (req, res) => {
     await session.abortTransaction();
     session.endSession();
     return res.status(500).json({
-      message: error.message || 'Failed to apply additional charge.',
+      message: error.message || 'Failed to complete add-on billing.',
     });
   }
 };
@@ -414,7 +468,6 @@ const getCustomerTransactions = async (req, res) => {
     if (customer.operatorId.toString() !== req.user.operatorId)
       return res.status(403).json({ message: 'Forbidden.' });
 
-    // Build query
     const query = { customerId };
 
     if (startDate || endDate) {
@@ -422,7 +475,7 @@ const getCustomerTransactions = async (req, res) => {
       if (startDate) query.createdAt.$gte = new Date(startDate);
       if (endDate) query.createdAt.$lte = new Date(endDate);
     }
-    if (type) query.type = type.toUpperCase(); // INVOICE, PAYMENT, ADJUSTMENT, REVERSAL
+    if (type) query.type = type.toUpperCase();
     if (invoiceId) query.invoiceId = invoiceId;
     if (receiptNumber) query.receiptNumber = receiptNumber;
 
@@ -430,8 +483,7 @@ const getCustomerTransactions = async (req, res) => {
     const numericPage = Math.max(1, parseInt(page));
     const skip = (numericPage - 1) * numericLimit;
 
-    // Pagination data
-    const [transactions, totalCount, totals] = await Promise.all([
+    const [transactions, totalCount] = await Promise.all([
       Transaction.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -440,47 +492,26 @@ const getCustomerTransactions = async (req, res) => {
         .populate('collectedBy', 'name')
         .lean(),
       Transaction.countDocuments(query),
-      Transaction.aggregate([
-        { $match: query },
-        {
-          $group: {
-            _id: null,
-            billedTotal: {
-              $sum: { $cond: [{ $eq: ['$type', 'INVOICE'] }, '$amount', 0] },
-            },
-            paidTotal: {
-              $sum: { $cond: [{ $eq: ['$type', 'PAYMENT'] }, '$amount', 0] },
-            },
-            adjustmentTotal: {
-              $sum: { $cond: [{ $eq: ['$type', 'ADJUSTMENT'] }, '$amount', 0] },
-            },
-          },
-        },
-      ]),
     ]);
 
-    res.status(200).json({
-      data: transactions,
+    return res.status(200).json({
+      transactions,
       pagination: {
         total: totalCount,
         page: numericPage,
+        pages: Math.ceil(totalCount / numericLimit),
         limit: numericLimit,
-        totalPages: Math.ceil(totalCount / numericLimit),
-      },
-      totals: totals[0] || {
-        billedTotal: 0,
-        paidTotal: 0,
-        adjustmentTotal: 0,
       },
       balance: customer.balanceAmount,
     });
   } catch (error) {
     console.error('Error fetching transactions:', error);
-    res
-      .status(500)
-      .json({ message: 'Server error while fetching transactions.' });
+    res.status(500).json({
+      message: 'Server error while fetching transactions.',
+    });
   }
 };
+
 /**
  * @desc   Reverse an invoice (cancel billing) safely
  * @route  POST /api/transactions/reverse-invoice
@@ -847,10 +878,37 @@ const getTransactionDetails = async (req, res) => {
   }
 };
 
+const getTransactionPDF = async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+
+    const transaction = await Transaction.findById(transactionId)
+      .populate('customerId')
+      .populate('productId')
+      .lean();
+
+    if (!transaction)
+      return res.status(404).json({ message: 'Transaction not found' });
+
+    const customer = await Customer.findById(transaction.customerId);
+    const operator = await Operator.findById(transaction.operatorId);
+
+    if (!customer || !operator)
+      return res.status(404).json({ message: 'Invalid mapping' });
+
+    generateInvoicePDF(res, transaction, customer, operator);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to generate invoice PDF' });
+  }
+};
+
 module.exports = {
   createBilling,
   createCollection,
-  createAdditionalCharge,
+  createAddonBilling,
   adjustBalance,
   getCustomerTransactions,
+  getTransactionDetails,
+  getTransactionPDF,
 };

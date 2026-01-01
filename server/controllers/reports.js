@@ -25,6 +25,10 @@ const SUMMARY_TYPE = {
   CUSTOMERS: 3,
   COMPLAINTS: 13,
 };
+/**
+ * COLLECTION REPORT — UI compatible
+ * date → area → payment mode → customers
+ */
 const formatCollectionReport = (collections) => {
   const report = {};
 
@@ -43,18 +47,21 @@ const formatCollectionReport = (collections) => {
       };
     }
 
-    // Update summary
+    // update summary
     report[dateKey].summary.customers += 1;
-    report[dateKey].summary.amount += tx.amount || 0;
-    report[dateKey].summary.discount += tx.discount || 0;
-    report[dateKey].summary.totalPayment += tx.amount || 0;
+    report[dateKey].summary.amount += tx.paidAmount;
+    report[dateKey].summary.discount += tx.discount;
+    report[dateKey].summary.totalPayment += tx.paidAmount;
 
-    // Update areas and payment modes
+    // area & mode
     const area = tx.area || 'Unknown';
     const mode = tx.method || 'Cash';
 
     if (!report[dateKey].areas[area]) {
       report[dateKey].areas[area] = { modes: [] };
+    }
+    if (!Array.isArray(report[dateKey].areas[area].modes)) {
+      report[dateKey].areas[area].modes = [];
     }
 
     const existingMode = report[dateKey].areas[area].modes.find(
@@ -63,52 +70,68 @@ const formatCollectionReport = (collections) => {
 
     if (existingMode) {
       existingMode.customers += 1;
-      existingMode.amount += tx.amount || 0;
-      existingMode.discount += tx.discount || 0;
-      existingMode.payment += tx.amount || 0;
+      existingMode.amount += tx.paidAmount;
+      existingMode.discount += tx.discount;
+      existingMode.payment += tx.paidAmount;
     } else {
       report[dateKey].areas[area].modes.push({
         mode,
         customers: 1,
-        amount: tx.amount || 0,
-        discount: tx.discount || 0,
-        payment: tx.amount || 0,
+        amount: tx.paidAmount,
+        discount: tx.discount,
+        payment: tx.paidAmount,
       });
     }
 
-    // Add customer details
+    // Push customer detail row for UI
     report[dateKey].customerDetails.push({
       id: tx.customerId,
-      name: tx.customerName || '',
-      area: tx.area || '',
-      previousBalance: tx.previousBalance || 0,
-      paidAmount: tx.amount || 0,
-      discount: tx.discount || 0,
-      currentBalance: tx.currentBalance || 0,
-      collectedBy: tx.collectedBy || '',
-      customerCode: tx.customerCode || '',
-      stbNo: tx.stbNo || '',
-      cardNo: tx.cardNo || '',
-      method: tx.method || 'Cash',
+      name: tx.customerName,
+      area: tx.area,
+      previousBalance: tx.previousBalance,
+      paidAmount: tx.paidAmount,
+      discount: tx.discount,
+      currentBalance: tx.currentBalance,
+      collectedBy: tx.collectedBy,
+      customerCode: tx.customerCode,
+      stbNo: tx.stbNo,
+      cardNo: tx.cardNo,
+      method: tx.method,
     });
   });
 
   return report;
 };
+
 /**
- * @desc    Get a detailed report of all collections with filters.
  * @route   GET /api/reports/collections
- * @access  Private (Operator only)
+ * @access  Private (Operator / Agent)
  */
 const getCollectionReport = async (req, res) => {
   try {
-    const { startDate, endDate, agentId, area, payment, status } = req.query;
+    const { startDate, endDate, agent, area, payment } = req.query;
+    const operatorId = req.user.operatorId;
 
-    // Build MongoDB aggregation pipeline
-    const pipeline = [
-      { $match: { type: 'Collection' } },
+    const match = {
+      operatorId: new mongoose.Types.ObjectId(operatorId),
+      type: 'PAYMENT',
+    };
 
-      // Join customer info
+    if (startDate || endDate) {
+      match.createdAt = {};
+      if (startDate) match.createdAt.$gte = new Date(startDate);
+      if (endDate) match.createdAt.$lte = new Date(endDate);
+    }
+
+    if (agent && agent !== 'all')
+      match.collectedBy = new mongoose.Types.ObjectId(agent);
+
+    if (payment && payment !== 'all')
+      match.method = new RegExp(`^${payment}$`, 'i'); // Cash / Online / UPI
+
+    // 🔥 Aggregation
+    const payments = await Transaction.aggregate([
+      { $match: match },
       {
         $lookup: {
           from: 'customers',
@@ -118,107 +141,93 @@ const getCollectionReport = async (req, res) => {
         },
       },
       { $unwind: '$customerInfo' },
-
-      // Join agent/operator info
-      {
-        $lookup: {
-          from: 'agents',
-          localField: 'collectedBy',
-          foreignField: '_id',
-          as: 'agentInfo',
-        },
-      },
-      {
-        $lookup: {
-          from: 'operators',
-          localField: 'collectedBy',
-          foreignField: '_id',
-          as: 'operatorInfo',
-        },
-      },
-
-      // Project required fields
       {
         $project: {
-          _id: 0,
-          receiptNumber: 1,
+          _id: 1,
           date: '$createdAt',
-          amount: 1,
+          amount: { $abs: '$amount' },
           discount: 1,
           customerId: 1,
+          balanceBefore: 1,
+          balanceAfter: 1,
+          method: '$paymentMethod',
           customerName: '$customerInfo.name',
-          area: '$customerInfo.locality',
-          balanceBefore: '$balanceBefore',
-          balanceAfter: '$balanceAfter',
-
-          collectedBy: {
-            $ifNull: [
-              { $arrayElemAt: ['$agentInfo.name', 0] },
-              { $arrayElemAt: ['$operatorInfo.name', 0] },
-            ],
-          },
           customerCode: '$customerInfo.customerCode',
-          stbNo: '$customerInfo.stbNo',
-          cardNo: '$customerInfo.cardNo',
-          method: 1,
+          area: '$customerInfo.locality',
         },
       },
-    ];
+      { $sort: { date: -1 } },
+    ]);
 
-    // Date filters
-    if (startDate || endDate) {
-      const matchDates = {};
-      if (startDate) matchDates.$gte = new Date(startDate);
-      if (endDate) matchDates.$lte = new Date(endDate);
-      pipeline.push({ $match: { createdAt: matchDates } });
-    }
+    // ---------------- FORMAT FOR UI ----------------
+    // 🔥 Final optimized formatter (UI-ready & enhanced)
+    const formatted = {};
 
-    // Additional filters
-    if (agentId)
-      pipeline.push({
-        $match: { collectedBy: new mongoose.Types.ObjectId(agentId) },
+    payments.forEach((tx) => {
+      const dateKey = format(tx.date, 'dd-MMM-yyyy');
+
+      if (!formatted[dateKey]) {
+        formatted[dateKey] = {
+          summary: { customers: 0, amount: 0, discount: 0, totalPayment: 0 },
+          areas: {},
+          customerDetails: [],
+        };
+      }
+
+      // ---- Update Summary ----
+      formatted[dateKey].summary.customers += 1;
+      formatted[dateKey].summary.amount += tx.amount || 0;
+      formatted[dateKey].summary.discount += tx.discount || 0;
+      formatted[dateKey].summary.totalPayment += tx.amount || 0;
+
+      // ---- Area + Mode ----
+      const area = tx.area || 'Unknown';
+      const mode = tx.method || 'Cash';
+
+      if (!formatted[dateKey].areas[area]) {
+        formatted[dateKey].areas[area] = { modes: [] };
+      }
+
+      let modeObj = formatted[dateKey].areas[area].modes.find(
+        (m) => m.mode === mode
+      );
+      if (!modeObj) {
+        modeObj = {
+          mode,
+          customers: 0,
+          amount: 0,
+          discount: 0,
+          payment: 0,
+        };
+        formatted[dateKey].areas[area].modes.push(modeObj);
+      }
+
+      modeObj.customers += 1;
+      modeObj.amount += tx.amount || 0;
+      modeObj.discount += tx.discount || 0;
+      modeObj.payment += tx.amount || 0;
+
+      // ---- Customer Details Row (never merged) ----
+      formatted[dateKey].customerDetails.push({
+        id: tx.customerId,
+        name: tx.customerName || '',
+        area: tx.area || '',
+        previousBalance: tx.balanceBefore || 0,
+        paidAmount: tx.amount || 0,
+        discount: tx.discount || 0,
+        currentBalance: tx.balanceAfter || 0,
+        collectedBy: tx.collectedByName || '', // ensure projected
+        customerCode: tx.customerCode || '',
+        stbNo: tx.stbNumber || '',
+        cardNo: tx.cardNumber || '',
+        method: tx.method || 'Cash',
       });
-    if (area)
-      pipeline.push({
-        $match: { 'customerInfo.locality': new RegExp(area, 'i') },
-      });
-    if (payment) {
-      pipeline.push({
-        $match: { method: new RegExp(`^${payment}$`, 'i') }, // e.g. Cash, Online, UPI
-      });
-    }
-    if (status) {
-      if (status === 'paid') pipeline.push({ $match: { amount: { $gt: 0 } } });
-      if (status === 'pending')
-        pipeline.push({ $match: { currentBalance: { $gt: 0 } } });
-    }
-
-    // Sort by date descending
-    pipeline.push({ $sort: { date: -1 } });
-
-    const collections = await Transaction.aggregate(pipeline);
-    const formattedData = formatCollectionReport(collections);
-    let totalSummary = {
-      customers: 0,
-      amount: 0,
-      discount: 0,
-      totalPayment: 0,
-    };
-    Object.values(formattedData).forEach((day) => {
-      totalSummary.customers += day.summary.customers;
-      totalSummary.amount += day.summary.amount;
-      totalSummary.discount += day.summary.discount;
-      totalSummary.totalPayment += day.summary.totalPayment;
     });
 
-    // Send both detailed report and totals
-    res.status(200).json({
-      report: formattedData,
-      totals: totalSummary,
-    });
+    return res.status(200).json({ report: formatted });
   } catch (error) {
     console.error('Error fetching collection report:', error);
-    res.status(500).json({ message: 'Server error.' });
+    res.status(500).json({ message: 'Server error while fetching report.' });
   }
 };
 
@@ -748,4 +757,5 @@ module.exports = {
   getCollectionReport,
   getIncomeReport,
   getDashboardStats,
+  getCollectionAreaSummary,
 };

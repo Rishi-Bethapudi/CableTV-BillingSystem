@@ -13,7 +13,6 @@ const productSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
 
     planType: {
-      // renaming "category"
       type: String,
       enum: ['BASE', 'ADDON'],
       required: true,

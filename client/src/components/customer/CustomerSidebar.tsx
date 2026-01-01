@@ -1,5 +1,3 @@
-// File: components/customer/CustomerSidebar.tsx
-
 import {
   CreditCard,
   RefreshCw,
@@ -8,9 +6,7 @@ import {
   Plus,
   Activity,
   Monitor,
-  Calendar,
   Edit,
-  Upload,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,11 +16,6 @@ interface SidebarItem {
   label: string;
   icon: React.ElementType;
   isPrimary?: boolean;
-}
-
-interface CustomerSidebarProps {
-  activeSection: string;
-  setActiveSection: (section: string) => void;
 }
 
 const sidebarItems: SidebarItem[] = [
@@ -42,34 +33,50 @@ const sidebarItems: SidebarItem[] = [
   { key: 'additional-charge', label: 'Additional Charge', icon: Plus },
   { key: 'balance-history', label: 'Balance History', icon: DollarSign },
   { key: 'hardware-details', label: 'Hardware Details', icon: Monitor },
-  // { key: 'customer-follow-up', label: 'Customer Follow Up', icon: Calendar },
   { key: 'customer-edit', label: 'Customer Edit', icon: Edit },
-  // { key: 'upload-documents', label: 'Upload Documents', icon: Upload },
 ];
+
+interface CustomerSidebarProps {
+  activeSection: string;
+  setActiveSection: (section: string) => void;
+  layout?: 'vertical' | 'horizontal'; // 🚀 NEW
+}
 
 export default function CustomerSidebar({
   activeSection,
   setActiveSection,
+  layout = 'vertical',
 }: CustomerSidebarProps) {
+  const isHorizontal = layout === 'horizontal';
+
   return (
-    <Card className="w-full sticky top-6">
-      <CardContent className="p-4 space-y-2">
+    <Card className="w-full">
+      <CardContent
+        className={`p-3 ${
+          isHorizontal ? 'flex flex-wrap gap-2 justify-center' : 'space-y-2'
+        }`}
+      >
         {sidebarItems.map(({ key, label, icon: Icon, isPrimary }) => {
           const isActive = activeSection === key;
+
           return (
             <Button
               key={key}
               onClick={() => setActiveSection(key)}
-              className={`w-full justify-start text-left ${
-                isActive
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-200'
-              } ${
-                isPrimary && !isActive ? 'font-semibold border-blue-300' : ''
-              }`}
+              size="sm"
+              className={`
+                flex items-center gap-2
+                ${
+                  isActive
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-200'
+                }
+                ${isPrimary && !isActive ? 'font-semibold border-blue-300' : ''}
+                ${isHorizontal ? 'px-3' : 'w-full justify-start'}
+              `}
               variant="ghost"
             >
-              <Icon className="h-4 w-4 mr-3" />
+              <Icon className="h-4 w-4" />
               {label}
             </Button>
           );

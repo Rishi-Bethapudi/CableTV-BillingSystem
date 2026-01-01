@@ -3,6 +3,9 @@ const router = express.Router();
 const {
   createCollection,
   createBilling,
+  createAddonBilling,
+  getTransactionDetails,
+  getTransactionPDF,
 } = require('../controllers/transaction.controller');
 const {
   authMiddleware,
@@ -24,5 +27,7 @@ router.post('/billing', createBilling);
  * @access  Private (Operator or Agent)
  */
 router.post('/collection', createCollection);
-
+router.post('/addon', createAddonBilling);
+router.get('/:id', getTransactionDetails);
+router.get('/:transactionId/pdf', getTransactionPDF);
 module.exports = router;

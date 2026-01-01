@@ -1,123 +1,99 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { MapPin, LinkIcon, SendHorizonal, Loader2 } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
+  DialogHeader,
 } from '@/components/ui/dialog';
+import { MapPin, LinkIcon, SendHorizonal, Loader2 } from 'lucide-react';
+
 import apiClient from '@/utils/apiClient';
-import type { Customer } from '@/utils/data';
+import type { Customer, CollectPaymentPayload } from '@/utils/data';
 
 interface CollectPaymentSectionProps {
   customer: Customer;
-  isVisible?: boolean;
   onRefresh: () => void;
 }
-type TransactionResponse = any;
-interface CollectPaymentPayload {
-  customerId: string;
-  amount: number;
-  discount: number;
-  method: string;
-  note: string;
-  recordedAt: string;
-}
+
 export default function CollectPaymentSection({
   customer,
   onRefresh,
 }: CollectPaymentSectionProps) {
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [discount, setDiscount] = useState('');
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [comment, setComment] = useState('');
+  const [historyType, setHistoryType] = useState<string | null>(null);
   const [recordTime, setRecordTime] = useState(
     new Date().toISOString().slice(0, 16)
   );
 
-  // state for modal
-  const [historyType, setHistoryType] = useState<string | null>(null);
-
-  const { mutate, isPending } = useMutation<
-    TransactionResponse,
-    Error,
-    CollectPaymentPayload
-  >({
-    mutationFn: async (payload: CollectPaymentPayload) => {
+  const { mutate, isPending } = useMutation({
+    mutationFn: async () => {
+      const payload: CollectPaymentPayload = {
+        customerId: customer._id,
+        amount: Number(paymentAmount),
+        method: paymentMode,
+        note: comment,
+        recordedAt: new Date(recordTime).toISOString(),
+      };
       const res = await apiClient.post('/transactions/collection', payload);
       return res.data;
     },
     onSuccess: () => {
       toast.success('Payment recorded successfully');
       setPaymentAmount('');
-      setDiscount('');
       setPaymentMode('Cash');
       setComment('');
-      if (onRefresh) onRefresh();
+      onRefresh?.();
     },
     onError: (err: any) => {
-      console.error('Transaction error:', err);
-      toast.error(
-        err?.response?.data?.message || err.message || 'Something went wrong'
-      );
+      toast.error(err?.response?.data?.message || 'Something went wrong');
     },
   });
 
+  const formattedExpiry = customer.earliestExpiry
+    ? new Date(customer.earliestExpiry).toLocaleDateString('en-IN')
+    : 'No Expiry';
+
+  const formattedLastPayDate = customer.lastPaymentDate
+    ? new Date(customer.lastPaymentDate).toLocaleDateString('en-IN')
+    : 'No Payment Recorded';
+
+  const newBalance = customer.balanceAmount - (Number(paymentAmount) || 0);
+
   const handleRecord = () => {
-    if (!paymentAmount) {
-      toast.warning('Please enter payment amount');
-      return;
-    }
-    mutate({
-      customerId: customer._id,
-      amount: Number(paymentAmount) || 0,
-      discount: Number(discount) || 0,
-      method: paymentMode,
-      note: comment,
-      recordedAt: new Date(recordTime).toISOString(),
-    });
+    if (!paymentAmount) return toast.warning('Enter payment amount');
+    mutate();
   };
-
-  const discountValue = Number(discount) || 0;
-  const paymentValue = Number(paymentAmount) || 0;
-
-  const newBalance = customer.balanceAmount - paymentValue - discountValue;
 
   return (
     <>
       <Card className="w-full">
-        <CardHeader className="bg-blue-50 dark:bg-blue-900/20 flex flex-col md:flex-row md:items-center md:justify-between py-3 px-4">
+        <CardHeader className="bg-blue-50 dark:bg-blue-900/20 py-3 px-4 flex justify-between flex-wrap gap-2">
           <CardTitle className="text-base font-semibold">
             Collect Payment
           </CardTitle>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex flex-wrap gap-2">
             {[
-              { icon: MapPin, label: 'Customer Location' },
-              { icon: LinkIcon, label: 'Advance Payment Link' },
-              { icon: SendHorizonal, label: 'Share Reminder Message' },
+              { icon: MapPin, label: 'Location' },
+              { icon: LinkIcon, label: 'Adv Pay Link' },
+              { icon: SendHorizonal, label: 'Reminder Msg' },
             ].map(({ icon: Icon, label }) => (
               <Button
                 key={label}
                 size="sm"
-                className="bg-teal-500 hover:bg-teal-600 text-white px-3 py-1.5 flex items-center gap-1"
+                className="bg-teal-500 text-white"
                 onClick={() => toast.info('Coming soon')}
               >
-                <Icon className="h-4 w-4" />
-                <span className="sr-only sm:not-sr-only">{label}</span>
+                <Icon className="h-4 w-4 mr-1" />
+                {label}
               </Button>
             ))}
           </div>
@@ -125,141 +101,99 @@ export default function CollectPaymentSection({
 
         <CardContent className="p-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Info cards (clickable) */}
-            <div className="flex flex-col sm:flex-row lg:flex-col flex-wrap gap-4">
+            {/* Three Summary Cards Stack Vertically */}
+            <div className="flex flex-col gap-4">
               {[
                 {
+                  title: 'Balance Amount',
+                  value: `₹${customer.balanceAmount}`,
+                  extra: `Expiry: ${formattedExpiry}`,
                   key: 'balance',
-                  label: 'Balance Amount',
-                  value: `₹${customer.balanceAmount}`,
-                  subtitle: customer.expiryDate
-                    ? `Expiry: ${new Date(
-                        customer.expiryDate
-                      ).toLocaleDateString()}`
-                    : 'No Expiry',
                 },
                 {
+                  title: 'Last Bill Amount',
+                  value: customer.lastBillAmount
+                    ? `₹${customer.lastBillAmount}`
+                    : 'N/A',
                   key: 'bill',
-                  label: 'Last Bill Amount',
-                  value: `₹${customer.balanceAmount}`,
                 },
                 {
+                  title: 'Last Payment',
+                  value: customer.lastPaymentAmount
+                    ? `₹${customer.lastPaymentAmount}`
+                    : 'N/A',
+                  extra: formattedLastPayDate,
                   key: 'payment',
-                  label: 'Last Payment',
-                  value: `₹${customer.lastPaymentAmount}`,
-                  subtitle: customer.lastPaymentDate
-                    ? `Collected on ${new Date(
-                        customer.lastPaymentDate
-                      ).toLocaleDateString()}`
-                    : 'No Payment Recorded',
                 },
-              ].map(({ key, label, value, subtitle }) => (
+              ].map(({ title, value, extra, key }) => (
                 <div
                   key={key}
-                  onClick={() => {}}
-                  className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                  className="bg-white border rounded-lg p-5 shadow-sm cursor-pointer hover:shadow-md transition"
+                  onClick={() => setHistoryType(key)}
                 >
-                  <div className="flex flex-col items-center text-center">
-                    <h3 className="text-gray-600 text-sm font-medium mb-3">
-                      {label}
-                    </h3>
-
-                    <div className="text-2xl font-bold text-gray-900 mb-3">
-                      {value}
-                    </div>
-
-                    {subtitle && (
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <span>{subtitle}</span>
-                      </div>
-                    )}
-                  </div>
+                  <p className="text-sm text-gray-500">{title}</p>
+                  <p className="text-2xl font-bold my-1">{value}</p>
+                  {extra && (
+                    <p className="text-xs text-gray-500 mt-1">{extra}</p>
+                  )}
                 </div>
               ))}
             </div>
 
-            {/* Form */}
-            <div className="lg:col-span-2 flex flex-col space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Paid Amount</Label>
-                  <Input
-                    type="number"
-                    placeholder="0"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Discount</Label>
-                  <Input
-                    placeholder="Discount"
-                    value={discount}
-                    onChange={(e) => setDiscount(e.target.value)}
-                  />
-                </div>
+            {/* Form (does not stretch full width) */}
+            <div className="lg:col-span-2 max-w-2xl mx-auto flex flex-col gap-6">
+              <div>
+                <Label>Paid Amount</Label>
+                <Input
+                  type="number"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Mode</Label>
-                  <Select value={paymentMode} onValueChange={setPaymentMode}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select mode" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Cash">CASH</SelectItem>
-                      <SelectItem value="UPI">UPI</SelectItem>
-                      <SelectItem value="Cheque">Cheque</SelectItem>
-                      <SelectItem value="Online">ONLINE</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Record Time</Label>
-                  <Input
-                    type="datetime-local"
-                    value={recordTime}
-                    onChange={(e) => setRecordTime(e.target.value)}
-                  />
-                </div>
+              <div>
+                <Label>Mode</Label>
+                <select
+                  className="border rounded p-2 w-full"
+                  value={paymentMode}
+                  onChange={(e) => setPaymentMode(e.target.value)}
+                >
+                  <option value="Cash">Cash</option>
+                  <option value="UPI">UPI</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Online">Online</option>
+                </select>
               </div>
 
               <div>
                 <Label>Comment</Label>
                 <Textarea
-                  placeholder="Add a comment..."
+                  rows={3}
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
-                  rows={3}
                 />
               </div>
 
-              <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg flex flex-col md:flex-row justify-between gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <span>Total Payment:</span>
-                  <span className="font-bold bg-slate-700 text-white px-3 py-1 rounded">
-                    ₹ {paymentAmount || 0}
-                  </span>
+              <div className="bg-slate-50 p-4 rounded text-sm flex flex-col sm:flex-row justify-between gap-4">
+                <div>
+                  Total Payment: <b>₹{paymentAmount || 0}</b>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span>New Balance:</span>
-                  <span
-                    className={`font-bold px-3 py-1 rounded ${
-                      newBalance >= 0
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                        : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                    }`}
+                <div>
+                  New Balance:{' '}
+                  <b
+                    className={
+                      newBalance >= 0 ? 'text-green-600' : 'text-red-600'
+                    }
                   >
-                    ₹ {newBalance}
-                  </span>
+                    ₹{newBalance}
+                  </b>
                 </div>
               </div>
 
               <Button
-                onClick={handleRecord}
                 disabled={isPending}
-                className="w-full bg-slate-800 hover:bg-slate-900 text-white flex items-center justify-center gap-2"
+                onClick={handleRecord}
+                className="w-full flex justify-center gap-2"
               >
                 {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {isPending ? 'Recording...' : 'Record'}
@@ -271,7 +205,7 @@ export default function CollectPaymentSection({
 
       {/* History Modal */}
       <Dialog open={!!historyType} onOpenChange={() => setHistoryType(null)}>
-        <DialogContent className="max-w-lg w-full">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>
               {historyType === 'balance'
@@ -281,6 +215,7 @@ export default function CollectPaymentSection({
                 : 'Payment History'}
             </DialogTitle>
           </DialogHeader>
+          {/* future: history table */}
         </DialogContent>
       </Dialog>
     </>

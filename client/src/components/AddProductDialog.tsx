@@ -37,7 +37,7 @@ export function AddProductDialog({
   const [formData, setFormData] = useState<ProductForm>({
     name: '',
     productCode: '',
-    category: '',
+    planType: '',
     customerPrice: '',
     operatorCost: '',
     billingIntervalValue: '30', // ✅ default 30
@@ -53,7 +53,7 @@ export function AddProductDialog({
     setFormData({
       name: '',
       productCode: '',
-      category: '',
+      planType: '',
       customerPrice: '',
       operatorCost: '',
       billingIntervalValue: '30',
@@ -73,13 +73,11 @@ export function AddProductDialog({
 
     try {
       await apiClient.post('/products', {
-        name: formData.name,
         productCode: formData.productCode,
-        category: formData.category,
+        name: formData.name,
+        planType: formData.planType,
         customerPrice: parseFloat(formData.customerPrice),
-        operatorCost: formData.operatorCost
-          ? parseFloat(formData.operatorCost)
-          : 0,
+        operatorCost: parseFloat(formData.operatorCost) || 0,
         billingInterval: {
           value: parseInt(formData.billingIntervalValue, 10),
           unit: formData.billingIntervalUnit,
@@ -144,16 +142,15 @@ export function AddProductDialog({
               Category
             </Label>
             <Select
-              value={formData.category}
-              onValueChange={(value) => handleChange('category', value)}
+              value={formData.planType}
+              onValueChange={(value) => handleChange('planType', value)}
             >
               <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Select category" />
+                <SelectValue placeholder="Select Plan Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Basic">Basic</SelectItem>
-                <SelectItem value="Premium">Premium</SelectItem>
-                <SelectItem value="Add-on">Add-on</SelectItem>
+                <SelectItem value="BASE">Base Pack</SelectItem>
+                <SelectItem value="ADDON">Addon Pack</SelectItem>
               </SelectContent>
             </Select>
           </div>

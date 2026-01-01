@@ -38,9 +38,9 @@ export function EditProductDialog({
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState<ProductForm>({
-    productCode: '',
     name: '',
-    category: 'Basic',
+    productCode: '',
+    planType: '',
     customerPrice: '',
     operatorCost: '',
     billingIntervalValue: '30',
@@ -54,9 +54,9 @@ export function EditProductDialog({
       setFormData({
         productCode: product.productCode,
         name: product.name,
-        category: product.category,
-        customerPrice: product.customerPrice.toFixed(2),
-        operatorCost: product.operatorCost.toFixed(2),
+        planType: product.planType, // FIXED
+        customerPrice: product.customerPrice.toString(),
+        operatorCost: product.operatorCost.toString(),
         billingIntervalValue: product.billingInterval.value.toString(),
         billingIntervalUnit: product.billingInterval.unit,
         isActive: product.isActive,
@@ -76,9 +76,9 @@ export function EditProductDialog({
       await apiClient.put(`/products/${product._id}`, {
         productCode: formData.productCode,
         name: formData.name,
-        category: formData.category,
+        planType: formData.planType, // FIXED
         customerPrice: parseFloat(formData.customerPrice),
-        operatorCost: parseFloat(formData.operatorCost),
+        operatorCost: parseFloat(formData.operatorCost) || 0,
         billingInterval: {
           value: parseInt(formData.billingIntervalValue, 10),
           unit: formData.billingIntervalUnit,
@@ -90,9 +90,7 @@ export function EditProductDialog({
       onSuccess();
     } catch (error: any) {
       console.error('Error updating product:', error);
-      const message =
-        error.response?.data?.message || 'Failed to update product';
-      toast.error(message);
+      toast.error(error.response?.data?.message || 'Failed to update product');
     } finally {
       setLoading(false);
     }
@@ -137,22 +135,21 @@ export function EditProductDialog({
             />
           </div>
 
-          {/* Category */}
+          {/* Plan Type */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="category" className="text-right">
-              Category
+            <Label htmlFor="planType" className="text-right">
+              Plan Type
             </Label>
             <Select
-              value={formData.category}
-              onValueChange={(value) => handleChange('category', value)}
+              value={formData.planType}
+              onValueChange={(value) => handleChange('planType', value)}
             >
               <SelectTrigger className="col-span-3">
-                <SelectValue />
+                <SelectValue placeholder="Select Plan Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Basic">Basic</SelectItem>
-                <SelectItem value="Premium">Premium</SelectItem>
-                <SelectItem value="Add-on">Add-on</SelectItem>
+                <SelectItem value="BASE">Base Pack</SelectItem>
+                <SelectItem value="ADDON">Addon Pack</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -197,7 +194,6 @@ export function EditProductDialog({
             </Label>
             <div className="col-span-3 flex gap-2">
               <Input
-                id="billingIntervalValue"
                 type="number"
                 min={1}
                 max={31}
@@ -206,7 +202,6 @@ export function EditProductDialog({
                   handleChange('billingIntervalValue', e.target.value)
                 }
                 className="w-1/2"
-                placeholder="e.g. 1 or 30"
                 required
               />
               <Select

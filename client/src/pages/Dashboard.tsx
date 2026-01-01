@@ -100,13 +100,7 @@ export default function Dashboard() {
             value={item.stat}
             currency={item.stat_type === 0}
             secondaryValue={item.des}
-            secondaryIcon={
-              item.name.includes('Pending')
-                ? AlertCircle
-                : item.name.includes('Customer')
-                ? UserPlus
-                : IndianRupee
-            }
+            secondaryIcon={Users}
             icon={
               item.name.includes('Collection')
                 ? IndianRupee

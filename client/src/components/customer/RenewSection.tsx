@@ -33,22 +33,22 @@ const RenewSubscription = ({
     ? new Date(customer.earliestExpiry) < new Date()
     : true;
 
+  // 🔹 Auto-calc To date based on start date & period
   useEffect(() => {
     if (fromDate && selectedPeriod) {
-      const startDate = new Date(fromDate);
-      const endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + parseInt(selectedPeriod));
-      setToDate(endDate.toISOString().split('T')[0]);
+      const start = new Date(fromDate);
+      const end = new Date(start);
+      end.setDate(start.getDate() + parseInt(selectedPeriod));
+      setToDate(end.toISOString().split('T')[0]);
     }
   }, [fromDate, selectedPeriod]);
 
+  // 🔹 Search filter
   useEffect(() => {
     if (searchTerm) {
       setFilteredPackages(
-        packages.filter(
-          (pkg) =>
-            pkg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            pkg.description?.toLowerCase().includes(searchTerm.toLowerCase())
+        packages.filter((pkg) =>
+          pkg.name.toLowerCase().includes(searchTerm.toLowerCase())
         )
       );
     } else {
@@ -56,6 +56,7 @@ const RenewSubscription = ({
     }
   }, [searchTerm, packages]);
 
+  // 🔥 Fetch products from backend (as per Product model)
   const fetchPackages = async () => {
     setLoading(true);
     try {
@@ -69,9 +70,6 @@ const RenewSubscription = ({
         if (match) {
           setSelectedPackage(match.name);
           setSearchTerm(match.name);
-        } else if (data.length > 0) {
-          setSelectedPackage(data[0].name);
-          setSearchTerm(data[0].name);
         }
       }
     } catch (error) {
@@ -107,15 +105,12 @@ const RenewSubscription = ({
     };
 
     setRenewLoading(true);
-
     try {
       await apiClient.post('/transactions/billing', payload);
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
       toast.success('Subscription renewed successfully!');
       onRefresh?.();
     } catch (error) {
-      console.error('Error renewing subscription:', error);
+      console.error('Renew error:', error);
       toast.error('Renewal failed. Try again.');
     } finally {
       setRenewLoading(false);
@@ -134,6 +129,7 @@ const RenewSubscription = ({
   return (
     <div className="max-w-6xl mx-auto p-4">
       <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+        {/* Info Banner */}
         <div
           className={`p-4 ${
             isExpired
@@ -148,18 +144,15 @@ const RenewSubscription = ({
           >
             <Package className="w-4 h-4" />
             Renew Subscription
-            {isExpired && (
-              <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full">
-                EXPIRED
-              </span>
-            )}
           </h2>
         </div>
 
+        {/* Body */}
         <div className="p-6 space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* LEFT INFO PANEL */}
+            {/* LEFT – customer info & dates */}
             <div className="space-y-4">
+              {/* Customer */}
               <div className="bg-gray-50 p-4 rounded-lg flex items-center gap-3">
                 <User className="w-5 h-5 text-gray-500" />
                 <div>
@@ -170,16 +163,18 @@ const RenewSubscription = ({
                 </div>
               </div>
 
+              {/* Balance */}
               <div className="bg-gray-50 p-4 rounded-lg flex justify-between">
                 <span className="text-sm text-gray-600 flex items-center gap-3">
-                  <CreditCard className="w-5 h-5 text-gray-500" /> Current
-                  Balance
+                  <CreditCard className="w-5 h-5 text-gray-500" />
+                  Current Balance
                 </span>
                 <span className="font-semibold text-white bg-gray-700 px-3 py-1 rounded-md">
                   ₹{customer.balanceAmount}
                 </span>
               </div>
 
+              {/* Last Bill Date */}
               <div className="bg-gray-50 p-4 rounded-lg">
                 <div className="flex items-center gap-3 mb-2">
                   <Calendar className="w-5 h-5 text-gray-500" />
@@ -190,7 +185,7 @@ const RenewSubscription = ({
                 </div>
               </div>
 
-              {/* DATE PICKERS */}
+              {/* Dates */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm mb-1 block">Start Date</label>
@@ -212,7 +207,7 @@ const RenewSubscription = ({
                 </div>
               </div>
 
-              {/* PERIOD SELECT */}
+              {/* Period */}
               <div>
                 <label className="text-sm mb-1 block">Period</label>
                 <select
@@ -229,7 +224,7 @@ const RenewSubscription = ({
               </div>
             </div>
 
-            {/* RIGHT STATUS PANEL */}
+            {/* RIGHT – subscription info */}
             <div
               className={`p-6 rounded-lg h-fit border ${
                 isExpired
@@ -247,15 +242,7 @@ const RenewSubscription = ({
 
               <div className="space-y-3">
                 <StatusRow label="Status">
-                  <strong
-                    className={`px-2 py-1 rounded ${
-                      isExpired
-                        ? 'bg-red-100 text-red-600'
-                        : 'bg-green-100 text-green-700'
-                    }`}
-                  >
-                    {isExpired ? 'EXPIRED' : 'ACTIVE'}
-                  </strong>
+                  {isExpired ? 'EXPIRED' : 'ACTIVE'}
                 </StatusRow>
 
                 <StatusRow label="Active until">
@@ -269,70 +256,66 @@ const RenewSubscription = ({
                 <StatusRow label="Package">
                   {activeProduct?.name || 'Not Subscribed'}
                 </StatusRow>
-
-                {activeProduct && fromDate && (
-                  <StatusRow label="New period">
-                    {selectedPeriod} days
-                  </StatusRow>
-                )}
               </div>
-            </div>
-            {/* PACKAGE SEARCH */}
-            <div className="relative">
-              <label className="text-sm mb-1 block">Package</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setShowDropdown(true);
-                  }}
-                  onFocus={() => setShowDropdown(true)}
-                  placeholder="Search package…"
-                  className="input-field pl-10"
-                />
-              </div>
-
-              {showDropdown && (
-                <div className="absolute z-10 w-full bg-white shadow-lg rounded-lg border mt-1 max-h-60 overflow-y-auto">
-                  {loading ? (
-                    <div className="p-3 text-center text-gray-500">
-                      Loading…
-                    </div>
-                  ) : filteredPackages.length > 0 ? (
-                    filteredPackages.map((pkg) => (
-                      <div
-                        key={pkg._id}
-                        onClick={() => handlePackageSelect(pkg)}
-                        className="p-3 hover:bg-gray-100 cursor-pointer"
-                      >
-                        <div className="font-medium">{pkg.name}</div>
-                        <div className="text-sm text-gray-600">
-                          ₹{pkg.customerPrice}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-3 text-center text-gray-500">
-                      No results
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
 
-          {/* ACTION BUTTONS */}
+          {/* 🔽 Package selection moved below current subscription */}
+          <div className="relative">
+            <label className="text-sm mb-1 block">Package</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setShowDropdown(true);
+                }}
+                onFocus={() => setShowDropdown(true)}
+                placeholder="Search package…"
+                className="input-field pl-10"
+              />
+            </div>
+
+            {showDropdown && (
+              <div className="absolute z-10 w-full bg-white shadow-lg rounded-lg border mt-1 max-h-60 overflow-y-auto">
+                {loading ? (
+                  <div className="p-3 text-center text-gray-500">Loading…</div>
+                ) : filteredPackages.length > 0 ? (
+                  filteredPackages.map((pkg) => (
+                    <div
+                      key={pkg._id}
+                      onClick={() => handlePackageSelect(pkg)}
+                      className="p-3 hover:bg-gray-100 cursor-pointer"
+                    >
+                      <div className="font-medium">{pkg.name}</div>
+                      <div className="text-sm text-gray-600">
+                        ₹{pkg.customerPrice}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-3 text-center text-gray-500">
+                    No results
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 🔥 Buttons with BG */}
           <div className="flex flex-col md:flex-row gap-4 border-t pt-6">
-            <button onClick={handleRenewToday} className="btn-secondary">
+            <button
+              onClick={handleRenewToday}
+              className="btn-secondary bg-gray-200"
+            >
               Renew From Today
             </button>
             <button
               onClick={handleRenew}
               disabled={!selectedPackage || !fromDate || renewLoading}
-              className="btn-primary"
+              className="btn-primary bg-blue-600 text-white"
             >
               {renewLoading ? 'Renewing…' : 'Renew Subscription'}
             </button>

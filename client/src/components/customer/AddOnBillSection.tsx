@@ -1,27 +1,19 @@
 import { useEffect, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import apiClient from '@/utils/apiClient';
-import type { Customer as CustomerData, Product } from '@/utils/data';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandList,
-  CommandInput,
-} from '@/components/ui/command';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Check, ChevronsUpDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import type { Customer as CustomerData } from '@/utils/data';
+import { useSelector } from 'react-redux';
+
+interface AdditionalItem {
+  name: string;
+  sellingPrice: number;
+  costPrice: number;
+  defaultNote?: string;
+}
 
 interface AddOnBillSectionProps {
   customer: CustomerData;
@@ -34,99 +26,90 @@ export default function AddOnBillSection({
   isVisible = true,
   onRefresh,
 }: AddOnBillSectionProps) {
-  const [packages, setPackages] = useState<Product[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPackage, setSelectedPackage] = useState<Product | null>(null);
+  const user = useSelector((state: any) => state.auth.user);
+  const [items, setItems] = useState<AdditionalItem[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [price, setPrice] = useState('');
   const [note, setNote] = useState('');
-  const [isPriceModified, setIsPriceModified] = useState(false);
-  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showAddItemForm, setShowAddItemForm] = useState(false);
 
-  // Fetch packages
+  // new item inputs
+  const [newName, setNewName] = useState('');
+  const [newSelling, setNewSelling] = useState('');
+  const [newCost, setNewCost] = useState('');
+
   useEffect(() => {
-    const fetchPackages = async () => {
-      setLoading(true);
-      try {
-        const res = await apiClient.get('/products');
-        const data = res.data;
-        setPackages(data);
-
-        if (data.length > 0) {
-          setSelectedPackage(data[0]);
-          setSearchTerm(data[0].name);
-          setPrice(data[0].customerPrice.toString());
-        }
-      } catch (error) {
-        console.error('Error fetching packages:', error);
-        toast.error('Failed to load packages');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPackages();
+    fetchItems();
   }, []);
 
-  // Update price when package changes (only if user hasn't manually modified it)
-  useEffect(() => {
-    if (selectedPackage && !isPriceModified) {
-      setPrice(selectedPackage.customerPrice.toString());
+  const fetchItems = async () => {
+    try {
+      // const res = await apiClient.get('/operator/me');
+      const res = setItems(user?.additionalItems || []);
+    } catch {
+      toast.error('Failed to load additional items');
     }
-  }, [selectedPackage, isPriceModified]);
-
-  // Track if user manually modifies the price
-  const handlePriceChange = (value: string) => {
-    setPrice(value);
-    setIsPriceModified(true);
-  };
-  const handleRemarkChange = (value: string) => {
-    setNote(value);
-  };
-  // Reset price modification flag when package changes
-  const handlePackageSelect = (pkg: Product) => {
-    setSelectedPackage(pkg);
-    setSearchTerm(pkg.name);
-    setIsPriceModified(false); // Reset flag when package changes
-    setOpen(false);
   };
 
-  // Mutation to add addon
-  const { mutate, isPending } = useMutation({
-    mutationFn: async () => {
-      if (!selectedPackage || !price) {
-        throw new Error('Please select a product and enter a price');
-      }
+  const handleSelectItem = (index: number) => {
+    setSelectedIndex(index);
+    const item = items[index];
+    setPrice(item.sellingPrice.toString());
+    setNote(item.defaultNote || item.name);
+  };
 
-      const payload = {
-        customerId: customer._id,
-        productId: selectedPackage._id,
-        amount: parseInt(price, 10),
-        note,
-      };
+  const handleAddItem = async () => {
+    if (!newName || !newSelling || !newCost) {
+      toast.error('Please fill all fields');
+      return;
+    }
+    try {
+      await apiClient.post('/operator/add-item', {
+        name: newName,
+        sellingPrice: Number(newSelling),
+        costPrice: Number(newCost),
+      });
 
-      const res = await apiClient.post('/transactions/billing', payload);
-      return res.data;
-    },
-    onSuccess: () => {
-      toast.success('Add-on added successfully');
-      setSelectedPackage(null);
-      setSearchTerm('');
-      setPrice('');
-      setIsPriceModified(false);
+      toast.success('Item added');
+      setShowAddItemForm(false);
+      setNewName('');
+      setNewSelling('');
+      setNewCost('');
+      fetchItems();
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to add item');
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!price) return toast.error('Enter billing amount');
+
+    const payload: any = {
+      customerId: customer._id,
+      note,
+    };
+
+    if (selectedIndex !== null) payload.itemIndex = selectedIndex;
+    else payload.amount = Number(price);
+
+    setLoading(true);
+    try {
+      await apiClient.post('/transactions/addon', payload);
+      toast.success('Add-on billing completed');
       onRefresh();
-    },
-    onError: (err: any) => {
-      console.error('Add-on error:', err);
-      toast.error(
-        err?.response?.data?.message || err.message || 'Something went wrong'
-      );
-    },
-  });
+      setSelectedIndex(null);
+      setPrice('');
+      setNote('');
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Billing failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!isVisible) return null;
-
-  const newBalance = customer.balanceAmount + (price ? parseInt(price, 10) : 0);
+  const newBalance = customer.balanceAmount + (price ? Number(price) : 0);
 
   return (
     <Card className="w-96">
@@ -134,137 +117,103 @@ export default function AddOnBillSection({
         <CardTitle className="text-lg">Add On Bill</CardTitle>
       </CardHeader>
       <CardContent className="p-4 space-y-4">
-        {/* Current balance */}
+        {/* Current Balance */}
         <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Current Balance
-          </div>
+          <div className="text-sm text-gray-500">Current Balance</div>
           <div className="text-2xl font-bold">₹{customer.balanceAmount}</div>
         </div>
 
-        {/* Product selector with shadcn/ui combobox */}
-        {/* Product selector with improved UI */}
-        <div className="space-y-2">
-          <Label>Select Add-on</Label>
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={open}
-                className="w-full justify-between text-left"
-              >
-                {selectedPackage ? (
-                  <div className="flex items-center justify-between w-full">
-                    <span>{selectedPackage.name}</span>
-                    <span className="text-sm text-gray-500">
-                      ₹{selectedPackage.customerPrice}
-                    </span>
-                  </div>
-                ) : (
-                  'Select product...'
-                )}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
+        {/* Dropdown item selector */}
+        <div className="flex gap-3 items-end">
+          {/* Select Item */}
+          <div className="flex-1">
+            <Label className="mb-1 block text-sm font-medium">
+              Select Item
+            </Label>
+            <select
+              value={selectedIndex ?? ''}
+              onChange={(e) => handleSelectItem(Number(e.target.value))}
+              className="w-full h-10 px-3 rounded-md border shadow-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 text-sm"
+            >
+              <option value="">-- Select --</option>
+              {items.map((item, i) => (
+                <option key={i} value={i}>
+                  {item.name} — ₹{item.sellingPrice}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            <PopoverContent className="w-full p-0">
-              <Command>
-                <CommandInput
-                  placeholder="Search product..."
-                  value={searchTerm}
-                  onValueChange={setSearchTerm}
-                />
-                <CommandEmpty>No product found.</CommandEmpty>
-                <CommandGroup className="max-h-60 overflow-y-auto">
-                  {packages
-                    .filter((pkg) =>
-                      pkg.name.toLowerCase().includes(searchTerm.toLowerCase())
-                    )
-                    .map((pkg) => (
-                      <CommandItem
-                        key={pkg._id}
-                        value={pkg.name}
-                        onSelect={() => handlePackageSelect(pkg)}
-                        className="flex justify-between items-center px-3 py-2 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded"
-                      >
-                        <span className="flex items-center gap-2">
-                          <Check
-                            className={cn(
-                              'h-4 w-4',
-                              selectedPackage?._id === pkg._id
-                                ? 'opacity-100 text-yellow-600'
-                                : 'opacity-0'
-                            )}
-                          />
-                          {pkg.name}
-                        </span>
-                        <span className="text-sm text-gray-500">
-                          ₹{pkg.customerPrice}
-                        </span>
-                      </CommandItem>
-                    ))}
-                </CommandGroup>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          {/* Add New Button */}
+          <Button
+            variant="outline"
+            onClick={() => setShowAddItemForm(!showAddItemForm)}
+            className="whitespace-nowrap h-10 px-4 border-yellow-500 text-yellow-700 hover:bg-yellow-100"
+          >
+            + Add New
+          </Button>
         </div>
 
-        {/* Price with sync indicator */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="price">Price</Label>
-            {isPriceModified && (
-              <span className="text-xs text-muted-foreground">
-                Custom price
-              </span>
-            )}
+        {/* New item form */}
+        {showAddItemForm && (
+          <div className="space-y-2 border p-3 rounded-lg">
+            <Label>Item Name</Label>
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+            />
+            <Label>Selling Price</Label>
+            <Input
+              type="number"
+              value={newSelling}
+              onChange={(e) => setNewSelling(e.target.value)}
+            />
+            <Label>Cost Price</Label>
+            <Input
+              type="number"
+              value={newCost}
+              onChange={(e) => setNewCost(e.target.value)}
+            />
+
+            <Button className="w-full mt-2" onClick={handleAddItem}>
+              Save Item
+            </Button>
           </div>
+        )}
+
+        {/* Price */}
+        <div className="space-y-2">
+          <Label>Price</Label>
           <Input
-            id="price"
             type="number"
-            placeholder="Enter price"
             value={price}
-            onChange={(e) => handlePriceChange(e.target.value)}
-            className={isPriceModified ? 'border-amber-500' : ''}
+            onChange={(e) => setPrice(e.target.value)}
           />
-          {!isPriceModified && selectedPackage && (
-            <p className="text-xs text-muted-foreground">
-              Auto-synced with selected package
-            </p>
-          )}
         </div>
+
+        {/* Note */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="remark">Remarks</Label>
-          </div>
+          <Label>Note</Label>
           <Input
-            id="remark"
-            type="string"
-            placeholder="Any Remarks..."
+            type="text"
             value={note}
-            onChange={(e) => handleRemarkChange(e.target.value)}
-            className={isPriceModified ? 'border-amber-500' : ''}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Optional"
           />
         </div>
 
-        {/* New Balance */}
-        <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              New Balance:
-            </span>
-            <span className="font-bold text-lg">₹{newBalance}</span>
-          </div>
+        {/* New Balance Preview */}
+        <div className="bg-slate-50 p-3 rounded-lg flex justify-between">
+          <span className="text-sm text-gray-500">New Balance:</span>
+          <span className="font-bold text-lg">₹{newBalance}</span>
         </div>
 
-        {/* Submit */}
         <Button
-          onClick={() => mutate()}
-          disabled={isPending || loading || !selectedPackage || !price}
+          onClick={handleSubmit}
+          disabled={loading || !price}
           className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
         >
-          {isPending ? 'Adding...' : 'Add to Bill'}
+          {loading ? 'Processing...' : 'Add to Bill'}
         </Button>
       </CardContent>
     </Card>
