@@ -57,5 +57,5 @@ router.put('/:id', updateProduct);
  */
 router.delete('/:id', deleteProduct);
 router.get('/export/excel', downloadProductsToExcel);
-router.post('/import/excel', uploadProductsFromExcel);
+router.post('/import/excel', upload.single('file'), uploadProductsFromExcel);
 module.exports = router;

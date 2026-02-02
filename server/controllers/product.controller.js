@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const Product = require('../models/product.model');
 const Subscription = require('../models/subscription.model');
-const XLSX = require('xlsx');
+const xlsx = require('xlsx');
 const fs = require('fs');
 
 exports.createProduct = async (req, res) => {
@@ -133,7 +133,7 @@ exports.updateProduct = async (req, res) => {
         billingInterval,
         isActive,
       },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     ).lean();
 
     if (!updated) {
@@ -244,28 +244,30 @@ exports.uploadProductsFromExcel = async (req, res) => {
 
         await Product.findOneAndUpdate(
           {
-            operatorId: req.user.id,
-            productCode: row.productCode.trim(),
+            operatorId: req.user.operatorId,
+            productCode: String(row.productCode).trim(),
           },
           {
-            operatorId: req.user.id,
-            productCode: row.productCode,
-            name: row.name,
+            operatorId: req.user.operatorId,
+            productCode: String(row.productCode).trim(),
+            name: String(row.name).trim(),
             planType:
               row.planType?.toUpperCase() === 'ADDON' ? 'ADDON' : 'BASE',
-            customerPrice: Number(row.customerPrice),
-            operatorCost: Number(row.operatorCost),
+            customerPrice: parseFloat(row.customerPrice) || 0,
+            operatorCost: parseFloat(row.operatorCost) || 0,
+
             billingInterval: {
               value: Number(row.billingIntervalValue || 30),
               unit: row.billingIntervalUnit === 'months' ? 'months' : 'days',
             },
             isActive: row.isActive === false ? false : true,
           },
-          { upsert: true, new: true, runValidators: true }
+          { upsert: true, new: true, runValidators: true },
         );
 
         success++;
-      } catch {
+      } catch (err) {
+        console.error('Row failed:', row, err.message);
         failed++;
       }
     }

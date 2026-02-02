@@ -18,7 +18,8 @@ import CustomerPagination from '@/components/customers/CustomerPagination';
 import apiClient from '@/utils/apiClient';
 import { useLayout } from '@/components/layouts/LayoutContext';
 import { useNavigate } from 'react-router-dom';
-import { Customer } from '@/types/customer.types';
+import { Customer } from '@/utils/data';
+import ExcelUploadDialog from '@/components/ExcelUploadDialog';
 
 export default function CustomersPage() {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ export default function CustomersPage() {
 
   const [showSearch, setShowSearch] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
 
@@ -45,52 +47,7 @@ export default function CustomersPage() {
   const [page, setPage] = useState(1);
   const limit = 20;
 
-  // Header actions (Search + Filter)
-  useEffect(() => {
-    setHeaderActions(
-      <div className="flex items-center gap-2">
-        {showSearch ? (
-          <div className="flex items-center border rounded-md px-2 w-full sm:w-64">
-            <Search className="h-4 w-4 text-gray-500 shrink-0" />
-            <Input
-              autoFocus
-              type="search"
-              placeholder="Search customers..."
-              className="pl-2 h-7 text-xs border-0 focus-visible:ring-0 flex-1"
-              onBlur={() => setShowSearch(false)}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, searchTerm: e.target.value }))
-              }
-            />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setShowSearch(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowSearch(true)}
-          >
-            <Search className="h-5 w-5" />
-          </Button>
-        )}
-        <Button variant="ghost" size="icon">
-          <Filter className="h-5 w-5" />
-        </Button>
-        <Button variant="ghost" size="icon">
-          <MoreVertical className="h-5 w-5" />
-        </Button>
-      </div>
-    );
-    return () => setHeaderActions(null);
-  }, [showSearch]);
-
+  // ================= FETCH CUSTOMERS =================
   const fetchCustomers = useCallback(async () => {
     setLoading(true);
     try {
@@ -128,6 +85,93 @@ export default function CustomersPage() {
     setPage(1);
   }, [filters]);
 
+  // ================= EXCEL UPLOAD =================
+  const handleUploadCustomersExcel = async (file: File) => {
+    if (!file) return;
+
+    const validTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
+
+    if (!validTypes.includes(file.type)) {
+      toast.error('Please upload a valid Excel file (.xlsx or .xls)');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      toast.loading('Uploading customers...');
+
+      const res = await apiClient.post('/customers/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120000,
+      });
+
+      toast.dismiss();
+      toast.success(res.data?.message || 'Customers imported successfully');
+
+      setShowUploadDialog(false);
+      fetchCustomers(); // 🔥 refresh data
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.response?.data?.message || 'Upload failed');
+      console.error('Customer Excel Upload Error:', err);
+    }
+  };
+
+  // ================= HEADER ACTIONS =================
+  useEffect(() => {
+    setHeaderActions(
+      <div className="flex items-center gap-2">
+        {showSearch ? (
+          <div className="flex items-center border rounded-md px-2 w-full sm:w-64">
+            <Search className="h-4 w-4 text-gray-500" />
+            <Input
+              autoFocus
+              type="search"
+              placeholder="Search customers..."
+              className="pl-2 h-7 text-xs border-0 focus-visible:ring-0"
+              onBlur={() => setShowSearch(false)}
+              onChange={(e) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  searchTerm: e.target.value,
+                }))
+              }
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setShowSearch(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowSearch(true)}
+          >
+            <Search className="h-5 w-5" />
+          </Button>
+        )}
+        <Button variant="ghost" size="icon">
+          <Filter className="h-5 w-5" />
+        </Button>
+        <Button variant="ghost" size="icon">
+          <MoreVertical className="h-5 w-5" />
+        </Button>
+      </div>,
+    );
+    return () => setHeaderActions(null);
+  }, [showSearch]);
+
+  // ================= DOWNLOAD =================
   const handleDownload = () => {
     if (!customers.length) return toast.error('No data');
     downloadCustomersToExcel(customers, 'customers.xlsx');
@@ -147,7 +191,7 @@ export default function CustomersPage() {
           <Button variant="outline" onClick={handleDownload}>
             <Download className="h-4 w-4 mr-2" /> Download Excel
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => setShowUploadDialog(true)}>
             <Upload className="h-4 w-4 mr-2" /> Upload Excel
           </Button>
           <Button onClick={() => navigate('/add-customer')}>
@@ -164,23 +208,30 @@ export default function CustomersPage() {
       </div>
 
       {/* Table */}
-      <div className="w-full overflow-x-auto">
-        <CustomerTable
-          customers={customers}
-          loading={loading}
-          sortField={filters.sortBy}
-          sortOrder={filters.order}
-          onSort={(field, order) =>
-            setFilters((prev) => ({ ...prev, sortBy: field, order }))
-          }
-        />
-      </div>
+      <CustomerTable
+        customers={customers}
+        loading={loading}
+        sortField={filters.sortBy}
+        sortOrder={filters.order}
+        onSort={(field, order) =>
+          setFilters((prev) => ({ ...prev, sortBy: field, order }))
+        }
+      />
 
       {/* Pagination */}
       <CustomerPagination
         currentPage={page}
         totalPages={totalPages}
         onPageChange={setPage}
+      />
+
+      {/* Upload Dialog */}
+      <ExcelUploadDialog
+        open={showUploadDialog}
+        onOpenChange={setShowUploadDialog}
+        title="Upload Customers"
+        description="Upload Excel file with customer data"
+        onUpload={handleUploadCustomersExcel}
       />
     </div>
   );

@@ -11,6 +11,7 @@ const generateCustomerCode = (operatorId, sequenceNo) => {
   return `C${String(sequenceNo).padStart(5, '0')}`;
 };
 
+const asString = (val) => (val ? String(val).trim() : '');
 /**
  * @desc    Create a new customer
  * @route   POST /api/customers
@@ -140,7 +141,7 @@ const createCustomer = async (req, res) => {
             note: 'Opening balance on customer creation',
           },
         ],
-        { session }
+        { session },
       );
     }
 
@@ -307,12 +308,12 @@ const getCustomerById = async (req, res) => {
     if (
       JSON.stringify(activeSubIds) !==
       JSON.stringify(
-        (customer.activeSubscriptions || []).map((id) => id.toString())
+        (customer.activeSubscriptions || []).map((id) => id.toString()),
       )
     ) {
       await Customer.updateOne(
         { _id: customerId },
-        { $set: { activeSubscriptions: activeSubIds } }
+        { $set: { activeSubscriptions: activeSubIds } },
       );
       customer.activeSubscriptions = activeSubIds; // reflect back in response
     }
@@ -327,7 +328,7 @@ const getCustomerById = async (req, res) => {
     ) {
       await Customer.updateOne(
         { _id: customerId },
-        { $set: { planNamesSummary } }
+        { $set: { planNamesSummary } },
       );
       customer.planNamesSummary = planNamesSummary;
     }
@@ -345,7 +346,7 @@ const getCustomerById = async (req, res) => {
     if (earliestExpiry?.toString() !== customer.earliestExpiry?.toString()) {
       await Customer.updateOne(
         { _id: customerId },
-        { $set: { earliestExpiry } }
+        { $set: { earliestExpiry } },
       );
       customer.earliestExpiry = earliestExpiry;
     }
@@ -475,7 +476,7 @@ const updateCustomer = async (req, res) => {
     const updatedCustomer = await Customer.findByIdAndUpdate(
       customerId,
       { $set: updates },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     ).populate('agentId', 'name');
 
     res.status(200).json(updatedCustomer);
@@ -525,7 +526,7 @@ const deleteCustomer = async (req, res) => {
     // Terminate active subscriptions
     await Subscription.updateMany(
       { customerId, operatorId: req.user.operatorId, status: 'ACTIVE' },
-      { $set: { status: 'TERMINATED' } }
+      { $set: { status: 'TERMINATED' } },
     );
 
     customer.deleted = true;
@@ -554,150 +555,130 @@ const importCustomersFromExcel = async (req, res) => {
 
   const filePath = req.file.path;
 
-  // Utility to only assign value if non-empty
-  const setIfValid = (obj, key, value) => {
-    if (value !== undefined && value !== null && value !== '') {
-      obj[key] = value;
-    }
-  };
-
   try {
     const workbook = xlsx.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
+    // Use raw: false to ensure dates are parsed correctly if formatted in Excel
     const rows = xlsx.utils.sheet_to_json(worksheet);
 
-    if (rows.length === 0) {
-      return res.status(400).json({
-        message: 'Excel file is empty or headers are incorrect.',
-      });
+    if (!rows.length) {
+      return res.status(400).json({ message: 'Excel file is empty.' });
     }
 
     const operatorId = req.user.id;
-    const customersToInsert = [];
+
+    // Fetch sequence once
+    const lastCustomer = await Customer.findOne({ operatorId }).sort({
+      sequenceNo: -1,
+    });
+    let nextSeq = lastCustomer ? lastCustomer.sequenceNo + 1 : 1;
 
     for (const row of rows) {
-      if (!row.name || !row.mobile) {
-        continue; // ❌ skip invalid rows
-      }
+      // 1. Extract and Validate Basic Info (Using your Template Headers)
+      const name = asString(row.Name);
+      const mobile = asString(row.Contact_Number);
 
-      // Generate unique sequence number
-      const lastCustomer = await Customer.findOne({ operatorId }).sort({
-        createdAt: -1,
-      });
-      const nextSeq = lastCustomer ? lastCustomer.sequenceNo + 1 : 1;
+      if (!name || !mobile) continue;
 
-      // Generate customerCode if missing
       const customerCode =
-        row.customerCode || `CUS-${String(nextSeq).padStart(5, '0')}`;
+        asString(row.Customer_Code) ||
+        `CUS-${String(nextSeq).padStart(5, '0')}`;
 
-      // Build customer object
-      const customer = {
+      // 2. Map Financials & Metadata
+      const customerData = {
         operatorId,
-        name: row.name.trim(),
-        contactNumber: row.mobile.toString().trim(),
-        locality: row.locality || '',
-        sequenceNo: nextSeq,
+        name,
+        contactNumber: mobile,
+        alternateContact: asString(row.Alt_Contact),
+        locality: asString(row.Locality),
+        billingAddress: asString(row.Address),
         customerCode,
-        active: row.active !== undefined ? Boolean(row.active) : true,
+        sequenceNo: nextSeq,
+        balanceAmount: Number(row.Opening_Balance) || 0,
+        lastBillAmount: Number(row.Last_Bill_Amt) || 0,
+        lastBillDate: row.Last_Bill_Date ? new Date(row.Last_Bill_Date) : null,
+        lastPaymentAmount: Number(row.Last_Pay_Amt) || 0,
+        lastPaymentDate: row.Last_Pay_Date ? new Date(row.Last_Pay_Date) : null,
+        securityDeposit: Number(row.Security_Deposit) || 0,
+        defaultExtraCharge: Number(row.Extra_Charge) || 0,
+        gstNumber: asString(row.GST_No),
+        billFrequency: Number(row.Bill_Frequency) || 30,
+        remark: asString(row.Remark),
+        devices: [],
       };
 
-      // Optional fields — added only if valid
-      setIfValid(customer, 'agentId', row.agentId);
-      setIfValid(customer, 'billingAddress', row.billingAddress);
-      setIfValid(
-        customer,
-        'connectionStartDate',
-        row.connectionStartDate ? new Date(row.connectionStartDate) : undefined
-      );
-      setIfValid(customer, 'remark', row.remark);
-      setIfValid(customer, 'lastPaymentAmount', Number(row.lastPaymentAmount));
-      setIfValid(
-        customer,
-        'lastPaymentDate',
-        row.lastPaymentDate ? new Date(row.lastPaymentDate) : undefined
-      );
-      setIfValid(customer, 'balanceAmount', Number(row.balanceAmount));
-      setIfValid(customer, 'additionalCharge', Number(row.additionalCharge));
-      setIfValid(customer, 'discount', Number(row.discount));
-
-      // Devices array
-      const devices = [];
-      if (row.stbName || row.stbNumber || row.cardNumber) {
-        devices.push({
-          stbName: row.stbName || undefined,
-          stbNumber: row.stbNumber || undefined,
-          cardNumber: row.cardNumber || undefined,
+      // 3. Map Devices
+      if (row.STB_Number || row.Card_Number) {
+        customerData.devices.push({
+          stbNumber: asString(row.STB_Number),
+          cardNumber: asString(row.Card_Number),
+          deviceModel: asString(row.STB_Model),
+          membershipNumber: asString(row.Membership_No),
           active: true,
         });
       }
-      if (devices.length) customer.devices = devices;
 
-      // Subscriptions importing is optional (if product IDs are given)
-      customer.subscriptions = [];
-      if (row.productIds) {
-        const productIdList = row.productIds
-          .toString()
-          .split(',')
-          .map((x) => x.trim());
-        for (const pid of productIdList) {
-          if (mongoose.Types.ObjectId.isValid(pid)) {
-            const product = await Product.findById(pid);
-            if (product) {
-              const startDate = new Date();
-              let expiryDate = new Date(startDate);
+      // 4. Save Customer First (Needed to get _id for Subscriptions)
+      const savedCustomer = await Customer.create(customerData);
 
-              if (product.billingInterval.unit === 'months') {
-                expiryDate.setMonth(
-                  startDate.getMonth() + product.billingInterval.value
-                );
-              } else {
-                expiryDate.setDate(
-                  startDate.getDate() + product.billingInterval.value
-                );
-              }
+      // 5. Handle Subscriptions (Linking to Subscription Model)
+      if (row.Product_Name) {
+        // Find product by name (assuming Product_Name is what you store)
+        const product = await Product.findOne({
+          operatorId,
+          name: asString(row.Product_Name),
+        });
 
-              customer.subscriptions.push({
-                productId: pid,
-                startDate,
-                expiryDate,
-                price: product.customerPrice,
-                billingInterval: product.billingInterval,
-                status: 'active',
-              });
-            }
+        if (product) {
+          const startDate = new Date();
+          let expiryDate = new Date(startDate);
+
+          if (product.billingInterval.unit === 'months') {
+            expiryDate.setMonth(
+              startDate.getMonth() + product.billingInterval.value,
+            );
+          } else {
+            expiryDate.setDate(
+              startDate.getDate() + product.billingInterval.value,
+            );
           }
+
+          const newSub = await Subscription.create({
+            customerId: savedCustomer._id,
+            operatorId,
+            productId: product._id,
+            planType: product.planType || 'BASE',
+            startDate,
+            expiryDate,
+            billingInterval: product.billingInterval,
+            customerPrice: product.customerPrice,
+            operatorCost: product.operatorCost,
+            status: 'ACTIVE',
+          });
+
+          // Update customer with the reference
+          await Customer.findByIdAndUpdate(savedCustomer._id, {
+            $push: { activeSubscriptions: newSub._id },
+            $set: {
+              earliestExpiry: expiryDate,
+              planNamesSummary: [product.name],
+            },
+          });
         }
       }
 
-      customersToInsert.push(customer);
+      nextSeq++;
     }
 
-    if (!customersToInsert.length) {
-      return res.status(400).json({
-        message: 'No valid customer rows found to import.',
-      });
-    }
-
-    await Customer.insertMany(customersToInsert, { ordered: false });
-
-    res.status(201).json({
-      message: `${customersToInsert.length} customers imported successfully.`,
-    });
+    res.status(201).json({ message: 'Import completed successfully.' });
   } catch (error) {
-    console.error('Excel Import Error:', error);
-
-    // Duplicate (mobile or stb) error handling
-    if (error.code === 11000) {
-      return res.status(409).json({
-        message:
-          'Some customers were not imported due to duplicate mobile/ STB/ card numbers.',
-      });
-    }
-
-    res.status(500).json({ message: 'Failed to import customers.' });
+    console.error('Import Error:', error);
+    res
+      .status(500)
+      .json({ message: error.message || 'Failed to import customers.' });
   } finally {
-    fs.unlinkSync(filePath);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   }
 };
 
@@ -723,8 +704,8 @@ const exportCustomersToExcel = async (req, res) => {
         .map(
           (s) =>
             `${s.productId?.name || 'N/A'} (exp: ${new Date(
-              s.expiryDate
-            ).toLocaleDateString()})`
+              s.expiryDate,
+            ).toLocaleDateString()})`,
         )
         .join(', ');
 
@@ -755,13 +736,13 @@ const exportCustomersToExcel = async (req, res) => {
 
     res.setHeader(
       'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
     res.setHeader(
       'Content-Disposition',
       `attachment; filename="customers_${operatorId}_${
         new Date().toISOString().split('T')[0]
-      }.xlsx"`
+      }.xlsx"`,
     );
 
     const buffer = xlsx.write(workbook, { bookType: 'xlsx', type: 'buffer' });

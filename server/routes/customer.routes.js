@@ -81,7 +81,7 @@ router.post(
   '/:id/adjust-balance',
   authMiddleware,
   operatorOrAgentOnly,
-  adjustBalance
+  adjustBalance,
 );
 
 // @route   POST /api/customers/:id/additionalCharge
@@ -89,7 +89,7 @@ router.post(
   '/transactions/addon',
   authMiddleware,
   operatorOrAgentOnly,
-  createAddonBilling
+  createAddonBilling,
 );
 
 /**
@@ -101,7 +101,7 @@ router.get(
   '/:customerId/transactions',
   authMiddleware,
   operatorOrAgentOnly,
-  getCustomerTransactions
+  getCustomerTransactions,
 );
 
 /*
@@ -121,7 +121,7 @@ router.post(
   authMiddleware,
   operatorOnly,
   upload.single('file'),
-  importCustomersFromExcel
+  importCustomersFromExcel,
 );
 
 /**
