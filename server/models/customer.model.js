@@ -8,7 +8,7 @@ const deviceSchema = new mongoose.Schema(
     membershipNumber: String,
     active: { type: Boolean, default: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const customerSchema = new mongoose.Schema(
@@ -65,8 +65,6 @@ const customerSchema = new mongoose.Schema(
     // Customer-specific additional charge & discount defaults
     defaultExtraCharge: { type: Number, default: 0 },
     defaultDiscount: { type: Number, default: 0 },
-
-    billFrequency: { type: Number, default: 30 },
     automaticBilling: { type: Boolean, default: false },
 
     securityDeposit: { type: Number, default: 0 },
@@ -77,7 +75,7 @@ const customerSchema = new mongoose.Schema(
 
     remark: String,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 customerSchema.index({ operatorId: 1, contactNumber: 1 });
