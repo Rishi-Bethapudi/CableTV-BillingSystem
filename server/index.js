@@ -49,7 +49,7 @@ app.use(
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-  })
+  }),
 );
 
 // FIX: Respond to preflight (OPTIONS) request
@@ -103,5 +103,5 @@ app.use((err, req, res, next) => {
 // --- Server Initialization ---
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`)
+  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`),
 );
