@@ -5,194 +5,102 @@ const Subscription = require('../models/subscription.model');
 const Operator = require('../models/operator.model');
 const Counter = require('../models/counter.model');
 const mongoose = require('mongoose');
-const { addDays, addMonths } = require('date-fns');
 const { generateInvoicePDF } = require('../services/invoicePDF');
+const { addDays, addMonths } = require('../utils/date.utils');
 
-/**
- * @desc  Generate invoice + renew subscription for a customer
- * @route POST /api/transactions/billing
- * @access Private (Operator or Agent)
- */
-const createBilling = async (req, res) => {
-  const { customerId, productId, startDate, endDate, durationDays, note } =
-    req.body;
+async function createInvoiceAndSubscription({
+  customer,
+  product,
+  operator,
+  startDate,
+  durationValue,
+  durationUnit,
+  renewalNumber,
+  note,
+  session,
+}) {
+  // ---------- Dates ----------
+  const start = startDate ? new Date(startDate) : new Date();
 
-  if (!customerId || !productId) {
-    return res.status(400).json({
-      message: 'Customer ID and Product ID are required.',
-    });
+  let expiry;
+  if (durationUnit === 'months') {
+    expiry = addMonths(start, durationValue);
+  } else {
+    expiry = addDays(start, durationValue);
   }
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  // ---------- Pricing ----------
+  const productDays =
+    product.billingInterval.unit === 'months'
+      ? product.billingInterval.value * 30
+      : product.billingInterval.value;
 
-  try {
-    const customer = await Customer.findById(customerId).session(session);
-    const product = await Product.findById(productId).session(session);
+  const totalDays =
+    durationUnit === 'months' ? durationValue * 30 : durationValue;
 
-    if (!customer) throw new Error('Customer not found.');
-    if (!product) throw new Error('Product not found.');
-    if (
-      customer.operatorId.toString() !== req.user.operatorId ||
-      product.operatorId.toString() !== req.user.operatorId
-    ) {
-      throw new Error('Forbidden.');
-    }
+  const factor = totalDays / productDays;
 
-    // Determine billing start date
-    const billingDate = startDate ? new Date(startDate) : new Date();
+  const baseAmount = product.customerPrice * factor;
+  const extraCharge = customer.defaultExtraCharge || 0;
+  const discount = customer.defaultDiscount || 0;
 
-    // Find last ACTIVE subscription for this product
-    const lastSub = await Subscription.findOne({
-      customerId,
-      productId,
-      status: 'ACTIVE',
-    })
-      .sort({ expiryDate: -1 })
-      .session(session);
+  const netAmount = baseAmount + extraCharge - discount;
 
-    let newStartDate, newExpiryDate, renewalNumber;
+  const balanceBefore = customer.balanceAmount;
+  const balanceAfter = balanceBefore + netAmount;
 
-    if (!lastSub) {
-      // First time subscription
-      newStartDate = billingDate;
-      renewalNumber = 1;
-    } else {
-      const baseStart =
-        lastSub.expiryDate > billingDate ? lastSub.expiryDate : billingDate;
-      newStartDate = baseStart;
-      renewalNumber = lastSub.renewalNumber + 1;
-    }
+  // ---------- Invoice ----------
+  const invoiceId = await Counter.getInvoiceNumber(operator.operatorId);
 
-    // Calculate expiry date
-    if (durationDays && durationDays > 0) {
-      newExpiryDate = addDays(newStartDate, durationDays);
-    } else if (endDate) {
-      newExpiryDate = new Date(endDate);
-    } else if (product.billingInterval.unit === 'months') {
-      newExpiryDate = addMonths(newStartDate, product.billingInterval.value);
-    } else {
-      newExpiryDate = addDays(newStartDate, product.billingInterval.value);
-    }
+  const [transaction] = await Transaction.create(
+    [
+      {
+        customerId: customer._id,
+        operatorId: operator.operatorId,
+        collectedBy: operator.userId,
+        collectedByType: operator.role === 'operator' ? 'Operator' : 'Agent',
+        type: 'INVOICE',
+        amount: netAmount,
+        balanceBefore,
+        balanceAfter,
+        invoiceId,
+        productId: product._id,
+        startDate: start,
+        expiryDate: expiry,
+        baseAmount,
+        extraCharge,
+        discount,
+        netAmount,
+        costOfGoodsSold: product.operatorCost * factor,
+        profit: netAmount - product.operatorCost * factor,
+        note,
+      },
+    ],
+    { session },
+  );
 
-    // Pricing (scaled if multiple renewal duration)
-    const daysInProduct =
-      product.billingInterval.unit === 'months'
-        ? product.billingInterval.value * 30
-        : product.billingInterval.value;
+  const [subscription] = await Subscription.create(
+    [
+      {
+        customerId: customer._id,
+        operatorId: operator.operatorId,
+        productId: product._id,
+        planType: product.planType,
+        startDate: start,
+        expiryDate: expiry,
+        billingInterval: product.billingInterval,
+        customerPrice: product.customerPrice,
+        operatorCost: product.operatorCost,
+        renewalNumber,
+        status: 'ACTIVE',
+        invoiceId,
+      },
+    ],
+    { session },
+  );
 
-    const totalDays =
-      durationDays && durationDays > 0
-        ? durationDays
-        : Math.ceil((newExpiryDate - newStartDate) / (1000 * 60 * 60 * 24));
-
-    const factor = totalDays / daysInProduct; // e.g. 90 days / 30 days → 3x
-    const baseAmount = product.customerPrice * factor;
-
-    const extraCharge = customer.defaultExtraCharge || 0;
-    const discount = customer.defaultDiscount || 0;
-
-    const netAmount = baseAmount + extraCharge - discount;
-    const balanceBefore = customer.balanceAmount;
-    const balanceAfter = balanceBefore + netAmount;
-
-    // Generate invoice number
-    const invoiceId = await Counter.getInvoiceNumber(req.user.operatorId);
-
-    // Create transaction record
-    const transaction = await Transaction.create(
-      [
-        {
-          customerId,
-          operatorId: req.user.operatorId,
-          collectedBy: req.user.id,
-          collectedByType: req.user.role === 'operator' ? 'Operator' : 'Agent',
-          type: 'INVOICE',
-          amount: netAmount,
-          balanceBefore,
-          balanceAfter,
-          invoiceId,
-          productId,
-          startDate: newStartDate,
-          expiryDate: newExpiryDate,
-          baseAmount,
-          extraCharge,
-          discount,
-          netAmount,
-          costOfGoodsSold: product.operatorCost * factor,
-          profit: netAmount - product.operatorCost * factor,
-          note,
-        },
-      ],
-      { session }
-    );
-
-    // Create subscription entry
-    const subscription = await Subscription.create(
-      [
-        {
-          customerId,
-          operatorId: req.user.operatorId,
-          productId,
-          planType: product.planType,
-          startDate: newStartDate,
-          expiryDate: newExpiryDate,
-          billingInterval: product.billingInterval,
-          customerPrice: product.customerPrice,
-          operatorCost: product.operatorCost,
-          status: 'ACTIVE',
-          renewalNumber,
-          invoiceId,
-        },
-      ],
-      { session }
-    );
-
-    // Update customer summary
-    customer.balanceAmount = balanceAfter;
-    customer.lastBillDate = new Date();
-    customer.lastBillAmount = netAmount;
-    customer.active = true;
-
-    // Push new subscription ID (remove old duplicates)
-    customer.activeSubscriptions = [
-      ...new Set([
-        ...customer.activeSubscriptions.map(String),
-        subscription[0]._id.toString(),
-      ]),
-    ];
-
-    // Compute new earliest expiry
-    const allActiveSubs = await Subscription.find({
-      customerId,
-      status: 'ACTIVE',
-    })
-      .select('expiryDate')
-      .session(session);
-
-    customer.earliestExpiry = allActiveSubs.length
-      ? allActiveSubs.map((s) => s.expiryDate).sort()[0]
-      : null;
-
-    await customer.save({ session });
-    await session.commitTransaction();
-    session.endSession();
-
-    return res.status(201).json({
-      message: 'Billing completed successfully.',
-      invoiceId,
-      transaction: transaction[0],
-      subscription: subscription[0],
-      customer,
-    });
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    return res.status(500).json({
-      message: error.message || 'Failed to complete billing.',
-    });
-  }
-};
+  return { transaction, subscription, balanceAfter, expiry };
+}
 
 /**
  * @desc   Record a payment received from a customer
@@ -242,7 +150,7 @@ const createCollection = async (req, res) => {
           note,
         },
       ],
-      { session }
+      { session },
     );
 
     // Update customer summary
@@ -296,7 +204,7 @@ const createAddonBilling = async (req, res) => {
       throw new Error('Forbidden');
 
     const operator = await Operator.findById(req.user.operatorId).session(
-      session
+      session,
     );
 
     let sellingPrice, costPrice, autoNote;
@@ -339,7 +247,7 @@ const createAddonBilling = async (req, res) => {
           note: note || autoNote || 'Add-on charge',
         },
       ],
-      { session }
+      { session },
     );
 
     // Update customer ledger summary
@@ -421,7 +329,7 @@ const adjustBalance = async (req, res) => {
           note: note || `Manual ${type} adjustment`,
         },
       ],
-      { session }
+      { session },
     );
 
     customer.balanceAmount = balanceAfter;
@@ -543,7 +451,7 @@ const reverseInvoice = async (req, res) => {
       throw new Error('Only operator can reverse invoices.');
 
     const customer = await Customer.findById(originalTx.customerId).session(
-      session
+      session,
     );
     if (!customer) throw new Error('Customer not found.');
 
@@ -555,7 +463,7 @@ const reverseInvoice = async (req, res) => {
 
     if (conflict)
       throw new Error(
-        'Invoice cannot be reversed because later transactions exist.'
+        'Invoice cannot be reversed because later transactions exist.',
       );
 
     // 3. Reverse subscription
@@ -596,7 +504,7 @@ const reverseInvoice = async (req, res) => {
           note: `Invoice reversed: ${reason || 'No reason provided'}`,
         },
       ],
-      { session }
+      { session },
     );
 
     // 6. Remove the subscription record (restores previous state)
@@ -666,7 +574,7 @@ const reversePayment = async (req, res) => {
       throw new Error('Only operator can reverse payments.');
 
     const customer = await Customer.findById(originalTx.customerId).session(
-      session
+      session,
     );
     if (!customer) throw new Error('Customer not found.');
 
@@ -678,7 +586,7 @@ const reversePayment = async (req, res) => {
 
     if (conflict)
       throw new Error(
-        'Reversal blocked: a later transaction exists after this payment.'
+        'Reversal blocked: a later transaction exists after this payment.',
       );
 
     // 3. Check reversal won't break accounting
@@ -689,7 +597,7 @@ const reversePayment = async (req, res) => {
     // If reversal causes negative owed-to-customer balance → block (must use refund API instead)
     if (balanceAfter < 0) {
       throw new Error(
-        'Payment reversal not permitted: would result in credit balance. Use refund API instead.'
+        'Payment reversal not permitted: would result in credit balance. Use refund API instead.',
       );
     }
 
@@ -711,7 +619,7 @@ const reversePayment = async (req, res) => {
           note: `Payment reversed: ${reason || 'No reason provided'}`,
         },
       ],
-      { session }
+      { session },
     );
 
     // 5. Update customer balance
@@ -769,13 +677,13 @@ const refundPayment = async (req, res) => {
     // Prevent negative beyond 0 (operator should never refund more than customer owes)
     if (balanceAfter < 0) {
       throw new Error(
-        "Refund amount is greater than customer's outstanding balance. Issue credit note instead."
+        "Refund amount is greater than customer's outstanding balance. Issue credit note instead.",
       );
     }
 
     // Generate refund ID — based on counter like receipt
     const refundId = await Counter.getNextSequence(
-      `refund-${req.user.operatorId}`
+      `refund-${req.user.operatorId}`,
     );
 
     // Create refund transaction
@@ -796,7 +704,7 @@ const refundPayment = async (req, res) => {
           note: reason || 'Refund issued',
         },
       ],
-      { session }
+      { session },
     );
 
     // Update customer summary
@@ -904,7 +812,7 @@ const getTransactionPDF = async (req, res) => {
 };
 
 module.exports = {
-  createBilling,
+  createInvoiceAndSubscription,
   createCollection,
   createAddonBilling,
   adjustBalance,
