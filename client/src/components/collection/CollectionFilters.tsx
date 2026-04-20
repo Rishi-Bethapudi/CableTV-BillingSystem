@@ -10,23 +10,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { XCircle } from 'lucide-react';
 import CalendarRangePicker from '@/components/CalendarRangePicker';
+import { useSelector, useDispatch } from 'react-redux';
+import { loadUserFromStorage } from '../../redux/slices/authSlice';
 
 interface CollectionFiltersProps {
   onFilterChange?: (filters: any) => void;
   onReset?: () => void;
 }
 
+interface Agent {
+  _id: string;
+  name: string;
+}
+
 export function CollectionFilters({
   onFilterChange,
   onReset,
 }: CollectionFiltersProps) {
-  const today = new Date();
-  const monthBefore = new Date();
-  monthBefore.setMonth(today.getMonth() - 1);
+  const today = useMemo(() => new Date(), []);
+  const monthBefore = useMemo(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return d;
+  }, []);
+
+  const dispatch = useDispatch();
+  const user = useSelector((state: any) => state.auth.user);
 
   const [filters, setFilters] = useState({
-    status: 'all',
     startDate: monthBefore,
     endDate: today,
     agent: 'all',
@@ -34,189 +47,144 @@ export function CollectionFilters({
     payment: 'all',
   });
 
-  // count "meaningful" filters
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (filters.status !== 'all') count++;
-    if (filters.agent !== 'all') count++;
-    if (filters.area !== 'all') count++;
-    if (filters.payment !== 'all') count++;
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [areas, setAreas] = useState<string[]>([]); // ✅ strings only
 
-    // date range not equal to default monthBefore–today
-    const defStart = monthBefore.toDateString();
-    const defEnd = today.toDateString();
-    if (
-      filters.startDate.toString() !== defStart ||
-      filters.endDate.toString() !== defEnd
-    ) {
-      count++;
-    }
-    return count;
-  }, [filters, monthBefore, today]);
+  useEffect(() => {
+    dispatch(loadUserFromStorage());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const userAgents = user.agents || [];
+    const userSupervisors = user.supervisors || [];
+
+    setAgents([
+      { _id: 'all', name: 'All Agents' },
+      ...userAgents,
+      ...userSupervisors,
+    ]);
+
+    // ✅ Keep areas as strings (matches backend)
+    setAreas(user.localities || []);
+  }, [user]);
 
   useEffect(() => {
     onFilterChange?.(filters);
   }, [filters, onFilterChange]);
 
-  const resetFilters = () => {
-    const reset = {
-      status: 'all',
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.agent !== 'all') count++;
+    if (filters.area !== 'all') count++;
+    if (filters.payment !== 'all') count++;
+    return count;
+  }, [filters]);
+
+  const handleReset = () => {
+    setFilters({
       startDate: monthBefore,
       endDate: today,
       agent: 'all',
       area: 'all',
       payment: 'all',
-    };
-    setFilters(reset);
+    });
     onReset?.();
   };
 
-  const setQuickRange = (type: 'today' | 'last7' | 'month') => {
-    const now = new Date();
-    if (type === 'today') {
-      setFilters((f) => ({ ...f, startDate: now, endDate: now }));
-    } else if (type === 'last7') {
-      const from = new Date();
-      from.setDate(now.getDate() - 7);
-      setFilters((f) => ({ ...f, startDate: from, endDate: now }));
-    } else if (type === 'month') {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1);
-      setFilters((f) => ({ ...f, startDate: start, endDate: now }));
-    }
-  };
-
   return (
-    <Card className="mb-6">
-      <CardContent className="p-4 ">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <h3 className="text-lg font-semibold mb-0">Filters and Options</h3>
-            {activeFilterCount > 0 && (
-              <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
-                Active filters: {activeFilterCount}
-              </span>
-            )}
+    <Card className="mb-6 border-none shadow-sm bg-slate-50/50">
+      <CardContent className="p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+          <div>
+            <h3 className="text-lg font-bold text-slate-800">
+              Filter Collections
+            </h3>
+            <p className="text-sm text-slate-500">
+              Refine report by date, agent, or location
+            </p>
           </div>
 
-          {/* Reset */}
-          <div>
-            <Button variant="outline" className="w-full" onClick={resetFilters}>
-              Reset
-            </Button>
-          </div>
+          <Button
+            variant={activeFilterCount > 0 ? 'destructive' : 'outline'}
+            size="sm"
+            onClick={handleReset}
+            className="transition-all"
+          >
+            {activeFilterCount > 0 && <XCircle className="mr-2 h-4 w-4" />}
+            Reset Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
+          </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
-          {/* Status */}
-          <div>
-            <Select
-              value={filters.status}
-              onValueChange={(val) =>
-                setFilters((f) => ({ ...f, status: val }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Data show or" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Data</SelectItem>
-                <SelectItem value="paid">Paid Only</SelectItem>
-                <SelectItem value="pending">Pending Only</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
           {/* Date Range */}
-          <div className="col-span-2 space-y-2">
+          <div className="lg:col-span-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 block">
+              Date Range
+            </label>
             <CalendarRangePicker
               startDate={filters.startDate}
               endDate={filters.endDate}
               onChange={(start, end) =>
-                setFilters((f) => ({ ...f, startDate: start, endDate: end }))
+                setFilters((f) => ({
+                  ...f,
+                  startDate: start,
+                  endDate: end,
+                }))
               }
             />
-            <div className="flex gap-2 flex-wrap text-xs">
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-2"
-                onClick={() => setQuickRange('today')}
+          </div>
+
+          {['agent', 'area', 'payment'].map((key) => (
+            <div key={key}>
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 block">
+                {key}
+              </label>
+
+              <Select
+                value={filters[key as keyof typeof filters] as string}
+                onValueChange={(val) =>
+                  setFilters((f) => ({ ...f, [key]: val }))
+                }
               >
-                Today
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-2"
-                onClick={() => setQuickRange('last7')}
-              >
-                Last 7 Days
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-2"
-                onClick={() => setQuickRange('month')}
-              >
-                This Month
-              </Button>
+                <SelectTrigger className="bg-white">
+                  <SelectValue placeholder={`Select ${key}`} />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {/* AGENT */}
+                  {key === 'agent' &&
+                    agents.map((a) => (
+                      <SelectItem key={a._id} value={a._id}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
+
+                  {/* AREA */}
+                  {key === 'area' && (
+                    <>
+                      <SelectItem value="all">All Areas</SelectItem>
+                      {areas.map((ar) => (
+                        <SelectItem key={ar} value={ar}>
+                          {ar}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+
+                  {/* PAYMENT */}
+                  {key === 'payment' && (
+                    <>
+                      <SelectItem value="all">All Modes</SelectItem>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Online">Online</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
-          </div>
-
-          {/* Agent */}
-          <div>
-            <Select
-              value={filters.agent}
-              onValueChange={(val) => setFilters((f) => ({ ...f, agent: val }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select Agent" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Agents</SelectItem>
-                {/* TODO: replace with dynamic list */}
-                <SelectItem value="agent1">Agent 1</SelectItem>
-                <SelectItem value="agent2">Agent 2</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Area */}
-          <div>
-            <Select
-              value={filters.area}
-              onValueChange={(val) => setFilters((f) => ({ ...f, area: val }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select Area" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Areas</SelectItem>
-                {/* TODO: replace with dynamic list */}
-                <SelectItem value="kandrapadu">Kandrapadu</SelectItem>
-                <SelectItem value="chennai">Chennai</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Payment */}
-          <div>
-            <Select
-              value={filters.payment}
-              onValueChange={(val) =>
-                setFilters((f) => ({ ...f, payment: val }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select Payment" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Payments</SelectItem>
-                <SelectItem value="Cash">Cash</SelectItem>
-                <SelectItem value="Online">Online</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          ))}
         </div>
       </CardContent>
     </Card>

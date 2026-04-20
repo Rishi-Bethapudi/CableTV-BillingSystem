@@ -4,7 +4,7 @@ const Product = require('../models/product.model');
 const Customer = require('../models/customer.model');
 const Transaction = require('../models/transaction.model');
 const Counter = require('../models/counter.model');
-const createInvoiceAndSubscription = require('./transaction.controller');
+const { createInvoiceAndSubscription } = require('./transaction.controller');
 const { addDays, addMonths, diffInDays } = require('../utils/date.utils');
 const { calculateBilling } = require('../utils/billing.utils');
 
@@ -141,7 +141,14 @@ exports.renewSubscription = async (req, res) => {
 };
 
 exports.addSubscription = async (req, res) => {
-  const { customerId, productId, startDate, durationValue, note } = req.body;
+  const {
+    customerId,
+    productId,
+    startDate,
+    durationValue,
+    durationUnit,
+    note,
+  } = req.body;
 
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -160,7 +167,7 @@ exports.addSubscription = async (req, res) => {
       },
       startDate,
       durationValue,
-      durationUnit: product.billingInterval.unit,
+      durationUnit,
       renewalNumber: 1,
       note,
       session,

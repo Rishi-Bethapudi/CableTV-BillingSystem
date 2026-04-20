@@ -97,14 +97,7 @@ const loginUser = async (req, res) => {
       message: 'Login successful',
       accessToken,
       refreshToken, // for mobile apps
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        contactNumber: user.contactNumber,
-        role,
-        operatorId,
-      },
+      user,
     });
   } catch (error) {
     console.error('Login error:', error);

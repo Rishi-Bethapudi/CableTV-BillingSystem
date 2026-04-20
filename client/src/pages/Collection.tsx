@@ -40,7 +40,14 @@ const CollectionDashboard = () => {
       // ignore cache errors
     }
   }, []);
-
+  useEffect(() => {
+    const fetchOnMount = async () => {
+      setLoading(true);
+      await fetchCollectionData();
+      setLoading(false);
+    };
+    fetchOnMount();
+  }, []);
   // -------- Save active tab ----------
   useEffect(() => {
     localStorage.setItem('collectionActiveTab', activeTab);
@@ -68,7 +75,8 @@ const CollectionDashboard = () => {
 
       const summary = summaryRes.data?.report || {};
       const details = detailsRes.data?.report || {};
-
+      console.log('Raw Summary:', summary);
+      console.log('Raw Details:', details);
       const final: any = {};
 
       // ----------- STEP 1: Copy summary to final -----------
@@ -111,7 +119,7 @@ const CollectionDashboard = () => {
           acc.customers += day.summary.customers || 0;
           return acc;
         },
-        { customers: 0, amount: 0, totalPayment: 0, discount: 0 }
+        { customers: 0, amount: 0, totalPayment: 0, discount: 0 },
       );
 
       setTotals(totalsFromServer);
@@ -143,112 +151,100 @@ const CollectionDashboard = () => {
     return () => clearTimeout(debounceRef.current);
   }, [filters]);
 
-  // --- Local / client-side filtering + recompute summary + areas ---
+  const onlineModes = useMemo(() => ['PhonePe', 'GPay', 'UPI', 'Online'], []);
+
   const filteredData = useMemo(() => {
     if (!transactionData || Object.keys(transactionData).length === 0)
       return {};
 
-    const clone = structuredClone(transactionData); // safe deep copy
-    const onlineModes = ['PhonePe', 'GPay', 'UPI', 'Online'];
-
     return Object.fromEntries(
-      Object.entries(clone).map(([date, data]: any) => {
-        let filteredCustomers = data.customerDetails || [];
+      Object.entries(transactionData)
+        .map(([date, data]: any) => {
+          let customers = data.customerDetails || [];
 
-        // Status filter: paid / pending
-        if (filters.status && filters.status !== 'all') {
-          if (filters.status === 'paid') {
-            filteredCustomers = filteredCustomers.filter(
-              (c: any) => (c.paidAmount || 0) > 0
-            );
-          } else if (filters.status === 'pending') {
-            filteredCustomers = filteredCustomers.filter(
-              (c: any) => (c.currentBalance || 0) > 0
-            );
-          }
-        }
-
-        // (Agent / Area / Payment already applied in backend via params,
-        //  but leaving here gives extra safety if backend ignores anything.)
-        if (filters.agent && filters.agent !== 'all') {
-          filteredCustomers = filteredCustomers.filter(
-            (c: any) => c.collectedBy === filters.agent
-          );
-        }
-
-        if (filters.area && filters.area !== 'all') {
-          filteredCustomers = filteredCustomers.filter(
-            (c: any) => c.area === filters.area
-          );
-        }
-
-        if (filters.payment && filters.payment !== 'all') {
-          if (filters.payment === 'Cash') {
-            filteredCustomers = filteredCustomers.filter(
-              (c: any) => c.method === 'Cash'
-            );
-          } else if (filters.payment === 'Online') {
-            filteredCustomers = filteredCustomers.filter((c: any) =>
-              onlineModes.includes(c.method)
-            );
-          }
-        }
-
-        // ---- Recompute summary + area breakdown from filteredCustomers ----
-        const newSummary = {
-          customers: 0,
-          amount: 0,
-          discount: 0,
-          totalPayment: 0,
-        };
-        const newAreas: any = {};
-
-        filteredCustomers.forEach((c: any) => {
-          const paid = c.paidAmount || 0;
-          const disc = c.discount || 0;
-          const areaName = c.area || 'Unknown';
-          const mode = c.method || 'Cash';
-
-          newSummary.customers += 1;
-          newSummary.amount += paid;
-          newSummary.discount += disc;
-          newSummary.totalPayment += paid;
-
-          if (!newAreas[areaName]) newAreas[areaName] = { modes: [] };
-
-          let modeRow = newAreas[areaName].modes.find(
-            (m: any) => m.mode === mode
-          );
-          if (!modeRow) {
-            modeRow = {
-              mode,
-              customers: 0,
-              amount: 0,
-              discount: 0,
-              payment: 0,
-            };
-            newAreas[areaName].modes.push(modeRow);
+          // -------- APPLY FILTERS --------
+          if (filters.status && filters.status !== 'all') {
+            customers =
+              filters.status === 'paid'
+                ? customers.filter((c: any) => (c.paidAmount || 0) > 0)
+                : customers.filter((c: any) => (c.currentBalance || 0) > 0);
           }
 
-          modeRow.customers += 1;
-          modeRow.amount += paid;
-          modeRow.discount += disc;
-          modeRow.payment += paid;
-        });
+          if (filters.agent && filters.agent !== 'all') {
+            customers = customers.filter(
+              (c: any) => c.collectedBy === filters.agent,
+            );
+          }
 
-        return [
-          date,
-          {
-            ...data,
-            summary: newSummary,
-            areas: newAreas,
-            customerDetails: filteredCustomers,
-          },
-        ];
-      })
+          if (filters.area && filters.area !== 'all') {
+            customers = customers.filter((c: any) => c.area === filters.area);
+          }
+
+          if (filters.payment && filters.payment !== 'all') {
+            customers =
+              filters.payment === 'Cash'
+                ? customers.filter((c: any) => c.method === 'Cash')
+                : customers.filter((c: any) => onlineModes.includes(c.method));
+          }
+
+          // ❗ REMOVE EMPTY DAYS (MAIN FIX)
+          if (!customers.length) return null;
+
+          // -------- RECOMPUTE SUMMARY --------
+          const summary = {
+            customers: 0,
+            amount: 0,
+            discount: 0,
+            totalPayment: 0,
+          };
+
+          const areas: Record<string, any> = {};
+
+          for (const c of customers) {
+            const paid = c.paidAmount || 0;
+            const disc = c.discount || 0;
+            const area = c.area || 'Unknown';
+            const mode = c.method || 'Cash';
+
+            summary.customers++;
+            summary.amount += paid;
+            summary.discount += disc;
+            summary.totalPayment += paid;
+
+            if (!areas[area]) areas[area] = { modes: [] };
+
+            let modeRow = areas[area].modes.find((m: any) => m.mode === mode);
+
+            if (!modeRow) {
+              modeRow = {
+                mode,
+                customers: 0,
+                amount: 0,
+                discount: 0,
+                payment: 0,
+              };
+              areas[area].modes.push(modeRow);
+            }
+
+            modeRow.customers++;
+            modeRow.amount += paid;
+            modeRow.discount += disc;
+            modeRow.payment += paid;
+          }
+
+          return [
+            date,
+            {
+              ...data,
+              summary,
+              areas,
+              customerDetails: customers,
+            },
+          ];
+        })
+        .filter(Boolean), // ✅ removes null days
     );
-  }, [transactionData, filters]);
-
+  }, [transactionData, filters, onlineModes]);
   // For Excel export we optionally use filteredData or full transactionData
   const dataForExport = useMemo(() => {
     if (exportFilteredOnly && Object.keys(filteredData).length > 0) {
@@ -269,28 +265,21 @@ const CollectionDashboard = () => {
   };
 
   const renderByMethod = (kind: 'Cash' | 'Online') => {
-    const onlineModes = ['PhonePe', 'GPay', 'UPI', 'Online'];
-
     return Object.entries(filteredData).map(([date, data]: any) => {
-      let filtered: any[] = [];
+      const customers =
+        kind === 'Cash'
+          ? data.customerDetails.filter((c: any) => c.method === 'Cash')
+          : data.customerDetails.filter((c: any) =>
+              onlineModes.includes(c.method),
+            );
 
-      if (kind === 'Cash') {
-        filtered = (data.customerDetails || []).filter(
-          (c: any) => c.method === 'Cash'
-        );
-      } else {
-        filtered = (data.customerDetails || []).filter((c: any) =>
-          onlineModes.includes(c.method)
-        );
-      }
-
-      if (!filtered.length) return null;
+      if (!customers.length) return null;
 
       return (
         <DailyReportTable
           key={date}
           date={date}
-          data={{ ...data, customerDetails: filtered }}
+          data={{ ...data, customerDetails: customers }}
         />
       );
     });
@@ -444,12 +433,12 @@ const CollectionDashboard = () => {
                                         ₹{m.payment}
                                       </td>
                                     </tr>
-                                  )
+                                  ),
                                 )}
                               </tbody>
                             </table>
                           </div>
-                        )
+                        ),
                       )}
                     </CardContent>
                   </Card>

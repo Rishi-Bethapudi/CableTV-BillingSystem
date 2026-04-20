@@ -57,7 +57,7 @@ const formatCollectionReport = (collections) => {
     }
 
     const existingMode = report[dateKey].areas[area].modes.find(
-      (m) => m.mode === mode
+      (m) => m.mode === mode,
     );
     if (existingMode) {
       existingMode.customers += 1;
@@ -109,7 +109,7 @@ const getDashboardSummary = async (req, res) => {
       now.getDate(),
       0,
       0,
-      0
+      0,
     );
     const todayEnd = new Date(
       now.getFullYear(),
@@ -117,7 +117,7 @@ const getDashboardSummary = async (req, res) => {
       now.getDate(),
       23,
       59,
-      59
+      59,
     );
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(
@@ -126,7 +126,7 @@ const getDashboardSummary = async (req, res) => {
       0,
       23,
       59,
-      59
+      59,
     );
 
     const format = (d) => d.toISOString().split('T')[0];
@@ -483,17 +483,36 @@ const getCollectionDetails = async (req, res) => {
       type: 'PAYMENT',
     };
 
+    // ✅ FIX 1: Proper date range handling (VERY IMPORTANT)
     if (startDate || endDate) {
       match.createdAt = {};
-      if (startDate) match.createdAt.$gte = new Date(startDate);
-      if (endDate) match.createdAt.$lte = new Date(endDate);
+
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0); // start of day
+        match.createdAt.$gte = start;
+      }
+
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999); // end of day
+        match.createdAt.$lte = end;
+      }
     }
 
-    if (agentId) match.collectedBy = new mongoose.Types.ObjectId(agentId);
-    if (paymentMode) match.method = paymentMode;
+    // ✅ FIX 2: Safe ObjectId usage
+    if (agentId && mongoose.Types.ObjectId.isValid(agentId)) {
+      match.collectedBy = new mongoose.Types.ObjectId(agentId);
+    }
 
-    const details = await Transaction.aggregate([
+    if (paymentMode && paymentMode !== 'all') {
+      match.method = paymentMode;
+    }
+
+    const pipeline = [
       { $match: match },
+
+      // Customer lookup
       {
         $lookup: {
           from: 'customers',
@@ -503,6 +522,7 @@ const getCollectionDetails = async (req, res) => {
         },
       },
       { $unwind: '$customer' },
+
       // Agent lookup
       {
         $lookup: {
@@ -522,13 +542,25 @@ const getCollectionDetails = async (req, res) => {
           as: 'operatorData',
         },
       },
-      ...(area ? [{ $match: { 'customer.locality': area } }] : []),
+
+      // ✅ FIX 3: Area filter (after lookup)
+      ...(area && area !== 'all'
+        ? [{ $match: { 'customer.locality': area } }]
+        : []),
+
       {
         $project: {
           createdAt: 1,
+
+          // ✅ FIX 4: Consistent date formatting (important)
           dateFormatted: {
-            $dateToString: { format: '%d-%b-%Y', date: '$createdAt' },
+            $dateToString: {
+              format: '%d-%b-%Y',
+              date: '$createdAt',
+              timezone: 'Asia/Kolkata', // 🔥 CRITICAL FIX
+            },
           },
+
           id: '$customerId',
           name: '$customer.name',
           area: '$customer.locality',
@@ -540,6 +572,7 @@ const getCollectionDetails = async (req, res) => {
           stbNo: '$customer.stbNumber',
           cardNo: '$customer.cardNumber',
           method: '$method',
+
           collectedBy: {
             $cond: [
               { $gt: [{ $size: '$agentData' }, 0] },
@@ -549,19 +582,28 @@ const getCollectionDetails = async (req, res) => {
           },
         },
       },
-      { $sort: { createdAt: -1 } },
-    ]);
 
+      { $sort: { createdAt: -1 } },
+    ];
+
+    const details = await Transaction.aggregate(pipeline);
+
+    // ✅ FIX 5: Grouping (clean + safe)
     const formatted = {};
+
     details.forEach((tx) => {
       const key = tx.dateFormatted;
-      if (!formatted[key]) formatted[key] = { customerDetails: [] };
+
+      if (!formatted[key]) {
+        formatted[key] = { customerDetails: [] };
+      }
+
       formatted[key].customerDetails.push(tx);
     });
 
     return res.status(200).json({ report: formatted });
   } catch (err) {
-    console.error(err);
+    console.error('Collection Details Error:', err);
     res.status(500).json({ message: 'Error generating details' });
   }
 };

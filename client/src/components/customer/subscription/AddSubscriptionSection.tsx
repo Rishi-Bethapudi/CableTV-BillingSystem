@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Package, Calendar, CreditCard } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Package, Calendar, CreditCard, Loader2, Plus } from 'lucide-react';
+import { addDays, addMonths } from 'date-fns';
 import apiClient from '@/utils/apiClient';
 import { toast } from 'sonner';
 import type { Customer } from '@/utils/data';
@@ -15,7 +17,7 @@ const AddSubscriptionSection = ({ customer, onRefresh }: Props) => {
   const [startDate, setStartDate] = useState(
     new Date().toISOString().split('T')[0],
   );
-  const [duration, setDuration] = useState<number | null>(null);
+  const [duration, setDuration] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
 
@@ -35,7 +37,6 @@ const AddSubscriptionSection = ({ customer, onRefresh }: Props) => {
     fetchProducts();
   }, []);
 
-  // 🔹 Duration options based on product billingInterval
   const durationOptions = useMemo(() => {
     if (!selectedProduct) return [];
 
@@ -44,16 +45,28 @@ const AddSubscriptionSection = ({ customer, onRefresh }: Props) => {
     if (unit === 'months') {
       return [1, 2, 3, 6].map((m) => ({
         label: `${m} Month${m > 1 ? 's' : ''}`,
-        days: m * 30,
+        value: m,
+        unit: 'months',
       }));
     }
 
-    // days-based
     return [1, 2, 3, 4].map((x) => ({
       label: `${x * value} Days`,
-      days: x * value,
+      value: x * value,
+      unit: 'days',
     }));
   }, [selectedProduct]);
+
+  const expiryDate = useMemo(() => {
+    if (!startDate || !duration) return null;
+
+    const start = new Date(startDate);
+    if (isNaN(start.getTime())) return null;
+
+    return duration.unit === 'months'
+      ? addMonths(start, duration.value)
+      : addDays(start, duration.value);
+  }, [startDate, duration]);
 
   const handleSubmit = async () => {
     if (!selectedProduct || !duration) {
@@ -65,14 +78,14 @@ const AddSubscriptionSection = ({ customer, onRefresh }: Props) => {
       customerId: customer._id,
       productId: selectedProduct._id,
       startDate,
-      durationDays: duration,
-      billingMode: 'NEW',
-      note: 'New subscription added',
+      durationValue: duration.value, // ✅ actual selected value
+      durationUnit: duration.unit, // ✅ actual unit
+      note: 'New subscription added by',
     };
 
     try {
       setSubmitLoading(true);
-      await apiClient.post('/transactions/billing', payload);
+      await apiClient.post('/subscriptions', payload);
       toast.success('Subscription added successfully');
       onRefresh();
     } catch (err: any) {
@@ -81,36 +94,12 @@ const AddSubscriptionSection = ({ customer, onRefresh }: Props) => {
       setSubmitLoading(false);
     }
   };
-
   return (
     <div className="bg-white rounded-lg shadow p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-2 text-lg font-semibold">
         <Package className="w-5 h-5" />
         Add New Subscription
-      </div>
-
-      {/* Existing subscriptions */}
-      <div>
-        <h4 className="text-sm font-medium mb-2">Current Subscriptions</h4>
-
-        {customer.activeSubscriptions?.length ? (
-          <div className="space-y-2">
-            {customer.activeSubscriptions.map((sub: any) => (
-              <div
-                key={sub._id}
-                className="flex justify-between bg-gray-50 p-3 rounded text-sm"
-              >
-                <span>{sub.productId?.name}</span>
-                <span className="text-gray-600">
-                  till {new Date(sub.expiryDate).toLocaleDateString('en-IN')}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-sm text-gray-500">No active subscriptions</div>
-        )}
       </div>
 
       {/* Product select */}
@@ -148,13 +137,13 @@ const AddSubscriptionSection = ({ customer, onRefresh }: Props) => {
           <label className="text-sm mb-1 block">Duration</label>
           <select
             className="input-field"
-            value={duration || ''}
-            onChange={(e) => setDuration(Number(e.target.value))}
+            value={duration ? JSON.stringify(duration) : ''}
+            onChange={(e) => setDuration(JSON.parse(e.target.value))}
             disabled={!selectedProduct}
           >
             <option value="">Select duration</option>
-            {durationOptions.map((opt) => (
-              <option key={opt.days} value={opt.days}>
+            {durationOptions.map((opt, i) => (
+              <option key={i} value={JSON.stringify(opt)}>
                 {opt.label}
               </option>
             ))}
@@ -171,17 +160,25 @@ const AddSubscriptionSection = ({ customer, onRefresh }: Props) => {
           </div>
           <div className="flex justify-between">
             <span>Duration</span>
-            <span>{duration} days</span>
+            <span>
+              {duration.value} {duration.unit}
+            </span>
           </div>
+          {expiryDate && (
+            <div className="flex justify-between">
+              <span>Expiry</span>
+              <span className="font-bold text-red-500">
+                {expiryDate.toLocaleDateString('en-IN')}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between font-semibold">
             <span>Amount</span>
             <span>
               ₹
-              {(
-                (selectedProduct.customerPrice * duration) /
-                (selectedProduct.billingInterval.unit === 'months'
-                  ? selectedProduct.billingInterval.value * 30
-                  : selectedProduct.billingInterval.value)
+              {(duration.unit === 'months'
+                ? duration.value * selectedProduct.customerPrice
+                : (duration.value / 30) * selectedProduct.customerPrice
               ).toFixed(2)}
             </span>
           </div>
@@ -189,13 +186,29 @@ const AddSubscriptionSection = ({ customer, onRefresh }: Props) => {
       )}
 
       {/* Submit */}
-      <button
+      <Button
         onClick={handleSubmit}
         disabled={submitLoading}
-        className="btn-primary w-full"
+        className="
+    w-full gap-2 font-semibold
+    bg-gradient-to-r from-indigo-500 to-purple-600
+    hover:from-indigo-600 hover:to-purple-700
+    text-white shadow-md hover:shadow-lg
+    transition-all duration-300
+  "
       >
-        {submitLoading ? 'Adding…' : 'Add Subscription'}
-      </button>
+        {submitLoading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Adding...
+          </>
+        ) : (
+          <>
+            <Plus className="w-4 h-4" />
+            Add Subscription
+          </>
+        )}
+      </Button>
     </div>
   );
 };
