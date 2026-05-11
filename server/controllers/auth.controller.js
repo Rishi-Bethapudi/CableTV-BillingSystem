@@ -79,13 +79,15 @@ const loginUser = async (req, res) => {
     */
 
     let user =
-      (await Admin.findOne({ email: identifier })) ||
+      (await Admin.findOne({
+        email: identifier,
+      }).select('+password +refreshTokens')) ||
       (await Operator.findOne({
-        $or: [{ email: identifier }, { mobile: identifier }],
-      })) ||
+        $or: [{ email: identifier }, { contactNumber: identifier }],
+      }).select('+password +refreshTokens')) ||
       (await Agent.findOne({
         $or: [{ email: identifier }, { mobile: identifier }],
-      }));
+      }).select('+password +refreshTokens'));
 
     /*
     =========================================================================
