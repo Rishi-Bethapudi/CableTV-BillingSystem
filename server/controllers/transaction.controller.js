@@ -122,7 +122,10 @@ const createCollection = async (req, res) => {
   try {
     const customer = await Customer.findById(customerId).session(session);
     if (!customer) throw new Error('Customer not found.');
-    if (customer.operatorId.toString() !== req.user.operatorId)
+    if (
+      customer.operatorId.toString() !==
+      req.user.operatorId.toString().toString()
+    )
       throw new Error('Forbidden.');
 
     const paymentAmount = Number(amount);
@@ -200,7 +203,7 @@ const createAddonBilling = async (req, res) => {
   try {
     const customer = await Customer.findById(customerId).session(session);
     if (!customer) throw new Error('Customer not found');
-    if (customer.operatorId.toString() !== req.user.operatorId)
+    if (customer.operatorId.toString() !== req.user.operatorId.toString())
       throw new Error('Forbidden');
 
     const operator = await Operator.findById(req.user.operatorId).session(
@@ -302,7 +305,7 @@ const adjustBalance = async (req, res) => {
     if (!customer) throw new Error('Customer not found.');
 
     // Only operator can manually adjust
-    if (customer.operatorId.toString() !== req.user.operatorId)
+    if (customer.operatorId.toString() !== req.user.operatorId.toString())
       throw new Error('Forbidden.');
     if (req.user.role !== 'operator')
       throw new Error('Only operator can perform manual adjustment.');
@@ -373,7 +376,7 @@ const getCustomerTransactions = async (req, res) => {
     const customer = await Customer.findById(customerId);
     if (!customer)
       return res.status(404).json({ message: 'Customer not found.' });
-    if (customer.operatorId.toString() !== req.user.operatorId)
+    if (customer.operatorId.toString() !== req.user.operatorId.toString())
       return res.status(403).json({ message: 'Forbidden.' });
 
     const query = { customerId };
@@ -443,7 +446,7 @@ const reverseInvoice = async (req, res) => {
     }).session(session);
 
     if (!originalTx) throw new Error('Invoice not found.');
-    if (originalTx.operatorId.toString() !== req.user.operatorId)
+    if (originalTx.operatorId.toString() !== req.user.operatorId.toString())
       throw new Error('Forbidden.');
 
     // Only operator can reverse invoices
@@ -566,7 +569,7 @@ const reversePayment = async (req, res) => {
     }).session(session);
 
     if (!originalTx) throw new Error('Payment receipt not found.');
-    if (originalTx.operatorId.toString() !== req.user.operatorId)
+    if (originalTx.operatorId.toString() !== req.user.operatorId.toString())
       throw new Error('Forbidden.');
 
     // Only operator can reverse payments
@@ -663,7 +666,10 @@ const refundPayment = async (req, res) => {
   try {
     const customer = await Customer.findById(customerId).session(session);
     if (!customer) throw new Error('Customer not found.');
-    if (customer.operatorId.toString() !== req.user.operatorId)
+    if (
+      customer.operatorId.toString() !==
+      req.user.operatorId.toString().toString()
+    )
       throw new Error('Forbidden.');
 
     // Only operator can issue refund
@@ -756,7 +762,7 @@ const getTransactionDetails = async (req, res) => {
       .lean();
 
     if (!tx) return res.status(404).json({ message: 'Transaction not found.' });
-    if (tx.operatorId.toString() !== req.user.operatorId)
+    if (tx.operatorId.toString() !== req.user.operatorId.toString())
       return res.status(403).json({ message: 'Forbidden.' });
 
     // Fetch customer

@@ -78,15 +78,15 @@ const authMiddleware = async (req, res, next) => {
 
     switch (decoded.role) {
       case 'admin':
-        user = await Admin.findById(decoded.id).select('-password');
+        user = await Admin.findById(decoded.id).select('+permissions');
         break;
 
       case 'operator':
-        user = await Operator.findById(decoded.id).select('-password');
+        user = await Operator.findById(decoded.id).select('+permissions');
         break;
 
       case 'agent':
-        user = await Agent.findById(decoded.id).select('-password');
+        user = await Agent.findById(decoded.id).select('+permissions');
         break;
 
       default:

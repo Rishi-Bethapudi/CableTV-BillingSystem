@@ -45,9 +45,7 @@ COLLECTIONS
 
 router.post(
   '/collection',
-
   checkPermissions('COLLECT_PAYMENT'),
-
   createCollection,
 );
 

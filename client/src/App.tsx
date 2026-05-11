@@ -47,7 +47,7 @@ import ProfilePage from './pages/ProfilePage';
 
 // import SettingsPage from './pages/settings';
 
-// import ContactPage from './pages/contact';
+// import ContactPage from './pages/ContactPage';
 
 // ---------------- QUERY CLIENT ----------------
 const queryClient = new QueryClient();
