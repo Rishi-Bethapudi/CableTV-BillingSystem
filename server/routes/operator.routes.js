@@ -1,5 +1,13 @@
 const express = require('express');
+
 const router = express.Router();
+
+/*
+=============================================================================
+CONTROLLERS
+=============================================================================
+*/
+
 const {
   createAgent,
   getAgents,
@@ -9,73 +17,95 @@ const {
   getOperatorProfile,
   updateOperatorProfile,
 } = require('../controllers/operator.controller');
-const {
-  authMiddleware,
-  operatorOnly,
-} = require('../middleware/auth.middleware');
-
-// All routes in this file are for logged-in operators
-router.use(authMiddleware, operatorOnly);
 
 /*
-================================================================================================
-                                        OPERATOR PROFILE ROUTES
-================================================================================================
+=============================================================================
+MIDDLEWARES
+=============================================================================
 */
 
-/**
- * @route   GET /api/operators/profile
- * @desc    Get the profile of the currently logged-in operator
- * @access  Private (Operator only)
- */
-router.get('/profile', getOperatorProfile);
+const authMiddleware = require('../middleware/auth.middleware');
 
-/**
- * @route   PUT /api/operators/profile
- * @desc    Update the profile of the currently logged-in operator
- * @access  Private (Operator only)
- */
-router.put('/profile', updateOperatorProfile);
+const allowRoles = require('../middleware/role.middleware');
+
+const checkPermissions = require('../middleware/permission.middleware');
 
 /*
-================================================================================================
-                                        AGENT MANAGEMENT ROUTES
-================================================================================================
+=============================================================================
+GLOBAL PROTECTION
+=============================================================================
 */
 
-/**
- * @route   POST /api/operators/agents
- * @desc    Create a new agent under the logged-in operator
- * @access  Private (Operator only)
- */
-router.post('/agents', createAgent);
+router.use(authMiddleware);
 
-/**
- * @route   GET /api/operators/agents
- * @desc    Get all agents belonging to the logged-in operator
- * @access  Private (Operator only)
- */
-router.get('/agents', getAgents);
+router.use(allowRoles('operator'));
 
-/**
- * @route   PUT /api/operators/agents/:agentId
- * @desc    Update an agent's details
- * @access  Private (Operator only)
- */
-router.put('/agents/:agentId', updateAgent);
+/*
+=============================================================================
+PROFILE
+=============================================================================
+*/
 
-/**
- * @route   DELETE /api/operators/agents/:agentId
- * @desc    Delete an agent
- * @access  Private (Operator only)
- */
-router.delete('/agents/:agentId', deleteAgent);
+router.get(
+  '/profile',
 
-/**
- * @route   PATCH /api/operators/agents/:agentId/change-password
- * @desc    Allows an operator to directly change an agent's password
- * @access  Private (Operator only)
- */
-router.patch('/agents/:agentId/change-password', changeAgentPassword);
+  checkPermissions('VIEW_PROFILE'),
+
+  getOperatorProfile,
+);
+
+router.put(
+  '/profile',
+
+  checkPermissions('EDIT_PROFILE'),
+
+  updateOperatorProfile,
+);
+
+/*
+=============================================================================
+AGENTS
+=============================================================================
+*/
+
+router.post(
+  '/agents',
+
+  checkPermissions('CREATE_AGENTS'),
+
+  createAgent,
+);
+
+router.get(
+  '/agents',
+
+  checkPermissions('VIEW_AGENTS'),
+
+  getAgents,
+);
+
+router.put(
+  '/agents/:agentId',
+
+  checkPermissions('EDIT_AGENTS'),
+
+  updateAgent,
+);
+
+router.delete(
+  '/agents/:agentId',
+
+  checkPermissions('DELETE_AGENTS'),
+
+  deleteAgent,
+);
+
+router.patch(
+  '/agents/:agentId/change-password',
+
+  checkPermissions('EDIT_AGENTS'),
+
+  changeAgentPassword,
+);
 
 module.exports = router;

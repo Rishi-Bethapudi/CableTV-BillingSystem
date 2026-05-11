@@ -1,5 +1,10 @@
-import { configureStore, combineReducers } from '@reduxjs/toolkit';
+import {
+  configureStore,
+  combineReducers,
+} from '@reduxjs/toolkit';
+
 import authReducer from './slices/authSlice';
+
 import {
   persistStore,
   persistReducer,
@@ -10,37 +15,47 @@ import {
   PURGE,
   REGISTER,
 } from 'redux-persist';
-import storage from 'redux-persist/lib/storage'; // for web
-import createCapacitorStorage from 'redux-persist-capacitor-storage'; // for mobile
 
-// Use Capacitor storage if running in native app
-const isNative = !!window?.Capacitor?.isNativePlatform?.();
-const persistStorage = isNative ? createCapacitorStorage() : storage;
+import storage from 'redux-persist/lib/storage';
 
 const persistConfig = {
   key: 'root',
-  storage: persistStorage,
-  whitelist: ['auth'],
-  blacklist: ['auth.loading', 'auth.error'],
+  storage,
 
+  whitelist: ['auth'],
 };
 
 const rootReducer = combineReducers({
   auth: authReducer,
 });
 
-const persistedReducer = persistReducer(persistConfig, rootReducer);
+const persistedReducer = persistReducer(
+  persistConfig,
+  rootReducer
+);
 
 export const store = configureStore({
   reducer: persistedReducer,
+
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
+        ignoredActions: [
+          FLUSH,
+          REHYDRATE,
+          PAUSE,
+          PERSIST,
+          PURGE,
+          REGISTER,
+        ],
       },
     }),
 });
 
 export const persistor = persistStore(store);
-export type RootState = ReturnType<typeof store.getState>;
+
+export type RootState = ReturnType<
+  typeof store.getState
+>;
+
 export type AppDispatch = typeof store.dispatch;

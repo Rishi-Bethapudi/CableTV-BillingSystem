@@ -1,5 +1,13 @@
 const express = require('express');
+
 const router = express.Router();
+
+/*
+=============================================================================
+CONTROLLERS
+=============================================================================
+*/
+
 const {
   createComplaint,
   getComplaints,
@@ -7,47 +15,92 @@ const {
   updateComplaint,
   updateComplaintStatus,
 } = require('../controllers/complaint.controller');
-const {
-  authMiddleware,
-  operatorOrAgentOnly,
-} = require('../middleware/auth.middleware');
 
-// Complaints can be managed by operators or agents
-router.use(authMiddleware, operatorOrAgentOnly);
+/*
+=============================================================================
+MIDDLEWARES
+=============================================================================
+*/
 
-/**
- * @route   POST /api/complaints
- * @desc    Log a new customer complaint
- * @access  Private (Operator or Agent)
- */
-router.post('/', createComplaint);
+const authMiddleware = require('../middleware/auth.middleware');
 
-/**
- * @route   GET /api/complaints
- * @desc    Get all complaints with filtering
- * @access  Private (Operator or Agent)
- */
-router.get('/', getComplaints);
+const allowRoles = require('../middleware/role.middleware');
 
-/**
- * @route   GET /api/complaints/:id
- * @desc    Get a single complaint by its ID
- * @access  Private (Operator or Agent)
- */
-router.get('/:id', getComplaintById);
+const checkPermissions = require('../middleware/permission.middleware');
 
-/**
- * @route   PUT /api/complaints/:id
- * @desc    Update a complaint's details (e.g., assign to an agent)
- * @access  Private (Operator or Agent)
- */
-router.put('/:id', updateComplaint);
+const checkAreaAccess = require('../middleware/areaAccess.middleware');
+
+/*
+=============================================================================
+GLOBAL PROTECTION
+=============================================================================
+*/
+
+router.use(authMiddleware);
+
+router.use(allowRoles('operator', 'agent'));
+
+/*
+=============================================================================
+ROUTES
+=============================================================================
+*/
 
 /**
- * @route   PATCH /api/complaints/:id/status
- * @desc    Update only the status of a complaint (e.g., resolve it)
- * @access  Private (Operator or Agent)
+ * CREATE COMPLAINT
  */
-router.patch('/:id/status', updateComplaintStatus);
+router.post(
+  '/',
+
+  checkPermissions('CREATE_COMPLAINT'),
+
+  checkAreaAccess,
+
+  createComplaint,
+);
+
+/**
+ * GET COMPLAINTS
+ */
+router.get(
+  '/',
+
+  checkPermissions('VIEW_COMPLAINTS'),
+
+  getComplaints,
+);
+
+/**
+ * GET SINGLE COMPLAINT
+ */
+router.get(
+  '/:id',
+
+  checkPermissions('VIEW_COMPLAINTS'),
+
+  getComplaintById,
+);
+
+/**
+ * UPDATE COMPLAINT
+ */
+router.put(
+  '/:id',
+
+  checkPermissions('UPDATE_COMPLAINT'),
+
+  updateComplaint,
+);
+
+/**
+ * UPDATE STATUS
+ */
+router.patch(
+  '/:id/status',
+
+  checkPermissions('UPDATE_COMPLAINT_STATUS'),
+
+  updateComplaintStatus,
+);
 
 module.exports = router;

@@ -1,41 +1,132 @@
 const express = require('express');
+
 const router = express.Router();
+
+/*
+=============================================================================
+CONTROLLERS
+=============================================================================
+*/
+
 const {
   loginUser,
   refreshAccessToken,
   requestPasswordReset,
   verifyOtpAndResetPassword,
   changePassword,
+  logoutUser,
+  // logoutAllSessions,
 } = require('../controllers/auth.controller');
-const { authMiddleware } = require('../middleware/auth.middleware');
+
+/*
+=============================================================================
+MIDDLEWARES
+=============================================================================
+*/
+
+const authMiddleware = require('../middleware/auth.middleware');
+
+const rateLimit = require('express-rate-limit');
+
+/*
+=============================================================================
+RATE LIMITERS
+=============================================================================
+*/
+
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: 'Too many requests. Please try again later.',
+});
+
+const refreshLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: 'Too many refresh attempts.',
+});
+
+/*
+=============================================================================
+AUTH ROUTES
+=============================================================================
+*/
 
 /**
- * @route   POST /api/auth/login
- * @desc    Login for any user (Admin, Operator, Agent)
- * @access  Public
+ * LOGIN
  */
-router.post('/login', loginUser);
+router.post(
+  '/login',
 
-router.post('/refresh', refreshAccessToken);
-/**
- * @route   POST /api/auth/change-password
- * @desc    Allows a logged-in user to change their own password using the old one
- * @access  Private (Any authenticated user)
- */
-router.post('/change-password', authMiddleware, changePassword);
+  authLimiter,
+
+  loginUser,
+);
 
 /**
- * @route   POST /api/auth/forgot-password
- * @desc    Step 1 of password reset: User requests an OTP via email/mobile
- * @access  Public
+ * REFRESH ACCESS TOKEN
  */
-router.post('/forgot-password', requestPasswordReset);
+router.post(
+  '/refresh',
+
+  refreshLimiter,
+
+  refreshAccessToken,
+);
 
 /**
- * @route   POST /api/auth/reset-password
- * @desc    Step 2 of password reset: User provides OTP and new password
- * @access  Public
+ * CHANGE PASSWORD
  */
-router.post('/reset-password', verifyOtpAndResetPassword);
+router.post(
+  '/change-password',
+
+  authMiddleware,
+
+  changePassword,
+);
+
+/**
+ * FORGOT PASSWORD
+ */
+router.post(
+  '/forgot-password',
+
+  authLimiter,
+
+  requestPasswordReset,
+);
+
+/**
+ * RESET PASSWORD
+ */
+router.post(
+  '/reset-password',
+
+  authLimiter,
+
+  verifyOtpAndResetPassword,
+);
+
+/**
+ * LOGOUT CURRENT SESSION
+ */
+router.post(
+  '/logout',
+
+  authMiddleware,
+
+  logoutUser,
+);
+
+/**
+ * LOGOUT ALL DEVICES
+ */
+// router.post(
+//   '/logout-all',
+
+//   authMiddleware,
+
+//   logoutAllSessions,
+// );
 
 module.exports = router;

@@ -1,5 +1,15 @@
 const express = require('express');
+
+const multer = require('multer');
+
 const router = express.Router();
+
+/*
+=============================================================================
+CONTROLLERS
+=============================================================================
+*/
+
 const {
   createCustomer,
   getCustomers,
@@ -8,127 +18,187 @@ const {
   deleteCustomer,
   importCustomersFromExcel,
   exportCustomersToExcel,
-} = require('../controllers/customer.controller'); // Assuming controller functions are defined elsewhere
+} = require('../controllers/customer.controller');
+
 const {
   adjustBalance,
   getCustomerTransactions,
   createAddonBilling,
 } = require('../controllers/transaction.controller');
-const {
-  authMiddleware,
-  operatorOnly,
-  operatorOrAgentOnly,
-} = require('../middleware/auth.middleware');
-
-// Multer middleware for handling file uploads (for Excel import)
-const multer = require('multer');
-const upload = multer({ dest: 'uploads/' }); // A temporary folder for uploads
 
 /*
-================================================================================================
-                                        CUSTOMER CRUD ROUTES
-================================================================================================
+=============================================================================
+MIDDLEWARES
+=============================================================================
+*/
+
+const authMiddleware = require('../middleware/auth.middleware');
+
+const allowRoles = require('../middleware/role.middleware');
+
+const checkPermissions = require('../middleware/permission.middleware');
+
+const checkAreaAccess = require('../middleware/areaAccess.middleware');
+
+/*
+=============================================================================
+UPLOADS
+=============================================================================
+*/
+
+const upload = multer({
+  dest: 'uploads/',
+});
+
+/*
+=============================================================================
+GLOBAL PROTECTION
+=============================================================================
+*/
+
+router.use(authMiddleware);
+
+router.use(allowRoles('operator', 'agent'));
+
+/*
+=============================================================================
+CUSTOMER CRUD
+=============================================================================
 */
 
 /**
- * @route   POST /api/customers
- * @desc    Create a new customer for the logged-in operator
- * @access  Private (Operator only)
- * @note    The controller will use `req.user.id` as the `operatorId` to ensure
- * the new customer is correctly associated with the correct tenant.
+ * CREATE CUSTOMER
  */
-router.post('/', authMiddleware, operatorOnly, createCustomer);
+router.post(
+  '/',
+
+  checkPermissions('CREATE_CUSTOMERS'),
+
+  checkAreaAccess,
+
+  createCustomer,
+);
 
 /**
- * @route   GET /api/customers
- * @desc    Get all customers for the logged-in operator. Supports pagination and filtering.
- * @access  Private (Operator or Agent)
- * @note    The controller will use `req.user.operatorId` to query the database,
- * ensuring an operator/agent can only see customers from their own organization.
- * Example Query: /api/customers?page=1&limit=10&search=John&status=active
+ * GET CUSTOMERS
  */
-router.get('/', authMiddleware, operatorOrAgentOnly, getCustomers);
-// router.get('/', getCustomers);
+router.get(
+  '/',
+
+  checkPermissions('VIEW_CUSTOMERS'),
+
+  getCustomers,
+);
 
 /**
- * @route   GET /api/customers/:id
- * @desc    Get a single customer by their ID
- * @access  Private (Operator or Agent)
- * @note    CRITICAL: The controller MUST verify that the requested customer's `operatorId`
- * matches `req.user.operatorId` to prevent data leakage between tenants.
+ * GET SINGLE CUSTOMER
  */
-router.get('/:id', authMiddleware, operatorOrAgentOnly, getCustomerById);
+router.get(
+  '/:id',
+
+  checkPermissions('VIEW_CUSTOMERS'),
+
+  getCustomerById,
+);
 
 /**
- * @route   PUT /api/customers/:id
- * @desc    Update a customer's details
- * @access  Private (Operator only)
- * @note    The controller must also perform the same check as GET /:id to ensure
- * an operator can only update customers within their own tenant.
+ * UPDATE CUSTOMER
  */
-router.put('/:id', authMiddleware, operatorOnly, updateCustomer);
+router.put(
+  '/:id',
+
+  checkPermissions('EDIT_CUSTOMERS'),
+
+  checkAreaAccess,
+
+  updateCustomer,
+);
 
 /**
- * @route   DELETE /api/customers/:id
- * @desc    Delete a customer
- * @access  Private (Operator only)
- * @note    The controller must also perform the same check as GET /:id.
+ * DELETE CUSTOMER
  */
-router.delete('/:id', authMiddleware, operatorOnly, deleteCustomer);
+router.delete(
+  '/:id',
 
-// @route   POST /api/customers/:id/adjust-balance
+  checkPermissions('DELETE_CUSTOMERS'),
+
+  deleteCustomer,
+);
+
+/*
+=============================================================================
+BALANCE ADJUSTMENT
+=============================================================================
+*/
+
 router.post(
   '/:id/adjust-balance',
-  authMiddleware,
-  operatorOrAgentOnly,
+
+  checkPermissions('COLLECT_PAYMENT'),
+
   adjustBalance,
 );
 
-// @route   POST /api/customers/:id/additionalCharge
+/*
+=============================================================================
+ADDON BILLING
+=============================================================================
+*/
+
 router.post(
   '/transactions/addon',
-  authMiddleware,
-  operatorOrAgentOnly,
+
+  checkPermissions('COLLECT_PAYMENT'),
+
   createAddonBilling,
 );
 
-/**
- * @route   GET /api/customers/:customerId/transactions
- * @desc    Get the full ledger/transaction history for a single customer.
- * @access  Private (Operator or Agent)
- */
+/*
+=============================================================================
+CUSTOMER TRANSACTIONS
+=============================================================================
+*/
+
 router.get(
   '/:customerId/transactions',
-  authMiddleware,
-  operatorOrAgentOnly,
+
+  checkPermissions('VIEW_TRANSACTIONS'),
+
   getCustomerTransactions,
 );
 
 /*
-================================================================================================
-                                    SPECIALIZED CUSTOMER ROUTES
-================================================================================================
+=============================================================================
+IMPORT CUSTOMERS
+=============================================================================
 */
 
-/**
- * @route   POST /api/customers/import
- * @desc    Bulk import customers from an Excel file
- * @access  Private (Operator only)
- * @note    Uses multer middleware to handle the 'file' field from a multipart/form-data request.
- */
 router.post(
   '/import',
-  authMiddleware,
-  operatorOnly,
+
+  allowRoles('operator'),
+
+  checkPermissions('IMPORT_CUSTOMERS'),
+
   upload.single('file'),
+
   importCustomersFromExcel,
 );
 
-/**
- * @route   GET /api/customers/export
- * @desc    Export all of an operator's customers to an Excel file
- * @access  Private (Operator only)
- */
-router.get('/export', authMiddleware, operatorOnly, exportCustomersToExcel);
+/*
+=============================================================================
+EXPORT CUSTOMERS
+=============================================================================
+*/
+
+router.get(
+  '/export',
+
+  allowRoles('operator'),
+
+  checkPermissions('EXPORT_CUSTOMERS'),
+
+  exportCustomersToExcel,
+);
 
 module.exports = router;

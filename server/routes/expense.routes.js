@@ -1,5 +1,13 @@
 const express = require('express');
+
 const router = express.Router();
+
+/*
+=============================================================================
+CONTROLLERS
+=============================================================================
+*/
+
 const {
   createExpense,
   getExpenses,
@@ -7,47 +15,73 @@ const {
   updateExpense,
   deleteExpense,
 } = require('../controllers/expense.controller');
-const {
-  authMiddleware,
-  operatorOnly,
-} = require('../middleware/auth.middleware');
 
-// All expense routes are for Operators only
-router.use(authMiddleware, operatorOnly);
+/*
+=============================================================================
+MIDDLEWARES
+=============================================================================
+*/
 
-/**
- * @route   POST /api/expenses
- * @desc    Create a new expense record
- * @access  Private (Operator only)
- */
-router.post('/', createExpense);
+const authMiddleware = require('../middleware/auth.middleware');
 
-/**
- * @route   GET /api/expenses
- * @desc    Get all expenses for the operator, with filtering
- * @access  Private (Operator only)
- */
-router.get('/', getExpenses);
+const allowRoles = require('../middleware/role.middleware');
 
-/**
- * @route   PUT /api/expenses/:id
- * @desc    Update an existing expense record
- * @access  Private (Operator only)
- */
-router.get('/:id', getExpenseById);
+const checkPermissions = require('../middleware/permission.middleware');
 
-/**
- * @route   PUT /api/expenses/:id
- * @desc    Update an existing expense record
- * @access  Private (Operator only)
- */
-router.put('/:id', updateExpense);
+/*
+=============================================================================
+GLOBAL PROTECTION
+=============================================================================
+*/
 
-/**
- * @route   DELETE /api/expenses/:id
- * @desc    Delete an expense record
- * @access  Private (Operator only)
- */
-router.delete('/:id', deleteExpense);
+router.use(authMiddleware);
+
+router.use(allowRoles('operator'));
+
+/*
+=============================================================================
+ROUTES
+=============================================================================
+*/
+
+router.post(
+  '/',
+
+  checkPermissions('CREATE_EXPENSE'),
+
+  createExpense,
+);
+
+router.get(
+  '/',
+
+  checkPermissions('VIEW_EXPENSES'),
+
+  getExpenses,
+);
+
+router.get(
+  '/:id',
+
+  checkPermissions('VIEW_EXPENSES'),
+
+  getExpenseById,
+);
+
+router.put(
+  '/:id',
+
+  checkPermissions('EDIT_EXPENSE'),
+
+  updateExpense,
+);
+
+router.delete(
+  '/:id',
+
+  checkPermissions('DELETE_EXPENSE'),
+
+  deleteExpense,
+);
 
 module.exports = router;

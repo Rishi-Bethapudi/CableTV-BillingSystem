@@ -1,26 +1,96 @@
 const express = require('express');
+
 const router = express.Router();
+
+/*
+=============================================================================
+CONTROLLERS
+=============================================================================
+*/
+
 const {
   createCollection,
   createAddonBilling,
   getTransactionDetails,
   getTransactionPDF,
 } = require('../controllers/transaction.controller');
-const {
-  authMiddleware,
-  operatorOrAgentOnly,
-} = require('../middleware/auth.middleware');
 
-// All routes here are protected and can be accessed by an Operator or their Agent
-router.use(authMiddleware, operatorOrAgentOnly);
+/*
+=============================================================================
+MIDDLEWARES
+=============================================================================
+*/
 
-/**
- * @route   POST /api/transactions/collection
- * @desc    Record a payment (collection) from a customer.
- * @access  Private (Operator or Agent)
- */
-router.post('/collection', createCollection);
-router.post('/addon', createAddonBilling);
-router.get('/:id', getTransactionDetails);
-router.get('/:transactionId/pdf', getTransactionPDF);
+const authMiddleware = require('../middleware/auth.middleware');
+
+const allowRoles = require('../middleware/role.middleware');
+
+const checkPermissions = require('../middleware/permission.middleware');
+
+/*
+=============================================================================
+GLOBAL PROTECTION
+=============================================================================
+*/
+
+router.use(authMiddleware);
+
+router.use(allowRoles('operator', 'agent'));
+
+/*
+=============================================================================
+COLLECTIONS
+=============================================================================
+*/
+
+router.post(
+  '/collection',
+
+  checkPermissions('COLLECT_PAYMENT'),
+
+  createCollection,
+);
+
+/*
+=============================================================================
+ADDON BILLING
+=============================================================================
+*/
+
+router.post(
+  '/addon',
+
+  checkPermissions('COLLECT_PAYMENT'),
+
+  createAddonBilling,
+);
+
+/*
+=============================================================================
+TRANSACTION DETAILS
+=============================================================================
+*/
+
+router.get(
+  '/:id',
+
+  checkPermissions('VIEW_TRANSACTIONS'),
+
+  getTransactionDetails,
+);
+
+/*
+=============================================================================
+TRANSACTION PDF
+=============================================================================
+*/
+
+router.get(
+  '/:transactionId/pdf',
+
+  checkPermissions('VIEW_TRANSACTIONS'),
+
+  getTransactionPDF,
+);
+
 module.exports = router;

@@ -1,68 +1,153 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+
 const Operator = require('../models/operator.model');
 const Agent = require('../models/agent.model');
-const Admin = require('../models/admin.model'); // Assuming an Admin model
-const { sendOtp } = require('../services/otp.service'); // A mock service for sending OTPs
+const Admin = require('../models/admin.model');
 
-// --- HELPER FUNCTIONS ---
-// Generates a short-lived Access Token
+const { sendOtp } = require('../services/otp.service');
+
+/*
+=============================================================================
+TOKEN HELPERS
+=============================================================================
+*/
+
 const generateAccessToken = (id, role, operatorId = null) => {
-  const payload = { id, role, operatorId };
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30m' });
+  return jwt.sign(
+    {
+      id,
+      role,
+      operatorId,
+    },
+
+    process.env.JWT_SECRET,
+
+    {
+      expiresIn: '15m',
+    },
+  );
 };
 
-// Generates a long-lived Refresh Token
 const generateRefreshToken = (id) => {
-  return jwt.sign({ id }, process.env.REFRESH_TOKEN_SECRET, {
-    expiresIn: '7d',
-  });
+  return jwt.sign(
+    {
+      id,
+    },
+
+    process.env.REFRESH_TOKEN_SECRET,
+
+    {
+      expiresIn: '7d',
+    },
+  );
 };
 
-/**
- * @desc    Login for any user type (MERGED & COMPLETE)
- * @route   POST /api/auth/login
- * @access  Public
- */
+/*
+=============================================================================
+PASSWORD VALIDATION
+=============================================================================
+*/
+
+const validatePasswordStrength = (password) => {
+  const strongPasswordRegex =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
+
+  return strongPasswordRegex.test(password);
+};
+
+/*
+=============================================================================
+LOGIN
+=============================================================================
+*/
 
 const loginUser = async (req, res) => {
   try {
-    const { identifier, password } = req.body; // identifier can be email or contactNumber
+    const { identifier, password } = req.body;
 
     if (!identifier || !password) {
-      return res
-        .status(400)
-        .json({ message: 'Identifier and password are required.' });
+      return res.status(400).json({
+        message: 'Identifier and password are required.',
+      });
     }
 
-    // Step 1: Find user across all collections
+    /*
+    =========================================================================
+    FIND USER
+    =========================================================================
+    */
+
     let user =
       (await Admin.findOne({ email: identifier })) ||
       (await Operator.findOne({
-        $or: [{ email: identifier }, { contactNumber: identifier }],
+        $or: [{ email: identifier }, { mobile: identifier }],
       })) ||
       (await Agent.findOne({
-        $or: [{ email: identifier }, { contactNumber: identifier }],
+        $or: [{ email: identifier }, { mobile: identifier }],
       }));
 
-    // Step 2: If user doesn't exist or password is wrong
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.status(401).json({ message: 'Invalid credentials.' });
+    /*
+    =========================================================================
+    INVALID USER
+    =========================================================================
+    */
+
+    if (!user) {
+      return res.status(401).json({
+        message: 'Invalid credentials.',
+      });
     }
 
-    // Step 3: Operator-specific validation
+    /*
+    =========================================================================
+    PASSWORD CHECK
+    =========================================================================
+    */
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(401).json({
+        message: 'Invalid credentials.',
+      });
+    }
+
+    /*
+    =========================================================================
+    STATUS CHECK
+    =========================================================================
+    */
+
+    if (user.status && ['inactive', 'suspended'].includes(user.status)) {
+      return res.status(403).json({
+        message: 'Account disabled.',
+      });
+    }
+
+    /*
+    =========================================================================
+    OPERATOR SUBSCRIPTION CHECK
+    =========================================================================
+    */
+
     if (
       user.constructor.modelName === 'Operator' &&
       user.subscription?.status !== 'active'
     ) {
       return res.status(403).json({
-        message: 'Your account is disabled. Please contact support.',
+        message: 'Subscription inactive.',
       });
     }
 
-    // Step 4: Set role and operatorId for token payload
-    let role,
-      operatorId = null;
+    /*
+    =========================================================================
+    ROLE SETUP
+    =========================================================================
+    */
+
+    let role;
+    let operatorId = null;
 
     if (user.constructor.modelName === 'Admin') {
       role = 'admin';
@@ -74,217 +159,148 @@ const loginUser = async (req, res) => {
       operatorId = user.operatorId;
     }
 
-    // Step 5: Generate Tokens
+    /*
+    =========================================================================
+    TOKENS
+    =========================================================================
+    */
+
     const accessToken = generateAccessToken(user._id, role, operatorId);
+
     const refreshToken = generateRefreshToken(user._id);
 
-    // Optional: Store refreshToken in DB (for token revocation later)
-    // Example: user.refreshTokens.push(refreshToken); await user.save();
+    /*
+    =========================================================================
+    STORE REFRESH TOKEN
+    =========================================================================
+    */
+
     user.refreshTokens = user.refreshTokens || [];
+
+    // Keep only latest 5 sessions
+    user.refreshTokens = user.refreshTokens.slice(-5);
+
     user.refreshTokens.push(refreshToken);
+
     await user.save();
-    // Step 6: Set refreshToken in secure cookie (Web)
+
+    /*
+    =========================================================================
+    COOKIE
+    =========================================================================
+    */
+
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
+
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'None',
-      // sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+
+      sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    // Step 7: Send token and user info to frontend
-    res.status(200).json({
+    /*
+    =========================================================================
+    RESPONSE
+    =========================================================================
+    */
+
+    return res.status(200).json({
       message: 'Login successful',
+
       accessToken,
-      refreshToken, // for mobile apps
-      user,
+
+      refreshToken,
+
+      user: {
+        id: user._id,
+
+        name: user.name,
+
+        email: user.email,
+
+        role,
+
+        operatorId,
+      },
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error during login.' });
+    console.error('LOGIN ERROR:', error);
+
+    return res.status(500).json({
+      message: 'Server error during login.',
+    });
   }
 };
 
-/**
- * @desc    Allows a logged-in user to change their password
- * @route   POST /api/auth/change-password
- * @access  Private
- */
-const changePassword = async (req, res) => {
+/*
+=============================================================================
+REFRESH ACCESS TOKEN
+=============================================================================
+*/
+
+const refreshAccessToken = async (req, res) => {
   try {
-    const { oldPassword, newPassword } = req.body;
-    const { id, role } = req.user; // from authMiddleware
+    const token = req.cookies.refreshToken || req.body.refreshToken;
 
-    let UserCollection;
-    if (role === 'admin') UserCollection = Admin;
-    else if (role === 'operator') UserCollection = Operator;
-    else UserCollection = Agent;
-
-    const user = await UserCollection.findById(id);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found.' });
-    }
-
-    const isMatch = await bcrypt.compare(oldPassword, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Incorrect old password.' });
-    }
-
-    // Hash new password
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(newPassword, salt);
-    await user.save();
-
-    res.status(200).json({ message: 'Password changed successfully.' });
-  } catch (error) {
-    console.error('Change password error:', error);
-    res.status(500).json({ message: 'Server error while changing password.' });
-  }
-};
-
-/**
- * @desc    Request a password reset OTP
- * @route   POST /api/auth/forgot-password
- * @access  Public
- */
-const requestPasswordReset = async (req, res) => {
-  try {
-    const { email } = req.body;
-    // Find user in Operator or Agent collections (Admins might have a different recovery process)
-    let user =
-      (await Operator.findOne({ email })) || (await Agent.findOne({ email }));
-
-    if (!user) {
-      // We send a success response even if the user doesn't exist to prevent email enumeration attacks
-      return res.status(200).json({
-        message:
-          'If a user with that email exists, a password reset OTP has been sent.',
+    if (!token) {
+      return res.status(401).json({
+        message: 'Refresh token missing.',
       });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
-    const otpExpires = new Date(new Date().getTime() + 10 * 60 * 1000); // OTP expires in 10 minutes
+    /*
+    =========================================================================
+    VERIFY TOKEN
+    =========================================================================
+    */
 
-    user.resetPasswordOtp = otp;
-    user.resetPasswordExpires = otpExpires;
-    await user.save();
+    const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
 
-    // --- OTP Sending Logic ---
-    // This is where you would integrate with a service like Twilio (for SMS) or Nodemailer/SendGrid (for email)
-    // For now, we'll just log it to the console and return success.
-    await sendOtp(user.email, otp); // Assumes sendOtp is an async function
-    console.log(`Password reset OTP for ${user.email}: ${otp}`);
-    // --- End OTP Sending Logic ---
+    const userId = decoded.id;
 
-    res.status(200).json({
-      message:
-        'If a user with that email exists, a password reset OTP has been sent.',
-    });
-  } catch (error) {
-    console.error('Forgot password error:', error);
-    res.status(500).json({ message: 'Server error.' });
-  }
-};
+    /*
+    =========================================================================
+    FIND USER
+    =========================================================================
+    */
 
-/**
- * @desc    Verify OTP and set a new password
- * @route   POST /api/auth/reset-password
- * @access  Public
- */
-const verifyOtpAndResetPassword = async (req, res) => {
-  try {
-    const { email, otp, newPassword } = req.body;
-
-    let user =
-      (await Operator.findOne({
-        email,
-        resetPasswordOtp: otp,
-        resetPasswordExpires: { $gt: Date.now() }, // Check if OTP is still valid
-      })) ||
-      (await Agent.findOne({
-        email,
-        resetPasswordOtp: otp,
-        resetPasswordExpires: { $gt: Date.now() },
-      }));
+    const user =
+      (await Admin.findById(userId)) ||
+      (await Operator.findById(userId)) ||
+      (await Agent.findById(userId));
 
     if (!user) {
-      return res
-        .status(400)
-        .json({ message: 'Invalid OTP or OTP has expired.' });
+      return res.status(403).json({
+        message: 'Invalid refresh token.',
+      });
     }
 
-    // Hash new password
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(newPassword, salt);
+    /*
+    =========================================================================
+    CHECK TOKEN EXISTS
+    =========================================================================
+    */
 
-    // Clear OTP fields after successful reset
-    user.resetPasswordOtp = undefined;
-    user.resetPasswordExpires = undefined;
-    await user.save();
-
-    res.status(200).json({ message: 'Password has been reset successfully.' });
-  } catch (error) {
-    console.error('Reset password error:', error);
-    res.status(500).json({ message: 'Server error.' });
-  }
-};
-
-/**
- * @desc    Logout user (UPDATED)
- * @route   POST /api/auth/logout
- * @access  Private
- */
-const logoutUser = async (req, res) => {
-  const token = req.cookies.refreshToken || req.body.refreshToken;
-  if (!token) return res.status(400).json({ message: 'No token found.' });
-
-  try {
-    const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
-    const userId = decoded.userId;
-
-    const user =
-      (await Admin.findById(userId)) ||
-      (await Operator.findById(userId)) ||
-      (await Agent.findById(userId));
-
-    if (user) {
-      user.refreshTokens = user.refreshTokens.filter((t) => t !== token);
-      await user.save();
+    if (!user.refreshTokens.includes(token)) {
+      return res.status(403).json({
+        message: 'Refresh token revoked.',
+      });
     }
 
-    res.clearCookie('refreshToken');
-    return res.status(200).json({ message: 'Logged out successfully' });
-  } catch (err) {
-    return res.status(403).json({ message: 'Invalid token.' });
-  }
-};
-const refreshAccessToken = async (req, res) => {
-  const token = req.cookies.refreshToken || req.body.refreshToken;
+    /*
+    =========================================================================
+    ROLE SETUP
+    =========================================================================
+    */
 
-  if (!token)
-    return res.status(401).json({ message: 'Refresh token missing.' });
+    let role;
+    let operatorId = null;
 
-  try {
-    // 1. Verify token
-    const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
-
-    // 2. Find user
-    const userId = decoded.userId;
-
-    const user =
-      (await Admin.findById(userId)) ||
-      (await Operator.findById(userId)) ||
-      (await Agent.findById(userId));
-
-    if (!user || !user.refreshTokens.includes(token)) {
-      return res.status(403).json({ message: 'Invalid refresh token.' });
-    }
-
-    // 3. Generate new access token
-    let role,
-      operatorId = null;
-    if (user.constructor.modelName === 'Admin') role = 'admin';
-    else if (user.constructor.modelName === 'Operator') {
+    if (user.constructor.modelName === 'Admin') {
+      role = 'admin';
+    } else if (user.constructor.modelName === 'Operator') {
       role = 'operator';
       operatorId = user._id;
     } else {
@@ -292,19 +308,372 @@ const refreshAccessToken = async (req, res) => {
       operatorId = user.operatorId;
     }
 
+    /*
+    =========================================================================
+    NEW ACCESS TOKEN
+    =========================================================================
+    */
+
     const newAccessToken = generateAccessToken(user._id, role, operatorId);
 
-    return res.json({ accessToken: newAccessToken });
-  } catch (err) {
-    return res.status(403).json({ message: 'Token expired or invalid.' });
+    return res.status(200).json({
+      accessToken: newAccessToken,
+    });
+  } catch (error) {
+    console.error('REFRESH TOKEN ERROR:', error);
+
+    return res.status(403).json({
+      message: 'Invalid or expired refresh token.',
+    });
   }
 };
+
+/*
+=============================================================================
+CHANGE PASSWORD
+=============================================================================
+*/
+
+const changePassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+
+    const { id, role } = req.user;
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({
+        message: 'All fields are required.',
+      });
+    }
+
+    /*
+    =========================================================================
+    PASSWORD STRENGTH
+    =========================================================================
+    */
+
+    if (!validatePasswordStrength(newPassword)) {
+      return res.status(400).json({
+        message:
+          'Password must contain uppercase, lowercase, number and special character.',
+      });
+    }
+
+    /*
+    =========================================================================
+    FIND USER
+    =========================================================================
+    */
+
+    let UserCollection;
+
+    if (role === 'admin') {
+      UserCollection = Admin;
+    } else if (role === 'operator') {
+      UserCollection = Operator;
+    } else {
+      UserCollection = Agent;
+    }
+
+    const user = await UserCollection.findById(id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: 'User not found.',
+      });
+    }
+
+    /*
+    =========================================================================
+    OLD PASSWORD CHECK
+    =========================================================================
+    */
+
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+
+    if (!isMatch) {
+      return res.status(400).json({
+        message: 'Incorrect old password.',
+      });
+    }
+
+    /*
+    =========================================================================
+    UPDATE PASSWORD
+    =========================================================================
+    */
+
+    const salt = await bcrypt.genSalt(10);
+
+    user.password = await bcrypt.hash(newPassword, salt);
+
+    /*
+    =========================================================================
+    REVOKE ALL TOKENS
+    =========================================================================
+    */
+
+    user.refreshTokens = [];
+
+    await user.save();
+
+    return res.status(200).json({
+      message: 'Password changed successfully. Please login again.',
+    });
+  } catch (error) {
+    console.error('CHANGE PASSWORD ERROR:', error);
+
+    return res.status(500).json({
+      message: 'Server error while changing password.',
+    });
+  }
+};
+
+/*
+=============================================================================
+FORGOT PASSWORD
+=============================================================================
+*/
+
+const requestPasswordReset = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user =
+      (await Operator.findOne({ email })) || (await Agent.findOne({ email }));
+
+    /*
+    =========================================================================
+    PREVENT EMAIL ENUMERATION
+    =========================================================================
+    */
+
+    if (!user) {
+      return res.status(200).json({
+        message: 'If account exists, OTP has been sent.',
+      });
+    }
+
+    /*
+    =========================================================================
+    OTP
+    =========================================================================
+    */
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    user.resetPasswordOtp = otp;
+
+    user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
+
+    await user.save();
+
+    /*
+    =========================================================================
+    SEND OTP
+    =========================================================================
+    */
+
+    await sendOtp(user.email, otp);
+
+    return res.status(200).json({
+      message: 'If account exists, OTP has been sent.',
+    });
+  } catch (error) {
+    console.error('FORGOT PASSWORD ERROR:', error);
+
+    return res.status(500).json({
+      message: 'Server error.',
+    });
+  }
+};
+
+/*
+=============================================================================
+VERIFY OTP & RESET PASSWORD
+=============================================================================
+*/
+
+const verifyOtpAndResetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    /*
+    =========================================================================
+    PASSWORD STRENGTH
+    =========================================================================
+    */
+
+    if (!validatePasswordStrength(newPassword)) {
+      return res.status(400).json({
+        message:
+          'Password must contain uppercase, lowercase, number and special character.',
+      });
+    }
+
+    /*
+    =========================================================================
+    FIND USER
+    =========================================================================
+    */
+
+    const user =
+      (await Operator.findOne({
+        email,
+
+        resetPasswordOtp: otp,
+
+        resetPasswordExpires: {
+          $gt: Date.now(),
+        },
+      })) ||
+      (await Agent.findOne({
+        email,
+
+        resetPasswordOtp: otp,
+
+        resetPasswordExpires: {
+          $gt: Date.now(),
+        },
+      }));
+
+    if (!user) {
+      return res.status(400).json({
+        message: 'Invalid or expired OTP.',
+      });
+    }
+
+    /*
+    =========================================================================
+    UPDATE PASSWORD
+    =========================================================================
+    */
+
+    const salt = await bcrypt.genSalt(10);
+
+    user.password = await bcrypt.hash(newPassword, salt);
+
+    /*
+    =========================================================================
+    CLEAR OTP
+    =========================================================================
+    */
+
+    user.resetPasswordOtp = undefined;
+
+    user.resetPasswordExpires = undefined;
+
+    /*
+    =========================================================================
+    REVOKE TOKENS
+    =========================================================================
+    */
+
+    user.refreshTokens = [];
+
+    await user.save();
+
+    return res.status(200).json({
+      message: 'Password reset successful.',
+    });
+  } catch (error) {
+    console.error('RESET PASSWORD ERROR:', error);
+
+    return res.status(500).json({
+      message: 'Server error.',
+    });
+  }
+};
+
+/*
+=============================================================================
+LOGOUT
+=============================================================================
+*/
+
+const logoutUser = async (req, res) => {
+  try {
+    const token = req.cookies.refreshToken || req.body.refreshToken;
+
+    if (!token) {
+      return res.status(400).json({
+        message: 'Refresh token missing.',
+      });
+    }
+
+    /*
+    =========================================================================
+    VERIFY TOKEN
+    =========================================================================
+    */
+
+    const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+
+    const userId = decoded.id;
+
+    /*
+    =========================================================================
+    FIND USER
+    =========================================================================
+    */
+
+    const user =
+      (await Admin.findById(userId)) ||
+      (await Operator.findById(userId)) ||
+      (await Agent.findById(userId));
+
+    if (!user) {
+      return res.status(404).json({
+        message: 'User not found.',
+      });
+    }
+
+    /*
+    =========================================================================
+    REMOVE TOKEN
+    =========================================================================
+    */
+
+    user.refreshTokens = user.refreshTokens.filter((t) => t !== token);
+
+    await user.save();
+
+    /*
+    =========================================================================
+    CLEAR COOKIE
+    =========================================================================
+    */
+
+    res.clearCookie('refreshToken');
+
+    return res.status(200).json({
+      message: 'Logged out successfully.',
+    });
+  } catch (error) {
+    console.error('LOGOUT ERROR:', error);
+
+    return res.status(500).json({
+      message: 'Logout failed.',
+    });
+  }
+};
+
+/*
+=============================================================================
+EXPORTS
+=============================================================================
+*/
+
 module.exports = {
   loginUser,
+
   refreshAccessToken,
+
   changePassword,
+
   requestPasswordReset,
+
   verifyOtpAndResetPassword,
+
   logoutUser,
-  refreshAccessToken,
 };

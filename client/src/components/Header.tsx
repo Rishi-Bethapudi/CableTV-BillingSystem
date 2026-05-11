@@ -1,13 +1,17 @@
-// src/components/Header.tsx
 import { useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+
 import { useLayout } from '@/components/layouts/LayoutContext';
 import { usePlatform } from '@/hooks/usePlatform';
+
 import { Menu, Search, Bell, User, X, ChevronLeft } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Sidebar } from './Sidebar'; // Assuming you have a Sidebar component
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,10 +21,24 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+import { Sidebar } from './Sidebar';
+import { logout } from '@/redux/slices/authSlice';
+
 export function Header() {
   const { isNative } = usePlatform();
   const { headerTitle, headerActions } = useLayout();
+
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  const handleLogout = () => {
+    dispatch(logout());
+
+    // redirect after logout
+    navigate('/login');
+  };
 
   // --- Web Header ---
   const WebHeader = () => (
@@ -28,27 +46,56 @@ export function Header() {
       <div className="flex-1">
         <h1 className="text-lg font-semibold">{headerTitle}</h1>
       </div>
+
       <div className="relative flex-1">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+
         <Input placeholder="Search customers, products..." className="pl-10" />
       </div>
+
       <div className="flex items-center gap-2">
+        {/* Notifications */}
         <Button variant="ghost" size="icon">
           <Bell className="h-5 w-5" />
         </Button>
+
+        {/* Profile Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full">
               <User className="h-5 w-5" />
             </Button>
           </DropdownMenuTrigger>
+
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
+
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Settings</DropdownMenuItem>
-            <DropdownMenuItem>Support</DropdownMenuItem>
+
+            {/* Profile */}
+            <DropdownMenuItem onClick={() => navigate('/profilepage')}>
+              Profile
+            </DropdownMenuItem>
+
+            {/* Settings */}
+            <DropdownMenuItem onClick={() => navigate('/settings')}>
+              Settings
+            </DropdownMenuItem>
+
+            {/* Support */}
+            <DropdownMenuItem onClick={() => navigate('/contact')}>
+              Support
+            </DropdownMenuItem>
+
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Logout</DropdownMenuItem>
+
+            {/* Logout */}
+            <DropdownMenuItem
+              onClick={handleLogout}
+              className="text-red-500 focus:text-red-500"
+            >
+              Logout
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

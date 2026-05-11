@@ -1,268 +1,443 @@
 const Operator = require('../models/operator.model');
 const Agent = require('../models/agent.model');
+const Admin = require('../models/admin.model');
+
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 
 /*
-================================================================================================
-                                        OPERATOR PROFILE LOGIC
-================================================================================================
+=============================================================================
+GET OPERATOR PROFILE
+=============================================================================
 */
 
-/**
- * @desc    Get the profile of the logged-in operator
- * @route   GET /api/operators/profile
- * @access  Private (Operator only)
- */
 const getOperatorProfile = async (req, res) => {
   try {
-    // req.user.id is the operator's ID from the JWT token
     const operator = await Operator.findById(req.user.id).select(
-      '-password -resetPasswordOtp -resetPasswordExpires'
+      '-password -refreshTokens',
     );
 
     if (!operator) {
-      return res.status(404).json({ message: 'Operator profile not found.' });
+      return res.status(404).json({
+        message: 'Operator not found',
+      });
     }
 
     res.status(200).json(operator);
   } catch (error) {
-    console.error('Error fetching operator profile:', error);
-    res.status(500).json({ message: 'Server error while fetching profile.' });
-  }
-};
+    console.error(error);
 
-/**
- * @desc    Update the profile of the logged-in operator
- * @route   PUT /api/operators/profile
- * @access  Private (Operator only)
- */
-const updateOperatorProfile = async (req, res) => {
-  try {
-    // Fields that should not be updatable via this route
-    delete req.body.password;
-    delete req.body.subscription;
-    delete req.body.serialNumber;
-    delete req.body.role;
-
-    const updatedOperator = await Operator.findByIdAndUpdate(
-      req.user.id,
-      { $set: req.body },
-      { new: true, runValidators: true }
-    ).select('-password');
-
-    if (!updatedOperator) {
-      return res.status(404).json({ message: 'Operator not found.' });
-    }
-
-    res.status(200).json(updatedOperator);
-  } catch (error) {
-    console.error('Error updating operator profile:', error);
-    res.status(500).json({ message: 'Server error while updating profile.' });
+    res.status(500).json({
+      message: 'Server error while fetching operator profile',
+    });
   }
 };
 
 /*
-================================================================================================
-                                        AGENT MANAGEMENT LOGIC
-================================================================================================
+=============================================================================
+UPDATE OPERATOR PROFILE
+=============================================================================
 */
 
-/**
- * @desc    Create a new agent under the logged-in operator
- * @route   POST /api/operators/agents
- * @access  Private (Operator only)
- */
+const updateOperatorProfile = async (req, res) => {
+  try {
+    delete req.body.password;
+    delete req.body.subscription;
+    delete req.body.refreshTokens;
+    delete req.body.agentsAllowed;
+    delete req.body.supervisorsAllowed;
+    delete req.body.agentsUsed;
+    delete req.body.supervisorsUsed;
+
+    const updatedOperator = await Operator.findByIdAndUpdate(
+      req.user.id,
+      {
+        $set: req.body,
+      },
+      {
+        new: true,
+        runValidators: true,
+      },
+    ).select('-password');
+
+    res.status(200).json(updatedOperator);
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      message: 'Server error while updating profile',
+    });
+  }
+};
+
+/*
+=============================================================================
+CREATE AGENT
+=============================================================================
+*/
+
 const createAgent = async (req, res) => {
   try {
-    const { name, email, password, mobile } = req.body;
-
-    if (!name || !email || !password || !mobile) {
-      return res.status(400).json({
-        message:
-          'Please provide name, email, password, and mobile for the agent.',
-      });
-    }
-
-    // Check if an agent with this email already exists for this operator
-    const existingAgent = await Agent.findOne({
-      email,
-      operatorId: req.user.id,
-    });
-    if (existingAgent) {
-      return res.status(409).json({
-        message: 'An agent with this email already exists under your account.',
-      });
-    }
-
-    // Also check if email is used by an operator or admin
-    const otherUser =
-      (await Operator.findOne({ email })) ||
-      (await require('../models/admin.model').findOne({ email }));
-    if (otherUser) {
-      return res
-        .status(409)
-        .json({ message: 'This email is already registered in the system.' });
-    }
-
-    // Hash the password before saving
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const newAgent = new Agent({
+    const {
       name,
       email,
-      password: hashedPassword,
+      password,
       mobile,
-      operatorId: req.user.id, // Link agent to the operator creating them
+      role,
+      permissions,
+      assignedAreas,
+      supervisorId,
+    } = req.body;
+
+    if (!name || !password || !mobile) {
+      return res.status(400).json({
+        message: 'Name, password and mobile are required',
+      });
+    }
+
+    /*
+    -------------------------------------------------------------------------
+    CHECK OPERATOR
+    -------------------------------------------------------------------------
+    */
+
+    const operator = await Operator.findById(req.user.id);
+
+    if (!operator) {
+      return res.status(404).json({
+        message: 'Operator not found',
+      });
+    }
+
+    /*
+    -------------------------------------------------------------------------
+    ENFORCE AGENT LIMITS
+    -------------------------------------------------------------------------
+    */
+
+    if (operator.agentsUsed >= operator.agentsAllowed) {
+      return res.status(400).json({
+        message: `Agent limit of ${operator.agentsAllowed} reached`,
+      });
+    }
+
+    /*
+    -------------------------------------------------------------------------
+    CHECK EXISTING MOBILE
+    -------------------------------------------------------------------------
+    */
+
+    const existingMobile = await Agent.findOne({
+      mobile,
+      isDeleted: false,
     });
 
-    const savedAgent = await newAgent.save();
+    if (existingMobile) {
+      return res.status(409).json({
+        message: 'Mobile already registered',
+      });
+    }
 
-    // Don't send the password back in the response
-    const agentResponse = savedAgent.toObject();
-    delete agentResponse.password;
+    /*
+    -------------------------------------------------------------------------
+    CHECK EXISTING EMAIL
+    -------------------------------------------------------------------------
+    */
 
-    res.status(201).json(agentResponse);
+    if (email) {
+      const existingEmail =
+        (await Agent.findOne({ email })) ||
+        (await Operator.findOne({ email })) ||
+        (await Admin.findOne({ email }));
+
+      if (existingEmail) {
+        return res.status(409).json({
+          message: 'Email already exists',
+        });
+      }
+    }
+
+    /*
+    -------------------------------------------------------------------------
+    HASH PASSWORD
+    -------------------------------------------------------------------------
+    */
+
+    const salt = await bcrypt.genSalt(10);
+
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    /*
+    -------------------------------------------------------------------------
+    CREATE AGENT
+    -------------------------------------------------------------------------
+    */
+
+    const newAgent = await Agent.create({
+      operatorId: req.user.id,
+      supervisorId: supervisorId || null,
+
+      name,
+      email,
+      mobile,
+
+      password: hashedPassword,
+
+      role: role || 'field_agent',
+
+      permissions: permissions || [],
+
+      assignedAreas: assignedAreas || [],
+    });
+
+    /*
+    -------------------------------------------------------------------------
+    UPDATE OPERATOR COUNTS
+    -------------------------------------------------------------------------
+    */
+
+    operator.agents.push(newAgent._id);
+    operator.agentsUsed = operator.agents.length;
+
+    await operator.save();
+
+    /*
+    -------------------------------------------------------------------------
+    RESPONSE
+    -------------------------------------------------------------------------
+    */
+
+    const response = newAgent.toObject();
+
+    delete response.password;
+    delete response.refreshTokens;
+
+    res.status(201).json(response);
   } catch (error) {
-    console.error('Error creating agent:', error);
-    res.status(500).json({ message: 'Server error while creating agent.' });
+    console.error(error);
+
+    res.status(500).json({
+      message: 'Server error while creating agent',
+    });
   }
 };
 
-/**
- * @desc    Get all agents for the logged-in operator
- * @route   GET /api/operators/agents
- * @access  Private (Operator only)
- */
+/*
+=============================================================================
+GET ALL AGENTS
+=============================================================================
+*/
+
 const getAgents = async (req, res) => {
   try {
-    const agents = await Agent.find({ operatorId: req.user.id }).select(
-      '-password'
-    );
+    const agents = await Agent.find({
+      operatorId: req.user.id,
+      isDeleted: false,
+    })
+      .select('-password -refreshTokens')
+      .populate('assignedAreas', 'name code')
+      .populate('supervisorId', 'name');
+
     res.status(200).json(agents);
   } catch (error) {
-    console.error('Error fetching agents:', error);
-    res.status(500).json({ message: 'Server error while fetching agents.' });
+    console.error(error);
+
+    res.status(500).json({
+      message: 'Server error while fetching agents',
+    });
   }
 };
 
-/**
- * @desc    Update an agent's details
- * @route   PUT /api/operators/agents/:agentId
- * @access  Private (Operator only)
- */
+/*
+=============================================================================
+UPDATE AGENT
+=============================================================================
+*/
+
 const updateAgent = async (req, res) => {
   try {
     const { agentId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(agentId)) {
-      return res.status(400).json({ message: 'Invalid agent ID format.' });
-    }
 
-    // Prevent password from being updated here
-    delete req.body.operatorId;
+    if (!mongoose.Types.ObjectId.isValid(agentId)) {
+      return res.status(400).json({
+        message: 'Invalid agent ID',
+      });
+    }
 
     const agent = await Agent.findOne({
       _id: agentId,
       operatorId: req.user.id,
+      isDeleted: false,
     });
 
     if (!agent) {
       return res.status(404).json({
-        message: 'Agent not found or you do not have permission to update.',
+        message: 'Agent not found',
       });
     }
+
+    /*
+    -------------------------------------------------------------------------
+    PROTECTED FIELDS
+    -------------------------------------------------------------------------
+    */
+
+    delete req.body.operatorId;
+    delete req.body.refreshTokens;
+    delete req.body.isDeleted;
+    delete req.body.deletedAt;
+
+    /*
+    -------------------------------------------------------------------------
+    HASH PASSWORD IF PRESENT
+    -------------------------------------------------------------------------
+    */
+
     if (req.body.password) {
       const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(req.body.password, salt);
-      req.body.password = hashedPassword;
+
+      req.body.password = await bcrypt.hash(req.body.password, salt);
+
+      req.body.passwordChangedAt = new Date();
     }
+
     const updatedAgent = await Agent.findByIdAndUpdate(
       agentId,
-      { $set: req.body },
-      { new: true }
-    ).select('-password');
+      {
+        $set: req.body,
+      },
+      {
+        new: true,
+        runValidators: true,
+      },
+    )
+      .select('-password -refreshTokens')
+      .populate('assignedAreas', 'name code');
 
     res.status(200).json(updatedAgent);
   } catch (error) {
-    console.error('Error updating agent:', error);
-    res.status(500).json({ message: 'Server error while updating agent.' });
+    console.error(error);
+
+    res.status(500).json({
+      message: 'Server error while updating agent',
+    });
   }
 };
 
-/**
- * @desc    Delete an agent
- * @route   DELETE /api/operators/agents/:agentId
- * @access  Private (Operator only)
- */
+/*
+=============================================================================
+DELETE AGENT (SOFT DELETE)
+=============================================================================
+*/
+
 const deleteAgent = async (req, res) => {
   try {
     const { agentId } = req.params;
+
     if (!mongoose.Types.ObjectId.isValid(agentId)) {
-      return res.status(400).json({ message: 'Invalid agent ID format.' });
+      return res.status(400).json({
+        message: 'Invalid agent ID',
+      });
     }
 
     const agent = await Agent.findOne({
       _id: agentId,
       operatorId: req.user.id,
+      isDeleted: false,
     });
 
     if (!agent) {
       return res.status(404).json({
-        message: 'Agent not found or you do not have permission to delete.',
+        message: 'Agent not found',
       });
     }
 
-    await Agent.findByIdAndDelete(agentId);
+    /*
+    -------------------------------------------------------------------------
+    SOFT DELETE
+    -------------------------------------------------------------------------
+    */
 
-    // Optional: Unassign this agent from any customers
-    await Customer.updateMany({ agent: agentId }, { $unset: { agent: '' } });
+    agent.isDeleted = true;
+    agent.deletedAt = new Date();
+    agent.status = 'inactive';
 
-    res.status(200).json({ message: 'Agent deleted successfully.' });
+    await agent.save();
+
+    /*
+    -------------------------------------------------------------------------
+    UPDATE OPERATOR COUNTS
+    -------------------------------------------------------------------------
+    */
+
+    await Operator.findByIdAndUpdate(req.user.id, {
+      $pull: {
+        agents: agent._id,
+      },
+      $inc: {
+        agentsUsed: -1,
+      },
+    });
+
+    res.status(200).json({
+      message: 'Agent deleted successfully',
+    });
   } catch (error) {
-    console.error('Error deleting agent:', error);
-    res.status(500).json({ message: 'Server error while deleting agent.' });
+    console.error(error);
+
+    res.status(500).json({
+      message: 'Server error while deleting agent',
+    });
   }
 };
 
-/**
- * @desc    Allows an operator to directly change an agent's password
- * @route   PATCH /api/operators/agents/:agentId/change-password
- * @access  Private (Operator only)
- */
+/*
+=============================================================================
+CHANGE AGENT PASSWORD
+=============================================================================
+*/
+
 const changeAgentPassword = async (req, res) => {
   try {
     const { agentId } = req.params;
+
     const { newPassword } = req.body;
 
     if (!newPassword) {
-      return res.status(400).json({ message: 'New password is required.' });
-    }
-    if (!mongoose.Types.ObjectId.isValid(agentId)) {
-      return res.status(400).json({ message: 'Invalid agent ID format.' });
+      return res.status(400).json({
+        message: 'New password required',
+      });
     }
 
     const agent = await Agent.findOne({
       _id: agentId,
       operatorId: req.user.id,
+      isDeleted: false,
     });
 
     if (!agent) {
-      return res
-        .status(404)
-        .json({ message: 'Agent not found or you do not have permission.' });
+      return res.status(404).json({
+        message: 'Agent not found',
+      });
     }
 
     const salt = await bcrypt.genSalt(10);
+
     agent.password = await bcrypt.hash(newPassword, salt);
+
+    agent.passwordChangedAt = new Date();
+
     await agent.save();
 
-    res.status(200).json({ message: "Agent's password updated successfully." });
+    res.status(200).json({
+      message: 'Password changed successfully',
+    });
   } catch (error) {
-    console.error("Error changing agent's password:", error);
-    res
-      .status(500)
-      .json({ message: "Server error while changing agent's password." });
+    console.error(error);
+
+    res.status(500).json({
+      message: 'Server error while changing password',
+    });
   }
 };
 

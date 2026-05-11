@@ -1,5 +1,13 @@
 const express = require('express');
+
 const router = express.Router();
+
+/*
+=============================================================================
+CONTROLLERS
+=============================================================================
+*/
+
 const {
   getDashboardSummary,
   getIncomeReport,
@@ -7,38 +15,85 @@ const {
   getCollectionAreaSummary,
   getCollectionDetails,
 } = require('../controllers/reports.controller');
-const {
-  authMiddleware,
-  operatorOnly,
-} = require('../middleware/auth.middleware');
-router.use((req, res, next) => {
-  if (req.method === 'OPTIONS') return res.sendStatus(200);
-  next();
-});
-// All reporting routes are for Operators only
-router.use(authMiddleware, operatorOnly);
 
-/**
- * @route   GET /api/reports/dashboard-summary
- * @desc    Get a full summary of all key metrics for the main dashboard.
- * @access  Private (Operator)
- */
-router.get('/dashboard-summary', getDashboardSummary);
+/*
+=============================================================================
+MIDDLEWARES
+=============================================================================
+*/
 
-/**
- * @route   GET /api/reports/income
- * @desc    Get a summary of income, costs, and profit.
- * @access  Private (Operator only)
- * @query   ?period=monthly|yearly
- */
-router.get('/income', getIncomeReport);
+const authMiddleware = require('../middleware/auth.middleware');
 
-/**
- * @route   GET /api/reports/dashboard-stats
- * @desc    Get key performance indicators (KPIs) for the operator's dashboard.
- * @access  Private (Operator only)
- */
-router.get('/dashboard-stats', getDashboardStats);
-router.get('/collection-area-summary', getCollectionAreaSummary);
-router.get('/collection-details', getCollectionDetails);
+const allowRoles = require('../middleware/role.middleware');
+
+const checkPermissions = require('../middleware/permission.middleware');
+
+/*
+=============================================================================
+GLOBAL PROTECTION
+=============================================================================
+*/
+
+router.use(authMiddleware);
+
+router.use(allowRoles('operator', 'agent'));
+
+/*
+=============================================================================
+DASHBOARD
+=============================================================================
+*/
+
+router.get(
+  '/dashboard-summary',
+
+  checkPermissions('VIEW_REPORTS'),
+
+  getDashboardSummary,
+);
+
+router.get(
+  '/dashboard-stats',
+
+  checkPermissions('VIEW_REPORTS'),
+
+  getDashboardStats,
+);
+
+/*
+=============================================================================
+FINANCIAL REPORTS
+=============================================================================
+*/
+
+router.get(
+  '/income',
+
+  checkPermissions('VIEW_FINANCIAL_REPORTS'),
+
+  getIncomeReport,
+);
+
+/*
+=============================================================================
+COLLECTION REPORTS
+=============================================================================
+*/
+
+router.get(
+  '/collection-area-summary',
+
+  checkPermissions('VIEW_COLLECTION_REPORTS'),
+
+  getCollectionAreaSummary,
+);
+
+router.get(
+  '/collection-details',
+
+  checkPermissions('VIEW_COLLECTION_REPORTS'),
+
+  getCollectionDetails,
+);
+
 module.exports = router;

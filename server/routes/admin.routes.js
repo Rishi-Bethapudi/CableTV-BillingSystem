@@ -1,42 +1,98 @@
 const express = require('express');
+
 const router = express.Router();
+
+/*
+=============================================================================
+CONTROLLERS
+=============================================================================
+*/
+
 const {
   createOperator,
   getAllOperators,
   getOperatorById,
   updateOperatorSubscription,
 } = require('../controllers/admin.controller');
-const { authMiddleware, adminOnly } = require('../middleware/auth.middleware');
 
-// Apply auth and admin-only middleware to all routes in this file
-router.use(authMiddleware, adminOnly);
+/*
+=============================================================================
+MIDDLEWARES
+=============================================================================
+*/
+
+const authMiddleware = require('../middleware/auth.middleware');
+
+const allowRoles = require('../middleware/role.middleware');
+
+const checkPermissions = require('../middleware/permission.middleware');
+
+/*
+=============================================================================
+GLOBAL ROUTE PROTECTION
+=============================================================================
+*/
+
+router.use(authMiddleware);
+
+router.use(allowRoles('admin'));
+
+/*
+=============================================================================
+ADMIN OPERATOR MANAGEMENT
+=============================================================================
+*/
 
 /**
- * @route   POST /api/admin/operators
- * @desc    Admin creates a new operator (tenant)
- * @access  Private (Admin only)
+ * @route   POST /api/v1/admin/operators
+ * @desc    Create new operator (tenant)
+ * @access  Admin
  */
-router.post('/operators', createOperator);
+router.post(
+  '/operators',
+
+  checkPermissions('CREATE_OPERATOR'),
+
+  createOperator,
+);
 
 /**
- * @route   GET /api/admin/operators
- * @desc    Admin gets a list of all operators
- * @access  Private (Admin only)
+ * @route   GET /api/v1/admin/operators
+ * @desc    Get all operators
+ * @access  Admin
  */
-router.get('/operators', getAllOperators);
+router.get(
+  '/operators',
+
+  checkPermissions('VIEW_OPERATORS'),
+
+  getAllOperators,
+);
 
 /**
- * @route   GET /api/admin/operators/:operatorId
- * @desc    Admin gets a single operator's details
- * @access  Private (Admin only)
+ * @route   GET /api/v1/admin/operators/:operatorId
+ * @desc    Get single operator details
+ * @access  Admin
  */
-router.get('/operators/:operatorId', getOperatorById);
+router.get(
+  '/operators/:operatorId',
+
+  checkPermissions('VIEW_OPERATORS'),
+
+  getOperatorById,
+);
 
 /**
- * @route   PATCH /api/admin/operators/:operatorId/subscription
- * @desc    Admin updates an operator's subscription status or dates
- * @access  Private (Admin only)
+ * @route   PATCH /api/v1/admin/operators/:operatorId/subscription
+ * @desc    Update operator subscription
+ * @access  Admin
  */
-router.patch('/operators/:operatorId/subscription', updateOperatorSubscription);
+router.patch(
+  '/operators/:operatorId/subscription',
+
+  checkPermissions('MANAGE_SUBSCRIPTIONS'),
+
+  updateOperatorSubscription,
+);
 
 module.exports = router;
