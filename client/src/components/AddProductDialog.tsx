@@ -21,6 +21,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import apiClient from '@/utils/apiClient';
 import type { ProductForm } from '@/utils/data';
+import { RefreshCw } from 'lucide-react';
 
 interface AddProductDialogProps {
   open: boolean;
@@ -241,7 +242,15 @@ export function AddProductDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? 'Adding...' : 'Add Product'}
+              {loading ? (
+                <>
+                  (
+                  <RefreshCw size={13} className="animate-spin mr-1.5" />{' '}
+                  Adding...)
+                </>
+              ) : (
+                'Add Product'
+              )}
             </Button>
           </DialogFooter>
         </form>

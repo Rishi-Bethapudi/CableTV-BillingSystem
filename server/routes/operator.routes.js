@@ -10,6 +10,7 @@ CONTROLLERS
 
 const {
   createAgent,
+  getAgent,
   getAgents,
   updateAgent,
   deleteAgent,
@@ -75,7 +76,6 @@ router.post(
 
   createAgent,
 );
-
 router.get(
   '/agents',
 
@@ -83,6 +83,7 @@ router.get(
 
   getAgents,
 );
+router.get('/agents/:agentId', checkPermissions('VIEW_AGENTS'), getAgent);
 
 router.put(
   '/agents/:agentId',

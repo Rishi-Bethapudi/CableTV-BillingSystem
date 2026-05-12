@@ -1,4 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+
+import apiClient from '@/utils/apiClient';
+import AgentForm from '@/components/agent/AgentForm';
+
+import AgentFilters from '@/components/agent/AgentFilters';
+
+import AgentTable from '@/components/agent/AgentTable';
+
+import { Card, CardContent } from '@/components/ui/card';
+
 import {
   Pagination,
   PaginationContent,
@@ -7,100 +17,212 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import AgentForm from '@/components/AgentForm';
-import AgentFilters from '@/components/AgentFilters';
-import AgentTable from '@/components/AgentTable';
+
+interface Agent {
+  _id: string;
+
+  name: string;
+
+  email?: string;
+
+  mobile: string;
+
+  employeeCode?: string;
+
+  status: string;
+
+  totalCollection: number;
+
+  monthlyCollection: number;
+
+  todaysCollection: number;
+}
 
 export default function Agents() {
+  /*
+  =============================================================================
+  STATES
+  =============================================================================
+  */
+
+  const [agents, setAgents] = useState<Agent[]>([]);
+
+  const [loading, setLoading] = useState(true);
+
   const [searchTerm, setSearchTerm] = useState('');
+
   const [statusFilter, setStatusFilter] = useState('all');
+
   const [currentPage, setCurrentPage] = useState(1);
+
   const itemsPerPage = 10;
 
-  const [agents, setAgents] = useState([]); // replace with actual data fetch
+  /*
+  =============================================================================
+  FETCH AGENTS
+  =============================================================================
+  */
 
-  // --- Filtered Agents ---
-  const filteredAgents = agents.filter((agent) => {
-    const matchesSearch =
-      agent.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      agent.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      agent.phone.includes(searchTerm) ||
-      agent.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      agent.agent_code.toLowerCase().includes(searchTerm.toLowerCase());
+  const fetchAgents = async () => {
+    try {
+      setLoading(true);
 
-    const matchesStatus =
-      statusFilter === 'all' || agent.status.toLowerCase() === statusFilter;
+      const response = await apiClient.get('/operators/agents');
 
-    return matchesSearch && matchesStatus;
-  });
+      setAgents(response.data.agents || []);
+    } catch (error) {
+      console.error('FETCH AGENTS ERROR:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // --- Pagination ---
+  /*
+  =============================================================================
+  INITIAL FETCH
+  =============================================================================
+  */
+
+  useEffect(() => {
+    fetchAgents();
+  }, []);
+
+  /*
+  =============================================================================
+  FILTERED AGENTS
+  =============================================================================
+  */
+
+  const filteredAgents = useMemo(() => {
+    return agents.filter((agent) => {
+      const search = searchTerm.toLowerCase();
+
+      const matchesSearch =
+        agent.name?.toLowerCase().includes(search) ||
+        agent.mobile?.includes(searchTerm) ||
+        agent.email?.toLowerCase().includes(search) ||
+        agent.employeeCode?.toLowerCase().includes(search);
+
+      const matchesStatus =
+        statusFilter === 'all' ? true : agent.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [agents, searchTerm, statusFilter]);
+
+  /*
+  =============================================================================
+  PAGINATION
+  =============================================================================
+  */
+
   const totalPages = Math.ceil(filteredAgents.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedAgents = filteredAgents.slice(startIndex, endIndex);
 
-  const handlePageChange = (page: number) => setCurrentPage(page);
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
-    setCurrentPage(1);
-  };
-  const handleStatusFilterChange = (value: string) => {
-    setStatusFilter(value);
-    setCurrentPage(1);
-  };
+  const startIndex = (currentPage - 1) * itemsPerPage;
+
+  const paginatedAgents = filteredAgents.slice(
+    startIndex,
+    startIndex + itemsPerPage,
+  );
+
+  /*
+  =============================================================================
+  FILTER HANDLERS
+  =============================================================================
+  */
+
   const clearFilters = () => {
     setSearchTerm('');
+
     setStatusFilter('all');
+
     setCurrentPage(1);
   };
+
+  /*
+  =============================================================================
+  LOADING STATE
+  =============================================================================
+  */
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-8 w-40 bg-muted rounded animate-pulse" />
+
+            <div className="h-4 w-64 bg-muted rounded animate-pulse mt-2" />
+          </div>
+        </div>
+
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            {Array.from({
+              length: 5,
+            }).map((_, i) => (
+              <div key={i} className="h-14 rounded bg-muted animate-pulse" />
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  /*
+  =============================================================================
+  PAGE
+  =============================================================================
+  */
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* HEADER */}
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-            Agents
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-1">
-            Manage your agents and their details ({filteredAgents.length} of{' '}
+          <h1 className="text-3xl font-bold">Agents</h1>
+
+          <p className="text-muted-foreground mt-1">
+            Manage your field workforce ({filteredAgents.length} of{' '}
             {agents.length})
           </p>
         </div>
-        <AgentForm onAgentCreated={() => {}} />
+
+        <AgentForm onAgentCreated={fetchAgents} />
       </div>
 
-      {/* Filters */}
+      {/* FILTERS */}
+
       <AgentFilters
         searchTerm={searchTerm}
         statusFilter={statusFilter}
-        onSearchChange={handleSearchChange}
-        onStatusFilterChange={handleStatusFilterChange}
+        onSearchChange={(value) => {
+          setSearchTerm(value);
+
+          setCurrentPage(1);
+        }}
+        onStatusFilterChange={(value) => {
+          setStatusFilter(value);
+
+          setCurrentPage(1);
+        }}
         onClearFilters={clearFilters}
       />
 
-      {/* Table or Empty State */}
-      {filteredAgents.length > 0 ? (
-        <AgentTable
-          agents={paginatedAgents}
-          searchTerm={searchTerm}
-          statusFilter={statusFilter}
-        />
-      ) : (
-        <p className="text-center text-slate-500 dark:text-slate-400 mt-8">
-          No agents found matching the filters.
-        </p>
-      )}
+      {/* TABLE */}
 
-      {/* Pagination */}
+      <AgentTable agents={paginatedAgents} />
+
+      {/* PAGINATION */}
+
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4">
-          <div className="text-sm text-slate-600 dark:text-slate-400">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
             Showing {startIndex + 1} to{' '}
-            {Math.min(endIndex, filteredAgents.length)} of{' '}
+            {Math.min(startIndex + itemsPerPage, filteredAgents.length)} of{' '}
             {filteredAgents.length} agents
-          </div>
+          </p>
 
           <Pagination>
             <PaginationContent>
@@ -109,40 +231,34 @@ export default function Agents() {
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
-                    if (currentPage > 1) handlePageChange(currentPage - 1);
+
+                    if (currentPage > 1) {
+                      setCurrentPage(currentPage - 1);
+                    }
                   }}
-                  className={
-                    currentPage === 1 ? 'pointer-events-none opacity-50' : ''
-                  }
                 />
               </PaginationItem>
 
-              {[...Array(totalPages)].map((_, i) => {
-                const page = i + 1;
-                if (
-                  page === 1 ||
-                  page === totalPages ||
-                  (page >= currentPage - 1 && page <= currentPage + 1)
-                ) {
-                  return (
-                    <PaginationItem key={page}>
-                      <PaginationLink
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handlePageChange(page);
-                        }}
-                        isActive={currentPage === page}
-                      >
-                        {page}
-                      </PaginationLink>
-                    </PaginationItem>
-                  );
-                }
-                if (page === currentPage - 2 || page === currentPage + 2) {
-                  return <PaginationItem key={page}>...</PaginationItem>;
-                }
-                return null;
+              {Array.from({
+                length: totalPages,
+              }).map((_, index) => {
+                const page = index + 1;
+
+                return (
+                  <PaginationItem key={page}>
+                    <PaginationLink
+                      href="#"
+                      isActive={currentPage === page}
+                      onClick={(e) => {
+                        e.preventDefault();
+
+                        setCurrentPage(page);
+                      }}
+                    >
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
               })}
 
               <PaginationItem>
@@ -150,14 +266,11 @@ export default function Agents() {
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
-                    if (currentPage < totalPages)
-                      handlePageChange(currentPage + 1);
+
+                    if (currentPage < totalPages) {
+                      setCurrentPage(currentPage + 1);
+                    }
                   }}
-                  className={
-                    currentPage === totalPages
-                      ? 'pointer-events-none opacity-50'
-                      : ''
-                  }
                 />
               </PaginationItem>
             </PaginationContent>

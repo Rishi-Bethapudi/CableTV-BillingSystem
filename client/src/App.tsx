@@ -44,6 +44,7 @@ import LoginPage from './pages/LoginPage';
 
 // OPTIONAL NEW PAGES
 import ProfilePage from './pages/ProfilePage';
+import ManageAgent from './components/agent/ManageAgent';
 
 // import SettingsPage from './pages/settings';
 
@@ -89,7 +90,7 @@ export const AppRoutes = () => {
 
         {/* Agents */}
         <Route path="agents" element={<Agents />} />
-
+        <Route path="/operators/agents/:agentId" element={<ManageAgent />} />
         {/* Expenses */}
         <Route path="expenses" element={<Expenses />} />
 

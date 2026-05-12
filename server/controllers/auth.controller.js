@@ -285,9 +285,11 @@ const refreshAccessToken = async (req, res) => {
     =========================================================================
     */
 
-    if (!user.refreshTokens.includes(token)) {
-      return res.status(403).json({
-        message: 'Refresh token revoked.',
+    const storedRefreshTokens = user.token || [];
+
+    if (!storedRefreshTokens.includes(token)) {
+      return res.status(401).json({
+        message: 'Invalid refresh token',
       });
     }
 
