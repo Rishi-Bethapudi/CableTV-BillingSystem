@@ -17,7 +17,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { SectionCard, ALL_LOCALITIES, PERMISSION_GROUPS } from '../Atoms';
+import { SectionCard, PERMISSION_GROUPS } from '../Atoms';
 import apiClient from '@/utils/apiClient';
 
 // ============================================
@@ -25,7 +25,7 @@ import apiClient from '@/utils/apiClient';
 // ============================================
 export function AssignedAreasCard({ agent, onSave }) {
   // Get operator's localities from Redux store
-  const user = useSelector((state) => state?.auth.user);
+  const user = useSelector((state) => state?.auth?.user);
   const operatorLocalities = user?.localities || [];
 
   const [areas, setAreas] = useState(agent.areas || []);
@@ -205,7 +205,8 @@ export function AssignedAreasCard({ agent, onSave }) {
             </p>
             <p className="text-xs text-amber-600 mt-0.5">
               Please contact your administrator to get localities assigned to
-              your account.
+              your account. Try adding localities to your operator profile
+              first, then refresh this page.
             </p>
           </div>
         </div>
@@ -217,96 +218,35 @@ export function AssignedAreasCard({ agent, onSave }) {
           </p>
         </div>
       ) : (
-        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-          {Object.entries(groupedLocalities).map(([letter, localities]) => {
-            const groupSelected = localities.every((loc) =>
-              selectedAreas.has(loc),
-            );
-            const groupPartial =
-              localities.some((loc) => selectedAreas.has(loc)) &&
-              !groupSelected;
-            const isExpanded = expandedGroups[letter] !== false; // Default expanded
-
-            return (
+        <div className="space-y-1 max-h-[400px] overflow-y-auto pr-2">
+          {filteredLocalities.map((locality) => (
+            <label
+              key={locality}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group border border-transparent hover:border-slate-100"
+            >
+              {/* Checkbox */}
               <div
-                key={letter}
-                className="border border-slate-100 rounded-lg overflow-hidden"
+                onClick={() => toggleArea(locality)}
+                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                  selectedAreas.has(locality)
+                    ? 'bg-slate-900 border-slate-900'
+                    : 'bg-white border-slate-300 group-hover:border-slate-400'
+                }`}
               >
-                {/* Group header */}
-                <div
-                  className="flex items-center justify-between px-3 py-2 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
-                  onClick={() => toggleGroupExpand(letter)}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-                        groupSelected
-                          ? 'bg-slate-900 border-slate-900'
-                          : groupPartial
-                            ? 'bg-slate-200 border-slate-300'
-                            : 'bg-white border-slate-300'
-                      }`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleGroup(localities);
-                      }}
-                    >
-                      {groupSelected && (
-                        <Check size={10} className="text-white" />
-                      )}
-                      {groupPartial && !groupSelected && (
-                        <div className="w-2 h-0.5 bg-slate-700 rounded" />
-                      )}
-                    </div>
-                    <span className="text-sm font-semibold text-slate-700">
-                      {letter}
-                    </span>
-                    <span className="text-xs text-slate-400">
-                      ({localities.length})
-                    </span>
-                  </div>
-                  {isExpanded ? (
-                    <ChevronUp size={14} className="text-slate-400" />
-                  ) : (
-                    <ChevronDown size={14} className="text-slate-400" />
-                  )}
-                </div>
-
-                {/* Group content */}
-                {isExpanded && (
-                  <div className="p-2 space-y-1">
-                    {localities.map((locality) => (
-                      <label
-                        key={locality}
-                        className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group"
-                      >
-                        <div
-                          onClick={() => toggleArea(locality)}
-                          className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                            selectedAreas.has(locality)
-                              ? 'bg-slate-900 border-slate-900'
-                              : 'bg-white border-slate-300 group-hover:border-slate-400'
-                          }`}
-                        >
-                          {selectedAreas.has(locality) && (
-                            <Check size={10} className="text-white" />
-                          )}
-                        </div>
-                        <div
-                          className="flex-1 min-w-0"
-                          onClick={() => toggleArea(locality)}
-                        >
-                          <span className="text-sm text-slate-700">
-                            {locality}
-                          </span>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
+                {selectedAreas.has(locality) && (
+                  <Check size={10} className="text-white" />
                 )}
               </div>
-            );
-          })}
+
+              {/* Locality Name */}
+              <div
+                className="flex-1 min-w-0"
+                onClick={() => toggleArea(locality)}
+              >
+                <span className="text-sm text-slate-700">{locality}</span>
+              </div>
+            </label>
+          ))}
         </div>
       )}
 

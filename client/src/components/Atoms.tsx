@@ -88,24 +88,6 @@ export const PERMISSION_GROUPS = {
   ],
 };
 
-export const ALL_LOCALITIES = [
-  'Kandrapadu',
-  'OBK V Palem',
-  'Gannavaram',
-  'Nuzvid',
-  'Vijayawada Central',
-  'Eluru',
-  'Gudivada',
-  'Machilipatnam',
-  'Tenali',
-  'Bhimavaram',
-  'Narsapur',
-  'Palakol',
-  'Rajam',
-  'Srikakulam',
-  'Narasannapeta',
-];
-
 export const PAYMENT_MODES = ['Cash', 'UPI', 'Online', 'Card', 'NEFT'];
 
 // Role meta derived from ROLES

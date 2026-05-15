@@ -215,17 +215,7 @@ const loginUser = async (req, res) => {
 
       refreshToken,
 
-      user: {
-        id: user._id,
-
-        name: user.name,
-
-        email: user.email,
-
-        role,
-
-        operatorId,
-      },
+      user: user,
     });
   } catch (error) {
     console.error('LOGIN ERROR:', error);

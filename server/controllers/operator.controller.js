@@ -6,6 +6,7 @@ const Transaction = require('../models/transaction.model');
 const Customer = require('../models/customer.model');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 
 /*
 
@@ -269,7 +270,7 @@ GET SINGLE AGENT DETAILS
 =============================================================================
 */
 
-const getAgent = async (req, res) => {
+const getAgentById = async (req, res) => {
   try {
     const { agentId } = req.params;
 
@@ -686,15 +687,27 @@ const updateAgent = async (req, res) => {
   try {
     const { agentId } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(agentId)) {
-      return res.status(400).json({
-        message: 'Invalid agent ID',
-      });
-    }
+    const allowedFields = [
+      'name',
+      'email',
+      'mobile',
+      'address',
+      'role',
+      'employeeCode',
+      'accessScope',
+    ];
+
+    const updates = {};
+
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    });
 
     const agent = await Agent.findOne({
       _id: agentId,
-      operatorId: req.user.id,
+      operatorId: req.user.operatorId,
       isDeleted: false,
     });
 
@@ -705,44 +718,58 @@ const updateAgent = async (req, res) => {
     }
 
     /*
-    -------------------------------------------------------------------------
-    PROTECTED FIELDS
-    -------------------------------------------------------------------------
+    =========================================================================
+    EMAIL DUPLICATE CHECK
+    =========================================================================
     */
 
-    delete req.body.operatorId;
-    delete req.body.refreshTokens;
-    delete req.body.isDeleted;
-    delete req.body.deletedAt;
+    if (updates.email && updates.email !== agent.email) {
+      const existingEmail =
+        (await Agent.findOne({
+          email: updates.email,
+          isDeleted: false,
+        })) ||
+        (await Operator.findOne({
+          email: updates.email,
+        })) ||
+        (await Admin.findOne({
+          email: updates.email,
+        }));
 
-    /*
-    -------------------------------------------------------------------------
-    HASH PASSWORD IF PRESENT
-    -------------------------------------------------------------------------
-    */
-
-    if (req.body.password) {
-      const salt = await bcrypt.genSalt(10);
-
-      req.body.password = await bcrypt.hash(req.body.password, salt);
-
-      req.body.passwordChangedAt = new Date();
+      if (existingEmail) {
+        return res.status(409).json({
+          message: 'Email already exists',
+        });
+      }
     }
 
-    const updatedAgent = await Agent.findByIdAndUpdate(
-      agentId,
-      {
-        $set: req.body,
-      },
-      {
-        new: true,
-        runValidators: true,
-      },
-    )
-      .select('-password -refreshTokens')
-      .populate('assignedAreas', 'name code');
+    /*
+    =========================================================================
+    MOBILE DUPLICATE CHECK
+    =========================================================================
+    */
 
-    res.status(200).json(updatedAgent);
+    if (updates.mobile && updates.mobile !== agent.mobile) {
+      const existingMobile = await Agent.findOne({
+        mobile: updates.mobile,
+        isDeleted: false,
+      });
+
+      if (existingMobile) {
+        return res.status(409).json({
+          message: 'Mobile already registered',
+        });
+      }
+    }
+
+    Object.assign(agent, updates);
+
+    await agent.save();
+
+    res.status(200).json({
+      message: 'Agent updated successfully',
+      agent,
+    });
   } catch (error) {
     console.error(error);
 
@@ -819,13 +846,137 @@ const deleteAgent = async (req, res) => {
   }
 };
 
+const updateAgentPermissions = async (req, res) => {
+  try {
+    const { agentId } = req.params;
+
+    const { permissions } = req.body;
+
+    if (!Array.isArray(permissions)) {
+      return res.status(400).json({
+        message: 'Permissions must be an array',
+      });
+    }
+
+    const agent = await Agent.findOne({
+      _id: agentId,
+      operatorId: req.user.operatorId,
+      isDeleted: false,
+    });
+
+    if (!agent) {
+      return res.status(404).json({
+        message: 'Agent not found',
+      });
+    }
+
+    agent.permissions = permissions;
+
+    await agent.save();
+
+    res.status(200).json({
+      message: 'Permissions updated successfully',
+      permissions: agent.permissions,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      message: 'Server error while updating permissions',
+    });
+  }
+};
+
+const updateAgentAreas = async (req, res) => {
+  try {
+    const { agentId } = req.params;
+
+    const { assignedAreas } = req.body;
+
+    if (!Array.isArray(assignedAreas)) {
+      return res.status(400).json({
+        message: 'assignedAreas must be an array',
+      });
+    }
+
+    const agent = await Agent.findOne({
+      _id: agentId,
+      operatorId: req.user.operatorId,
+      isDeleted: false,
+    });
+
+    if (!agent) {
+      return res.status(404).json({
+        message: 'Agent not found',
+      });
+    }
+
+    agent.assignedAreas = assignedAreas;
+
+    await agent.save();
+
+    res.status(200).json({
+      message: 'Assigned areas updated successfully',
+      assignedAreas: agent.assignedAreas,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      message: 'Server error while updating areas',
+    });
+  }
+};
+
+const updateAgentStatus = async (req, res) => {
+  try {
+    const { agentId } = req.params;
+
+    const { status } = req.body;
+
+    const allowedStatuses = ['active', 'inactive', 'suspended'];
+
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        message: 'Invalid status',
+      });
+    }
+
+    const agent = await Agent.findOne({
+      _id: agentId,
+      operatorId: req.user.operatorId,
+      isDeleted: false,
+    });
+
+    if (!agent) {
+      return res.status(404).json({
+        message: 'Agent not found',
+      });
+    }
+
+    agent.status = status;
+
+    await agent.save();
+
+    res.status(200).json({
+      message: 'Agent status updated successfully',
+      status: agent.status,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      message: 'Server error while updating status',
+    });
+  }
+};
 /*
 =============================================================================
 CHANGE AGENT PASSWORD
 =============================================================================
 */
 
-const changeAgentPassword = async (req, res) => {
+const resetAgentPassword = async (req, res) => {
   try {
     const { agentId } = req.params;
 
@@ -869,13 +1020,87 @@ const changeAgentPassword = async (req, res) => {
   }
 };
 
+const loginAsAgent = async (req, res) => {
+  try {
+    const { agentId } = req.params;
+
+    const agent = await Agent.findOne({
+      _id: agentId,
+      operatorId: req.user.operatorId,
+      isDeleted: false,
+      status: 'active',
+    });
+
+    if (!agent) {
+      return res.status(404).json({
+        message: 'Active agent not found',
+      });
+    }
+
+    /*
+    =========================================================================
+    GENERATE ACCESS TOKEN
+    =========================================================================
+    */
+
+    const accessToken = jwt.sign(
+      {
+        id: agent._id,
+
+        role: 'agent',
+      },
+
+      process.env.JWT_SECRET,
+
+      {
+        expiresIn: process.env.JWT_EXPIRES_IN || '15m',
+      },
+    );
+
+    /*
+    =========================================================================
+    AUDIT LOG (OPTIONAL)
+    =========================================================================
+    */
+
+    console.log(`Operator ${req.user.id} logged in as agent ${agent._id}`);
+
+    res.status(200).json({
+      message: 'Logged in as agent successfully',
+
+      accessToken,
+
+      impersonation: true,
+
+      agent: {
+        id: agent._id,
+
+        name: agent.name,
+
+        mobile: agent.mobile,
+
+        role: agent.role,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      message: 'Server error while impersonating agent',
+    });
+  }
+};
 module.exports = {
   getOperatorProfile,
   updateOperatorProfile,
   createAgent,
-  getAgent,
+  getAgentById,
   getAgents,
   updateAgent,
   deleteAgent,
-  changeAgentPassword,
+  updateAgentPermissions,
+  updateAgentAreas,
+  updateAgentStatus,
+  resetAgentPassword,
+  loginAsAgent,
 };

@@ -1,3 +1,5 @@
+// routes/operator.routes.js
+
 const express = require('express');
 
 const router = express.Router();
@@ -10,13 +12,15 @@ CONTROLLERS
 
 const {
   createAgent,
-  getAgent,
   getAgents,
+  getAgentById,
   updateAgent,
+  updateAgentPermissions,
+  updateAgentAreas,
+  updateAgentStatus,
+  resetAgentPassword,
+  loginAsAgent,
   deleteAgent,
-  changeAgentPassword,
-  getOperatorProfile,
-  updateOperatorProfile,
 } = require('../controllers/operator.controller');
 
 /*
@@ -43,70 +47,82 @@ router.use(allowRoles('operator'));
 
 /*
 =============================================================================
-PROFILE
+AGENT CRUD
 =============================================================================
 */
 
-router.get(
-  '/profile',
+router.post('/agents', checkPermissions('CREATE_AGENTS'), createAgent);
 
-  checkPermissions('VIEW_PROFILE'),
+router.get('/agents', checkPermissions('VIEW_AGENTS'), getAgents);
 
-  getOperatorProfile,
-);
+router.get('/agents/:agentId', checkPermissions('VIEW_AGENTS'), getAgentById);
 
-router.put(
-  '/profile',
+router.patch('/agents/:agentId', checkPermissions('EDIT_AGENTS'), updateAgent);
 
-  checkPermissions('EDIT_PROFILE'),
-
-  updateOperatorProfile,
+router.delete(
+  '/agents/:agentId',
+  checkPermissions('DELETE_AGENTS'),
+  deleteAgent,
 );
 
 /*
 =============================================================================
-AGENTS
+AGENT PERMISSIONS
+=============================================================================
+*/
+
+router.patch(
+  '/agents/:agentId/permissions',
+  checkPermissions('EDIT_AGENTS'),
+  updateAgentPermissions,
+);
+
+/*
+=============================================================================
+AGENT AREA ASSIGNMENT
+=============================================================================
+*/
+
+router.patch(
+  '/agents/:agentId/areas',
+  checkPermissions('ASSIGN_AREAS'),
+  updateAgentAreas,
+);
+
+/*
+=============================================================================
+AGENT STATUS
+=============================================================================
+*/
+
+router.patch(
+  '/agents/:agentId/status',
+  checkPermissions('EDIT_AGENTS'),
+  updateAgentStatus,
+);
+
+/*
+=============================================================================
+RESET AGENT PASSWORD
 =============================================================================
 */
 
 router.post(
-  '/agents',
-
-  checkPermissions('CREATE_AGENTS'),
-
-  createAgent,
+  '/agents/:agentId/reset-password',
+  checkPermissions('EDIT_AGENTS'),
+  resetAgentPassword,
 );
-router.get(
-  '/agents',
 
+/*
+=============================================================================
+LOGIN AS AGENT
+=============================================================================
+*/
+
+router.post(
+  '/agents/:agentId/login-as-agent',
   checkPermissions('VIEW_AGENTS'),
-
-  getAgents,
-);
-router.get('/agents/:agentId', checkPermissions('VIEW_AGENTS'), getAgent);
-
-router.put(
-  '/agents/:agentId',
-
-  checkPermissions('EDIT_AGENTS'),
-
-  updateAgent,
-);
-
-router.delete(
-  '/agents/:agentId',
-
-  checkPermissions('DELETE_AGENTS'),
-
-  deleteAgent,
-);
-
-router.patch(
-  '/agents/:agentId/change-password',
-
-  checkPermissions('EDIT_AGENTS'),
-
-  changeAgentPassword,
+  loginAsAgent,
 );
 
 module.exports = router;
