@@ -9,6 +9,10 @@ import {
   Eye,
   X,
   Printer,
+  Calendar,
+  Clock,
+  Users,
+  IndianRupee,
 } from 'lucide-react';
 import {
   Dialog,
@@ -21,61 +25,6 @@ import { SectionCard, fmtINR, fmtDate, fmtTime } from '../Atoms';
 import * as XLSX from 'xlsx';
 
 const PERF_PAGE_SIZE = 6;
-
-// Mock transactions data
-const MOCK_TRANSACTIONS = Array.from({ length: 18 }, (_, i) => ({
-  id: `TXN-${String(1000 + i).padStart(4, '0')}`,
-  transactionId: `IVO${11076 + i}`,
-  customer: [
-    'C. Ramesh',
-    'P. Latha',
-    'K. Suresh',
-    'M. Anand',
-    'S. Devi',
-    'R. Pillai',
-  ][i % 6],
-  customerCode: [
-    '100740915',
-    '100740916',
-    '100740917',
-    '100740918',
-    '100740919',
-    '100740920',
-  ][i % 6],
-  customerPhone: [
-    '6309436569',
-    '9441995758',
-    '9876543210',
-    '9123456789',
-    '9988776655',
-    '9876543211',
-  ][i % 6],
-  customerAddress: [
-    'Colony Lane 1, Kandrapadu',
-    'Main Road, OBK V Palem',
-    'GNR Towers, Gannavaram',
-    'Prasadampadu, Vijayawada',
-    'Temple Street, Nuzvid',
-    'Bus Stand Road, Eluru',
-  ][i % 6],
-  area: ['Kandrapadu', 'OBK V Palem', 'Gannavaram'][i % 3],
-  amount: [499, 699, 349, 849, 249, 599][i % 6],
-  item: [
-    'APSFL Basic',
-    'APSFL Premium',
-    'APSFL Standard',
-    'APSFL Basic Plus',
-    'APSFL Family',
-    'APSFL Basic',
-  ][i % 6],
-  date: new Date(Date.now() - i * 86400000 * 0.7).toISOString(),
-  mode: ['Cash', 'UPI', 'Online', 'Card', 'NEFT'][i % 5],
-  status: i % 7 === 0 ? 'pending' : 'collected',
-  invoiceDate: '07-May-2026',
-  billingPeriod: '07-May-2026 to 05-Jun-2026',
-  stbName: 'DASAN - Corpus',
-  stbId: `DSNW202de${String(100 + i).slice(1)}`,
-}));
 
 // Bill Preview Component
 function BillPreviewModal({ transaction, open, onClose }) {
@@ -97,7 +46,7 @@ function BillPreviewModal({ transaction, open, onClose }) {
             </Button>
           </DialogTitle>
           <DialogDescription>
-            Invoice #{transaction.transactionId}
+            Invoice #{transaction.transactionId || transaction.id}
           </DialogDescription>
         </DialogHeader>
 
@@ -122,11 +71,11 @@ function BillPreviewModal({ transaction, open, onClose }) {
             <div>
               <p>
                 <span className="font-semibold">Invoice No:</span>{' '}
-                {transaction.transactionId}
+                {transaction.transactionId || transaction.id}
               </p>
               <p>
                 <span className="font-semibold">Invoice Date:</span>{' '}
-                {transaction.invoiceDate}
+                {transaction.invoiceDate || fmtDate(transaction.date)}
               </p>
             </div>
           </div>
@@ -134,19 +83,19 @@ function BillPreviewModal({ transaction, open, onClose }) {
           {/* Bill To */}
           <div className="border-t border-b py-3 text-sm">
             <p className="font-semibold">Bill To:</p>
-            <p>{transaction.customer}</p>
-            <p>{transaction.customerAddress}</p>
+            <p>{transaction.customerName || transaction.customer}</p>
+            <p>{transaction.customerAddress || 'Address not available'}</p>
             <p>
               <span className="font-semibold">Customer Code:</span>{' '}
-              {transaction.customerCode}
+              {transaction.customerCode || 'N/A'}
             </p>
             <p>
               <span className="font-semibold">Phone:</span>{' '}
-              {transaction.customerPhone}
+              {transaction.customerPhone || transaction.mobile || 'N/A'}
             </p>
             <p>
               <span className="font-semibold">Date:</span>{' '}
-              {transaction.billingPeriod}
+              {transaction.billingPeriod || fmtDate(transaction.date)}
             </p>
             <p>
               <span className="font-semibold">Created By:</span> MAHI
@@ -169,7 +118,9 @@ function BillPreviewModal({ transaction, open, onClose }) {
             <tbody>
               <tr className="border-b">
                 <td className="p-2">1</td>
-                <td className="p-2">{transaction.item}</td>
+                <td className="p-2">
+                  {transaction.item || 'Broadband Service'}
+                </td>
                 <td className="p-2">1</td>
                 <td className="p-2">-</td>
                 <td className="p-2">₹0</td>
@@ -181,9 +132,9 @@ function BillPreviewModal({ transaction, open, onClose }) {
           {/* Hardware Detail */}
           <div className="border-t pt-3 text-sm">
             <p className="font-semibold">Hardware Detail:</p>
-            <p>Stb Name: {transaction.stbName}</p>
-            <p>Stb: {transaction.stbId}</p>
-            <p>Mem. no: {transaction.customerCode}</p>
+            <p>Stb Name: {transaction.stbName || 'N/A'}</p>
+            <p>Stb: {transaction.stbId || 'N/A'}</p>
+            <p>Mem. no: {transaction.customerCode || 'N/A'}</p>
           </div>
 
           {/* Footer */}
@@ -246,18 +197,21 @@ function ExportOptionsDialog({ open, onClose, onExport, collections }) {
     }
 
     const excelData = dataToExport.map((txn) => ({
-      'Transaction ID': txn.transactionId,
-      'Customer Name': txn.customer,
+      'Transaction ID': txn.transactionId || txn.id,
+      'Customer Name': txn.customerName || txn.customer,
       'Customer Code': txn.customerCode,
-      Phone: txn.customerPhone,
+      Phone: txn.customerPhone || txn.mobile,
       Area: txn.area,
-      Item: txn.item,
+      Item: txn.item || 'Broadband Service',
       Amount: txn.amount,
       Date: fmtDate(txn.date),
       Time: fmtTime(txn.date),
-      'Payment Mode': txn.mode,
-      Status: txn.status === 'collected' ? 'Collected' : 'Pending',
-      'Billing Period': txn.billingPeriod,
+      'Payment Mode': txn.mode || txn.paymentMode,
+      Status:
+        txn.status === 'collected' || txn.status === 'completed'
+          ? 'Collected'
+          : 'Pending',
+      'Billing Period': txn.billingPeriod || fmtDate(txn.date),
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -335,13 +289,14 @@ function ExportOptionsDialog({ open, onClose, onExport, collections }) {
 
 export function CollectionPerformanceCard({ agent }) {
   const s = agent.stats;
+  const transactions = agent.recentTransactions || [];
   const [page, setPage] = useState(1);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [showBillModal, setShowBillModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
 
-  const totalPages = Math.ceil(MOCK_TRANSACTIONS.length / PERF_PAGE_SIZE);
-  const paginated = MOCK_TRANSACTIONS.slice(
+  const totalPages = Math.ceil(transactions.length / PERF_PAGE_SIZE);
+  const paginated = transactions.slice(
     (page - 1) * PERF_PAGE_SIZE,
     page * PERF_PAGE_SIZE,
   );
@@ -354,6 +309,15 @@ export function CollectionPerformanceCard({ agent }) {
   const handleExport = (option) => {
     console.log(`Exported ${option} collections`);
   };
+
+  // Calculate pending collections (you may need to adjust this based on your data)
+  const pendingCollections = transactions.filter(
+    (t) => t.status === 'pending' || t.status === 'due',
+  ).length;
+
+  // Calculate average daily collections
+  const avgDailyCollections =
+    s.totalCollections > 0 ? (s.totalCollections / 30).toFixed(1) : 0;
 
   // Summary cards - Updated to show more relevant info
   const summaryCards = [
@@ -369,26 +333,50 @@ export function CollectionPerformanceCard({ agent }) {
       value: s.monthCollections,
       amount: fmtINR(s.monthAmount),
       color: 'border-blue-200 bg-blue-50',
+      icon: Calendar,
     },
     {
       label: 'Today',
       value: s.todayCollections,
       amount: fmtINR(s.todayAmount),
       color: 'border-emerald-200 bg-emerald-50',
+      icon: Clock,
+    },
+    {
+      label: 'Total Customers',
+      value: s.totalCustomers,
+      amount: '',
+      color: 'border-purple-200 bg-purple-50',
+      icon: Users,
     },
     {
       label: 'Pending',
-      value: s.pendingCollections,
+      value: pendingCollections,
       amount: '',
       color: 'border-amber-200 bg-amber-50',
-    },
-    {
-      label: 'Avg/Day',
-      value: s.avgDailyCollections,
-      amount: '',
-      color: 'border-violet-200 bg-violet-50',
+      icon: IndianRupee,
     },
   ];
+
+  if (!transactions || transactions.length === 0) {
+    return (
+      <SectionCard
+        title="Collection Performance"
+        icon={TrendingUp}
+        description="Transactions and collection analytics"
+      >
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">📊</div>
+          <h3 className="text-lg font-semibold text-slate-800 mb-2">
+            No Transactions Yet
+          </h3>
+          <p className="text-sm text-slate-500">
+            No collection records found for this agent.
+          </p>
+        </div>
+      </SectionCard>
+    );
+  }
 
   return (
     <>
@@ -416,7 +404,9 @@ export function CollectionPerformanceCard({ agent }) {
               className={`rounded-xl border p-3 ${color} hover:shadow-md transition-all cursor-pointer`}
             >
               {Icon && <Icon size={16} className="text-slate-500 mb-2" />}
-              <p className="text-lg font-bold text-slate-900">{value}</p>
+              <p className="text-lg font-bold text-slate-900">
+                {typeof value === 'number' ? value.toLocaleString() : value}
+              </p>
               <p className="text-xs font-medium text-slate-600 mt-1">{label}</p>
               {amount && (
                 <p className="text-xs text-slate-500 mt-0.5 font-semibold">
@@ -428,152 +418,168 @@ export function CollectionPerformanceCard({ agent }) {
         </div>
 
         {/* Transactions — Desktop table with clickable rows */}
-        <div className="hidden sm:block">
-          <div className="rounded-xl border border-slate-100 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  {[
-                    'Transaction ID',
-                    'Customer',
-                    'Area',
-                    'Amount',
-                    'Date',
-                    'Mode',
-                    'Status',
-                    'Action',
-                  ].map((h) => (
-                    <th
-                      key={h}
-                      className="text-left px-3 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.map((txn) => (
-                  <tr
-                    key={txn.id}
-                    className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors group"
-                  >
-                    <td className="px-3 py-2.5 font-mono text-xs text-slate-600">
-                      {txn.transactionId}
-                    </td>
-                    <td className="px-3 py-2.5 font-medium text-slate-800">
-                      {txn.customer}
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-500">{txn.area}</td>
-                    <td className="px-3 py-2.5 font-semibold text-slate-900">
-                      {fmtINR(txn.amount)}
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-500">
-                      {fmtDate(txn.date)}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs font-medium">
-                        {txn.mode}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                          txn.status === 'collected'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}
+        {paginated.length > 0 ? (
+          <>
+            <div className="hidden sm:block">
+              <div className="rounded-xl border border-slate-100 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      {[
+                        'Transaction ID',
+                        'Customer',
+                        'Area',
+                        'Amount',
+                        'Date',
+                        'Mode',
+                        'Status',
+                        'Action',
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          className="text-left px-3 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider"
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginated.map((txn, idx) => (
+                      <tr
+                        key={txn._id || txn.id || idx}
+                        className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors group"
                       >
-                        {txn.status === 'collected' ? 'Collected' : 'Pending'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewBill(txn)}
-                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Eye size={14} />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                        <td className="px-3 py-2.5 font-mono text-xs text-slate-600">
+                          {txn.transactionId || txn.id}
+                        </td>
+                        <td className="px-3 py-2.5 font-medium text-slate-800">
+                          {txn.customerName || txn.customer}
+                        </td>
+                        <td className="px-3 py-2.5 text-slate-500">
+                          {txn.area || 'N/A'}
+                        </td>
+                        <td className="px-3 py-2.5 font-semibold text-slate-900">
+                          {fmtINR(txn.amount)}
+                        </td>
+                        <td className="px-3 py-2.5 text-slate-500">
+                          {fmtDate(txn.date)}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs font-medium">
+                            {txn.mode || txn.paymentMode || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              txn.status === 'collected' ||
+                              txn.status === 'completed'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}
+                          >
+                            {txn.status === 'collected' ||
+                            txn.status === 'completed'
+                              ? 'Collected'
+                              : 'Pending'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewBill(txn)}
+                            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Eye size={14} />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-        {/* Transactions — Mobile cards with click to view bill */}
-        <div className="sm:hidden space-y-2">
-          {paginated.map((txn) => (
-            <div
-              key={txn.id}
-              className="border border-slate-100 rounded-xl p-3 active:bg-slate-50 cursor-pointer"
-              onClick={() => handleViewBill(txn)}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">
-                    {txn.customer}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {txn.transactionId} · {fmtDate(txn.date)}
-                  </p>
-                </div>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    txn.status === 'collected'
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      : 'bg-amber-50 text-amber-700 border border-amber-200'
-                  }`}
+            {/* Transactions — Mobile cards with click to view bill */}
+            <div className="sm:hidden space-y-2">
+              {paginated.map((txn, idx) => (
+                <div
+                  key={txn._id || txn.id || idx}
+                  className="border border-slate-100 rounded-xl p-3 active:bg-slate-50 cursor-pointer"
+                  onClick={() => handleViewBill(txn)}
                 >
-                  {txn.status === 'collected' ? 'Collected' : 'Pending'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-slate-900">
-                    {fmtINR(txn.amount)}
-                  </span>
-                  <span className="text-xs text-slate-400 ml-2">
-                    {txn.area}
-                  </span>
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        {txn.customerName || txn.customer}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {txn.transactionId || txn.id} · {fmtDate(txn.date)}
+                      </p>
+                    </div>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        txn.status === 'collected' || txn.status === 'completed'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}
+                    >
+                      {txn.status === 'collected' || txn.status === 'completed'
+                        ? 'Collected'
+                        : 'Pending'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-slate-900">
+                        {fmtINR(txn.amount)}
+                      </span>
+                      <span className="text-xs text-slate-400 ml-2">
+                        {txn.area || 'N/A'}
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                      {txn.mode || txn.paymentMode || 'N/A'}
+                    </span>
+                  </div>
                 </div>
-                <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                  {txn.mode}
-                </span>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
-            <span className="text-xs text-slate-400">
-              Page {page} of {totalPages}
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-7 w-7"
-                disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                <ChevronLeft size={13} />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-7 w-7"
-                disabled={page === totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                <ChevronRight size={13} />
-              </Button>
-            </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
+                <span className="text-xs text-slate-400">
+                  Page {page} of {totalPages}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    disabled={page === 1}
+                    onClick={() => setPage((p) => p - 1)}
+                  >
+                    <ChevronLeft size={13} />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    disabled={page === totalPages}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    <ChevronRight size={13} />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-sm text-slate-500">No transactions to display</p>
           </div>
         )}
       </SectionCard>
@@ -593,7 +599,7 @@ export function CollectionPerformanceCard({ agent }) {
         open={showExportModal}
         onClose={() => setShowExportModal(false)}
         onExport={handleExport}
-        collections={MOCK_TRANSACTIONS}
+        collections={transactions}
       />
     </>
   );

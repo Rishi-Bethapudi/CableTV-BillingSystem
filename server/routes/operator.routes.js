@@ -120,7 +120,7 @@ LOGIN AS AGENT
 */
 
 router.post(
-  '/agents/:agentId/login-as-agent',
+  '/agents/:agentId/impersonate',
   checkPermissions('VIEW_AGENTS'),
   loginAsAgent,
 );

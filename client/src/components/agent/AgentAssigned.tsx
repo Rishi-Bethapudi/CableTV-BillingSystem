@@ -19,23 +19,31 @@ import {
 } from 'lucide-react';
 import { SectionCard, PERMISSION_GROUPS } from '../Atoms';
 import apiClient from '@/utils/apiClient';
+import { useToast } from '@/hooks/use-toast';
 
 // ============================================
-// ASSIGNED AREAS CARD - Checkbox Version
+// ASSIGNED AREAS CARD
 // ============================================
-export function AssignedAreasCard({ agent, onSave }) {
+// AgentAssigned.tsx - Updated AssignedAreasCard
+
+// AgentAssigned.tsx - Updated AssignedAreasCard with duplicate prevention
+
+// AgentAssigned.tsx - Fixed version with proper state management
+
+// AgentAssigned.tsx - Refactored Child Component (No API calls)
+
+export function AssignedAreasCard({ agent, onSave, disabled = false }) {
+  const { toast } = useToast();
   // Get operator's localities from Redux store
   const user = useSelector((state) => state?.auth?.user);
   const operatorLocalities = user?.localities || [];
 
-  const [areas, setAreas] = useState(agent.areas || []);
   const [selectedAreas, setSelectedAreas] = useState(
-    new Set(agent.areas || []),
+    new Set(agent.assignedAreas || agent.areas || []),
   );
-  const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [expandedGroups, setExpandedGroups] = useState({});
+  const [localSaving, setLocalSaving] = useState(false);
 
   // Available localities = operator's assigned localities only
   const availableLocalities = operatorLocalities;
@@ -45,18 +53,9 @@ export function AssignedAreasCard({ agent, onSave }) {
     locality.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  // Group localities by first letter for better organization
-  const groupedLocalities = filteredLocalities.reduce((groups, locality) => {
-    const firstLetter = locality.charAt(0).toUpperCase();
-    if (!groups[firstLetter]) {
-      groups[firstLetter] = [];
-    }
-    groups[firstLetter].push(locality);
-    return groups;
-  }, {});
-
   // Toggle a single area
   const toggleArea = (locality) => {
+    if (localSaving || disabled) return;
     setSelectedAreas((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(locality)) {
@@ -71,6 +70,7 @@ export function AssignedAreasCard({ agent, onSave }) {
 
   // Toggle all areas in a group
   const toggleGroup = (groupLocalities) => {
+    if (localSaving || disabled) return;
     const allSelected = groupLocalities.every((loc) => selectedAreas.has(loc));
     setSelectedAreas((prev) => {
       const newSet = new Set(prev);
@@ -86,6 +86,7 @@ export function AssignedAreasCard({ agent, onSave }) {
 
   // Select/Deselect all
   const toggleAll = () => {
+    if (localSaving || disabled) return;
     if (selectedAreas.size === availableLocalities.length) {
       setSelectedAreas(new Set());
     } else {
@@ -94,40 +95,47 @@ export function AssignedAreasCard({ agent, onSave }) {
     setDirty(true);
   };
 
-  // Toggle group expansion
-  const toggleGroupExpand = (groupLetter) => {
-    setExpandedGroups((prev) => ({
-      ...prev,
-      [groupLetter]: !prev[groupLetter],
-    }));
-  };
-
+  // Handle save - just call parent's onSave function
   const handleSave = async () => {
-    setSaving(true);
-    try {
-      const areasArray = Array.from(selectedAreas);
-      // API call to update agent's areas
-      await apiClient.patch(`/operators/agents/${agent.id}/areas`, {
-        areas: areasArray,
+    if (localSaving || disabled) {
+      console.log('Save already in progress');
+      return;
+    }
+
+    if (!agent._id && !agent.id) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Agent ID not found',
       });
-      setAreas(areasArray);
-      onSave(areasArray);
+      return;
+    }
+
+    try {
+      setLocalSaving(true);
+
+      const areasArray = Array.from(selectedAreas);
+
+      // Call parent's save function - parent handles the API call
+      await onSave(areasArray);
+
+      // If we get here, save was successful
       setDirty(false);
-    } catch (error) {
-      console.error('Failed to save areas:', error);
-      // You might want to show an error toast here
+    } catch (error: any) {
+      // Error is already handled by parent's toast
+      console.error('Save failed:', error);
     } finally {
-      setSaving(false);
+      setLocalSaving(false);
     }
   };
 
   // Reset selected areas when agent changes
   useEffect(() => {
-    const agentAreas = agent.areas || [];
-    setAreas(agentAreas);
+    const agentAreas = agent.assignedAreas || agent.areas || [];
+    console.log('Agent changed, resetting areas:', agentAreas);
     setSelectedAreas(new Set(agentAreas));
     setDirty(false);
-  }, [agent.id, agent.areas]);
+  }, [agent._id, agent.id, agent.assignedAreas, agent.areas]);
 
   const totalSelected = selectedAreas.size;
   const totalAvailable = availableLocalities.length;
@@ -142,16 +150,16 @@ export function AssignedAreasCard({ agent, onSave }) {
           <Button
             size="sm"
             onClick={handleSave}
-            disabled={saving}
+            disabled={localSaving || disabled}
             className="gap-1.5 h-7 text-xs bg-slate-900 hover:bg-slate-700 text-white"
           >
-            {saving ? (
+            {localSaving ? (
               <>
-                <RefreshCw size={11} className="animate-spin" /> Saving...
+                <RefreshCw size={11} className="animate-spin mr-1" /> Saving...
               </>
             ) : (
               <>
-                <Check size={11} /> Save Changes
+                <Check size={11} className="mr-1" /> Save Changes
               </>
             )}
           </Button>
@@ -164,7 +172,7 @@ export function AssignedAreasCard({ agent, onSave }) {
           <span className="text-xs font-medium text-slate-600">
             {totalSelected} of {totalAvailable} areas selected
           </span>
-          {totalSelected > 0 && (
+          {totalSelected > 0 && totalAvailable > 0 && (
             <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
               {Math.round((totalSelected / totalAvailable) * 100)}%
             </span>
@@ -175,7 +183,7 @@ export function AssignedAreasCard({ agent, onSave }) {
           size="sm"
           onClick={toggleAll}
           className="h-7 text-xs"
-          disabled={totalAvailable === 0}
+          disabled={totalAvailable === 0 || disabled || localSaving}
         >
           {totalSelected === totalAvailable ? 'Deselect All' : 'Select All'}
         </Button>
@@ -192,6 +200,7 @@ export function AssignedAreasCard({ agent, onSave }) {
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Search localities..."
           className="pl-9 h-9 text-sm"
+          disabled={disabled || localSaving}
         />
       </div>
 
@@ -205,8 +214,7 @@ export function AssignedAreasCard({ agent, onSave }) {
             </p>
             <p className="text-xs text-amber-600 mt-0.5">
               Please contact your administrator to get localities assigned to
-              your account. Try adding localities to your operator profile
-              first, then refresh this page.
+              your account.
             </p>
           </div>
         </div>
@@ -222,11 +230,14 @@ export function AssignedAreasCard({ agent, onSave }) {
           {filteredLocalities.map((locality) => (
             <label
               key={locality}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group border border-transparent hover:border-slate-100"
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group border border-transparent hover:border-slate-100 ${
+                disabled || localSaving ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
-              {/* Checkbox */}
               <div
-                onClick={() => toggleArea(locality)}
+                onClick={() =>
+                  !disabled && !localSaving && toggleArea(locality)
+                }
                 className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
                   selectedAreas.has(locality)
                     ? 'bg-slate-900 border-slate-900'
@@ -238,10 +249,11 @@ export function AssignedAreasCard({ agent, onSave }) {
                 )}
               </div>
 
-              {/* Locality Name */}
               <div
                 className="flex-1 min-w-0"
-                onClick={() => toggleArea(locality)}
+                onClick={() =>
+                  !disabled && !localSaving && toggleArea(locality)
+                }
               >
                 <span className="text-sm text-slate-700">{locality}</span>
               </div>
@@ -267,24 +279,27 @@ export function AssignedAreasCard({ agent, onSave }) {
       )}
 
       {/* Currently assigned areas summary */}
-      {!dirty && areas.length > 0 && (
+      {!dirty && (agent.assignedAreas || agent.areas || []).length > 0 && (
         <div className="mt-4 pt-3 border-t border-slate-100">
           <p className="text-xs font-semibold text-slate-600 mb-2">
-            Currently Assigned ({areas.length}):
+            Currently Assigned (
+            {(agent.assignedAreas || agent.areas || []).length}):
           </p>
           <div className="flex flex-wrap gap-1.5">
-            {areas.slice(0, 5).map((area) => (
-              <span
-                key={area}
-                className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 rounded-full text-xs"
-              >
-                <MapPin size={10} />
-                {area}
-              </span>
-            ))}
-            {areas.length > 5 && (
+            {(agent.assignedAreas || agent.areas || [])
+              .slice(0, 5)
+              .map((area) => (
+                <span
+                  key={area}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 rounded-full text-xs"
+                >
+                  <MapPin size={10} />
+                  {area}
+                </span>
+              ))}
+            {(agent.assignedAreas || agent.areas || []).length > 5 && (
               <span className="inline-flex items-center px-2 py-1 bg-slate-100 text-slate-500 rounded-full text-xs">
-                +{areas.length - 5} more
+                +{(agent.assignedAreas || agent.areas || []).length - 5} more
               </span>
             )}
           </div>
@@ -292,7 +307,7 @@ export function AssignedAreasCard({ agent, onSave }) {
       )}
 
       {/* Unsaved changes indicator */}
-      {dirty && (
+      {dirty && !localSaving && (
         <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2">
           <Info size={13} className="text-amber-600 shrink-0" />
           <p className="text-xs text-amber-700 font-medium">
@@ -303,16 +318,18 @@ export function AssignedAreasCard({ agent, onSave }) {
     </SectionCard>
   );
 }
+// ============================================
+// PERMISSIONS CARD
+// ============================================
 
-// ============================================
-// PERMISSIONS CARD (unchanged)
-// ============================================
-export function PermissionsCard({ agent, onSave }) {
-  const [selected, setSelected] = useState(new Set(agent.permissions));
-  const [saving, setSaving] = useState(false);
+export function PermissionsCard({ agent, onSave, disabled = false }) {
+  const { toast } = useToast();
+  const [selected, setSelected] = useState(new Set(agent.permissions || []));
+  const [localSaving, setLocalSaving] = useState(false); // Renamed from saving to localSaving
   const [dirty, setDirty] = useState(false);
 
   const toggle = (id) => {
+    if (disabled || localSaving) return; // Added localSaving check
     setSelected((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -322,6 +339,7 @@ export function PermissionsCard({ agent, onSave }) {
   };
 
   const toggleGroup = (groupPerms) => {
+    if (disabled || localSaving) return; // Added localSaving check
     const ids = groupPerms.map((p) => p.id);
     const allIn = ids.every((id) => selected.has(id));
     setSelected((prev) => {
@@ -334,12 +352,45 @@ export function PermissionsCard({ agent, onSave }) {
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    await new Promise((r) => setTimeout(r, 900));
-    onSave([...selected]);
-    setSaving(false);
-    setDirty(false);
+    if (localSaving || disabled) {
+      // Changed from saving to localSaving
+      console.log('Save already in progress');
+      return;
+    }
+
+    if (!agent._id && !agent.id) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Agent ID not found',
+      });
+      return;
+    }
+
+    try {
+      setLocalSaving(true); // Changed from setSaving to setLocalSaving
+
+      const permissionsArray = [...selected];
+
+      // Call parent's save function - parent handles the API call
+      await onSave(permissionsArray);
+
+      // If we get here, save was successful
+      setDirty(false);
+    } catch (error: any) {
+      // Error is already handled by parent's toast
+      console.error('Save failed:', error);
+    } finally {
+      setLocalSaving(false); // Changed from setSaving to setLocalSaving
+    }
   };
+
+  // Reset selected permissions when agent changes
+  useEffect(() => {
+    const agentPermissions = agent.permissions || [];
+    setSelected(new Set(agentPermissions));
+    setDirty(false);
+  }, [agent._id, agent.id, agent.permissions]);
 
   return (
     <SectionCard
@@ -351,16 +402,16 @@ export function PermissionsCard({ agent, onSave }) {
           <Button
             size="sm"
             onClick={handleSave}
-            disabled={saving}
+            disabled={localSaving || disabled} // Changed from saving to localSaving
             className="gap-1.5 h-7 text-xs bg-slate-900 hover:bg-slate-700 text-white"
           >
-            {saving ? (
+            {localSaving ? ( // Changed from saving to localSaving
               <>
-                <RefreshCw size={11} className="animate-spin" /> Saving...
+                <RefreshCw size={11} className="animate-spin mr-1" /> Saving...
               </>
             ) : (
               <>
-                <Check size={11} /> Save
+                <Check size={11} className="mr-1" /> Save
               </>
             )}
           </Button>
@@ -377,8 +428,12 @@ export function PermissionsCard({ agent, onSave }) {
           return (
             <div key={group}>
               <div
-                className="flex items-center justify-between mb-2 cursor-pointer"
-                onClick={() => toggleGroup(perms)}
+                className={`flex items-center justify-between mb-2 ${
+                  !disabled && !localSaving
+                    ? 'cursor-pointer'
+                    : 'cursor-default' // Added localSaving check
+                }`}
+                onClick={() => !disabled && !localSaving && toggleGroup(perms)} // Added localSaving check
               >
                 <div className="flex items-center gap-2">
                   <div
@@ -408,10 +463,16 @@ export function PermissionsCard({ agent, onSave }) {
                 {perms.map((perm) => (
                   <label
                     key={perm.id}
-                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group"
+                    className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-slate-50 transition-colors group ${
+                      disabled || localSaving
+                        ? 'opacity-50 cursor-not-allowed'
+                        : 'cursor-pointer' // Added localSaving check
+                    }`}
                   >
                     <div
-                      onClick={() => toggle(perm.id)}
+                      onClick={() =>
+                        !disabled && !localSaving && toggle(perm.id)
+                      } // Added localSaving check
                       className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
                         selected.has(perm.id)
                           ? 'bg-slate-900 border-slate-900'
@@ -424,7 +485,9 @@ export function PermissionsCard({ agent, onSave }) {
                     </div>
                     <div
                       className="flex items-center gap-1.5 min-w-0"
-                      onClick={() => toggle(perm.id)}
+                      onClick={() =>
+                        !disabled && !localSaving && toggle(perm.id)
+                      } // Added localSaving check
                     >
                       <span className="text-sm text-slate-700">
                         {perm.label}
@@ -445,14 +508,15 @@ export function PermissionsCard({ agent, onSave }) {
         })}
       </div>
 
-      {dirty && (
-        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2">
-          <Info size={13} className="text-amber-600 shrink-0" />
-          <p className="text-xs text-amber-700 font-medium">
-            Unsaved permission changes. Click Save to apply.
-          </p>
-        </div>
-      )}
+      {dirty &&
+        !localSaving && ( // Added !localSaving condition
+          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2">
+            <Info size={13} className="text-amber-600 shrink-0" />
+            <p className="text-xs text-amber-700 font-medium">
+              Unsaved permission changes. Click Save to apply.
+            </p>
+          </div>
+        )}
     </SectionCard>
   );
 }
