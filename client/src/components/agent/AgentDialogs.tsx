@@ -20,7 +20,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { RefreshCw, Lock, AlertTriangle } from 'lucide-react';
-import { ROLES } from '../atoms';
+import { ROLES } from '../Atoms';
 
 // ============================================
 // CONFIRM DIALOG

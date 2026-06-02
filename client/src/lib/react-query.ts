@@ -1,4 +1,5 @@
-// lib/react-query.ts
+
+
 import { QueryClient, DefaultOptions } from '@tanstack/react-query';
 
 const defaultOptions: DefaultOptions = {
